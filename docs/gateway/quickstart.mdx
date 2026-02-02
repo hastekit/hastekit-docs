@@ -1,0 +1,103 @@
+---
+title: Quickstart
+description: Get up and running with Uno LLM Gateway in minutes.
+---
+
+## Prerequisites
+
+- [Docker](https://www.docker.com/products/docker-desktop/) and Docker Compose.
+
+## 1. Start Uno LLM Gateway
+
+Start Uno with a single command:
+
+```bash
+npx @hastekit/ai-gateway
+```
+
+This command will automatically download the required files and start all services.
+
+### Optional: Start with Additional Services
+
+You can also start Uno with additional worker services:
+
+```bash
+# Start with Temporal worker
+npx @hastekit/ai-gateway --temporal
+
+# Start with Restate service
+npx @hastekit/ai-gateway --restate
+
+# Start with both Temporal and Restate
+npx @hastekit/ai-gateway --all
+```
+
+## 2. Open the Dashboard
+
+Once the services are running, open `http://localhost:3000` in your browser.
+
+## 3. Configure a Provider
+
+1.  Navigate to the **Providers** tab in the Dashboard.
+2.  Choose one of the supported providers from the sidebar.
+3.  Click **Add API Key** and enter your provider API Key and click **Create**.
+4.  Go to **Virtual Keys** and create a new key for your project. Note down the key.
+
+## 4. Point your SDK to the LLM Gateway
+
+Now, update your application to send LLM calls to the gateway and use the virtual key instead of the provider's API key.
+
+<CodeGroup dropdown>
+    ```go main.go
+    package main
+
+    import (
+        "context"
+        "fmt"
+
+        "github.com/openai/openai-go/v3"
+        "github.com/openai/openai-go/v3/option"
+        "github.com/openai/openai-go/v3/shared"
+    )
+
+    func main() {
+        client := openai.NewClient(
+            option.WithBaseURL("http://localhost:6060/api/gateway/openai")
+            option.WithAPIKey("your-virtual-key--or--provider-api-key"),
+        )
+
+        chatCompletion, err := client.Chat.Completions.New(context.TODO(), openai.ChatCompletionNewParams{
+            Model: openai.ChatModelGPT4_1Mini,
+            Instructions: "You are a coding assistant that talks like a pirate.",
+            Messages: []openai.ChatCompletionMessageParamUnion{
+                openai.UserMessage("Hello!"),
+            },
+        })
+
+        if err != nil {
+            panic(err.Error())
+        }
+
+        println(chatCompletion.Choices[0].Message.Content)
+    }
+    ```
+
+    ```python main.py
+    import os
+    from openai import OpenAI
+
+    client = OpenAI(
+        base_url="http://localhost:6060/api/gateway/openai",
+        api_key="your-virtual-key--or--provider-api-key",
+    )
+
+    response = client.responses.create(
+        model="gpt-4.1-mini",
+        instructions="You are a coding assistant that talks like a pirate.",
+        input="Hello!",
+    )
+
+    print(response.output_text)
+    ```
+</CodeGroup>
+

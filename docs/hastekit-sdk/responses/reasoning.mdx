@@ -1,0 +1,58 @@
+---
+title: Reasoning
+---
+
+Reasoning models (like OpenAI's `o1` and `o3` series) perform internal chain-of-thought processing before generating a final answer. The Uno SDK allows you to configure reasoning parameters and access these reasoning steps.
+
+## Enabling Reasoning
+
+To use reasoning features, you typically need to use a compatible model and configure the `Reasoning` parameters in your request.
+
+```go
+resp, err := model.NewResponses(ctx, &responses.Request{
+    Input: responses.InputUnion{
+        OfString: utils.Ptr("If 2+4=6, what would be 22+44=?"),
+    },
+    Parameters: responses.Parameters{
+        Reasoning: &responses.ReasoningParam{
+            Summary: utils.Ptr("detailed"),
+        },
+		Include: []responses.Includable{
+            responses.IncludableReasoningEncryptedContent,
+        },
+    },
+})
+```
+
+### Reasoning Output
+
+Reasoning steps are returned as distinct output items, separate from the final text response. You can access them like this:
+
+```go
+resp, err := model.NewResponses(ctx, request)
+if err != nil {
+    panic(err)
+}
+
+for _, output := range resp.Output {
+    if output.OfReasoning != nil {
+        fmt.Println("Reasoning Steps:")
+        for _, s := range output.OfReasoning.Summary {
+            fmt.Printf("- %s\n", s.Text)
+        }
+    }
+}
+```
+
+### Streaming Reasoning
+
+When streaming, reasoning steps are emitted as chunks. You can detect when a reasoning item is completed.
+
+```go
+acc := ""
+for chunk := range stream {
+    if chunk.ChunkType() == "response.reasoning_summary_text.delta" {
+		acc += chunk.OfReasoningSummaryTextDelta.Delta
+    }
+}
+```

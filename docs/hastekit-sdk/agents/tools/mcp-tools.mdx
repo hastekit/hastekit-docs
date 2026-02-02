@@ -1,0 +1,132 @@
+---
+title: MCP Tools
+---
+
+MCP (Model Context Protocol) tools allow your agent to connect to external MCP servers and use their tools. This enables your agent to interact with various services and resources through standardized MCP tool interfaces.
+
+## Connecting to an MCP Server
+
+To use MCP tools, you first need to create an MCP client using the `mcpclient.NewSSEClient` function. The server should expose an SSE (Server-Sent Events) endpoint:
+
+```go
+import (
+    "context"
+    "github.com/hastekit/hastekit-sdk-go/pkg/agents/tools""
+)
+
+mcpClient, err := mcpclient.NewSSEClient(context.Background(), "http://localhost:9001/sse")
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+### Parameters
+
+- **`ctx`**: The context for the connection
+- **`endpoint`**: The SSE endpoint URL of the MCP server (e.g., `"http://localhost:9001/sse"`)
+
+## Custom Headers
+
+You can also configure the MCP Client to send custom HTTP headers while interacting with the MCP server.
+
+```go
+mcpClient, err := mcpclient.NewSSEClient(context.Background(), "http://localhost:9001/sse",
+	mcpclient.WithHeaders(map[string]string{
+        "token": "your-token",
+    }),
+)
+```
+
+### Filtering Tools
+
+You can optionally filter which tools to use by passing tool names to `GetTools()`:
+
+```go
+// Only use specific tools
+mcpClient, err := mcpclient.NewSSEClient(context.Background(), "http://localhost:9001/sse",
+		mcpclient.WithToolFilter("list_users"),
+	)
+```
+
+## Complete Example
+
+Here's a complete example of an agent using MCP tools:
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+
+	"github.com/bytedance/sonic"
+	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
+	"github.com/hastekit/hastekit-sdk-go/pkg/agents/mcpclient""
+	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
+	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
+	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
+	"github.com/hastekit/hastekit-sdk-go"
+)
+
+func main() {
+    // Initialize SDK client
+    client, err := sdk.New(&sdk.ClientOptions{
+		LLMConfigs: sdk.NewInMemoryConfigStore([]*gateway.ProviderConfig{
+			{
+				ProviderName:  llm.ProviderNameOpenAI,
+				BaseURL:       "",
+				CustomHeaders: nil,
+				ApiKeys: []*gateway.APIKeyConfig{
+					{
+						Name:   "Key 1",
+						APIKey: "",
+					},
+				},
+			},
+		}),
+	})
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Create LLM model
+    model := client.NewLLM(sdk.LLMOptions{
+        Provider: llm.ProviderNameOpenAI,
+        Model:    "gpt-4o-mini",
+    })
+
+    // Create conversation history
+    history := client.NewConversationManager("default", uuid.NewString(), "")
+
+    // Connect to MCP server
+    mcpClient, err := mcpclient.NewSSEClient(context.Background(), "http://localhost:9001/sse",
+		mcpclient.WithHeaders(map[string]string{
+			"token": "your-token",
+		}),
+		mcpclient.WithToolFilter("list_users"),
+	)
+
+    // Create agent with MCP tools
+    agent := client.NewAgent(&sdk.AgentOptions{
+        Name:        "Hello world agent",
+        Instruction: client.Prompt("You are helpful assistant."),
+        LLM:         model,
+        History:     history,
+        McpServers:  []agents.MCPToolset{mcpClient},
+    })
+
+    // Execute agent
+	out, err := agent.Execute(context.Background(), &agents.AgentInput{
+        Messages: []responses.InputMessageUnion{
+            responses.UserMessage("Hello!"),
+        },
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    b, _ := sonic.Marshal(out)
+    fmt.Println(string(b))
+}
+```
