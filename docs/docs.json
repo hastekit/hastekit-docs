@@ -22,6 +22,11 @@
       "measurementId": "G-KCJE4F3BCS"
     }
   },
+  "seo": {
+    "metatags": {
+      "canonical": "https://docs.hastekit.ai"
+    }
+  },
   "navigation": {
         "tabs": [
           {
