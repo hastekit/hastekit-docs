@@ -1,16 +1,16 @@
 ---
 title: Quickstart
-description: Setup Uno SDK in your project in seconds.
+description: Setup HasteKit SDK in your project in seconds.
 ---
 
 ## Prerequisites
 
 - Golang - [v1.25.0](https://go.dev/doc/devel/release#go1.25.0).
 
-## Install Uno
+## Install HasteKit SDK
 
 ```bash
-go get -u github.com/curaious/uno
+go get -u github.com/hastekit/hastekit-sdk-go
 ````
 
 ## Setting up the SDK
@@ -19,41 +19,37 @@ go get -u github.com/curaious/uno
 package main
 
 import (
-    "github.com/hastekit/hastekit-sdk-go"
+    hastekit "github.com/hastekit/hastekit-sdk-go"
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
+    "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
+    "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
 )
 
 func main() {
-	client, err := sdk.New(&sdk.ClientOptions{
-		LLMConfigs: sdk.NewInMemoryConfigStore([]*gateway.ProviderConfig{
-			{
-				ProviderName:  llm.ProviderNameOpenAI,
-				ApiKeys: []*gateway.APIKeyConfig{
-					{
-						Name:   "Key 1",
-						APIKey: "your-openai-api-key",
-					},
-				},
-			},
-		}),
-	})
+	client, err := hastekit.New(&hastekit.ClientOptions{
+        ProviderConfigs: []gateway.ProviderConfig{
+            {
+                ProviderName:  llm.ProviderNameOpenAI,
+                BaseURL:       "",
+                CustomHeaders: nil,
+                ApiKeys: []*gateway.APIKeyConfig{
+                    {
+                        Name:   "Key 1",
+                        APIKey: os.Getenv("OPENAI_API_KEY"),
+                    },
+                },
+            },
+        },
+    })
 }
 ```
 
 ## Making LLM Calls
+Make a call to the model provider to generate a response:
 
-Create a model instance by specifying the provider and model name:
 ```go
-model := client.NewLLM(sdk.LLMOptions{
-    Provider: llm.ProviderNameOpenAI,
-    Model:    "gpt-4.1-mini",
-})
-```
-
-Then, make a call to generate a response:
-```go
-resp, err := model.NewResponses(ctx, &responses.Request{
+resp, err := client.NewResponses(ctx, &responses.Request{
+    Model:        "OpenAI/gpt-4.1-mini",
     Instructions: utils.Ptr("You are a helpful assistant."),
     Input: responses.InputUnion{
         OfString: utils.Ptr("What is the capital of France?"),
@@ -81,10 +77,10 @@ for _, output := range resp.Output {
 ## Creating Agents
 Create a simple agent with system instructions and an LLM:
 ```go
-agent := client.NewAgent(&sdk.AgentOptions{
+agent := client.NewAgent(&hastekit.AgentOptions{
     Name:        "Assistant",
     Instruction: client.Prompt("You are a helpful assistant."),
-    LLM: client.NewLLM(sdk.LLMOptions{
+    LLM: client.NewLLM(hastekit.LLMOptions{
         Provider: llm.ProviderNameOpenAI,
         Model:    "gpt-4o-mini",
     }),

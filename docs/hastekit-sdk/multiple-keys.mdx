@@ -2,20 +2,20 @@
 title: Managing Multiple Keys
 ---
 
-Uno supports managing multiple API keys for a single provider. This is useful for:
+HasteKit supports managing multiple API keys for a single provider. This is useful for:
 - **Load Balancing:** Distribute requests across multiple API keys to avoid rate limits.
 - **Redundancy:** Ensure high availability by having fallback keys.
 - **Cost Management:** Allocate traffic based on usage quotas or costs associated with different keys.
 
 ## Weighted Random Selection
 
-When multiple API keys with weights are configured for a provider, Uno uses **weighted random selection** to choose which key to use for each request.
+When multiple API keys with weights are configured for a provider, HasteKit uses **weighted random selection** to choose which key to use for each request.
 
 Each API key must be assigned a `Weight`. The probability of a key being selected is proportional to its weight relative to the sum of all weights for that provider.
 
 ### How it Works
 
-1.  Uno retrieves all enabled API keys for the requested provider.
+1.  HasteKit retrieves all enabled API keys for the requested provider.
 2.  It extracts the `Weight` from each `APIKeyConfig`.
 3.  If multiple keys exist, it performs a weighted random selection.
 4.  The request is then executed using the selected API key.
@@ -24,7 +24,7 @@ If all keys have the same weight (e.g., all set to `1` or not specified), the se
 
 ## Configuration Example
 
-When using the Uno SDK in direct mode, you can configure multiple keys using the `InMemoryConfigStore`.
+When using the HasteKit SDK in direct mode, you can configure multiple keys using the `InMemoryConfigStore`.
 
 ```go
 package main
@@ -36,7 +36,7 @@ import (
 
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
-	"github.com/hastekit/hastekit-sdk-go"
+	hastekit "github.com/hastekit/hastekit-sdk-go"
 )
 
 func main() {
@@ -56,14 +56,14 @@ func main() {
 	}
 
 	// Initialize the config store
-	configStore := sdk.NewInMemoryConfigStore([]*gateway.ProviderConfig{openAIConfig})
+	configStore := hastekit.NewInMemoryConfigStore([]*gateway.ProviderConfig{openAIConfig})
 
-	// Create the Uno client
-	uno, err := sdk.New(&sdk.ClientOptions{
+	// Create the HasteKit client
+	HasteKit, err := hastekit.New(&hastekit.ClientOptions{
 		LLMConfigs: configStore,
 	})
 	if err != nil {
-		log.Fatalf("failed to create uno client: %v", err)
+		log.Fatalf("failed to create HasteKit client: %v", err)
 	}
 }
 ```

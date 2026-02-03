@@ -2,16 +2,17 @@
 title: Image Generation
 ---
 
-If the downstream LLM provider supports image processing (vision) and generation capabilities, then Uno SDK also supports it.
+If the downstream LLM provider supports image processing (vision) and generation capabilities, then HasteKit SDK also supports it.
 
 ## Image Processing
 
 Models that supports image processing or vision can understand images as input. You can attach images in either as a URL or as a base64 encoded string like this:
 
 ```go
-resp, err := model.NewResponses(
+resp, err := client.NewResponses(
     context.Background(),
     &responses.Request{
+        Model:        "OpenAI/gpt-4.1-mini",
         Instructions: utils.Ptr("Describe this image"),
         Input: responses.InputUnion{
             OfInputMessageList: responses.InputMessageList{
@@ -29,7 +30,7 @@ resp, err := model.NewResponses(
                         Content: responses.InputContent{
                             {
                                 OfInputImage: &responses.InputImageContent{
-									// or https://picsum.photos/200/300
+                                    // or https://picsum.photos/200/300
                                     ImageURL: utils.Ptr("data:image/png;base64,yourbase64image"),
                                     Detail:   "auto",
                                 },
@@ -48,9 +49,10 @@ resp, err := model.NewResponses(
 To enable image generation, include the `ImageGenerationTool` in your request's `Tools` array:
 
 ```go
-resp, err := model.NewResponses(
+resp, err := client.NewResponses(
     context.Background(),
     &responses.Request{
+        Model: "OpenAI/gpt-4.1-mini",
         Input: responses.InputUnion{
             OfString: utils.Ptr("Generate a beautiful sunset over mountains"),
         },
@@ -76,13 +78,14 @@ import (
     "fmt"
     "os"
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
-    "github.com/curaious/uno/internal/utils"
+    "github.com/hastekit/hastekit-sdk-go/pkg/utils"
 )
 
 func main() {
-    // ... client and model initialization ...
+    // ... client initialization ...
 
-    resp, err := model.NewResponses(context.Background(), &responses.Request{
+    resp, err := client.NewResponses(context.Background(), &responses.Request{
+        Model: "OpenAI/gpt-4.1-mini",
         Input: responses.InputUnion{
             OfString: utils.Ptr("Create an image of a serene lake at sunset"),
         },
@@ -141,13 +144,14 @@ import (
     "fmt"
     "os"
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
-    "github.com/curaious/uno/internal/utils"
+    "github.com/hastekit/hastekit-sdk-go/pkg/utils"
 )
 
 func main() {
-    // ... client and model initialization ...
+    // ... client initialization ...
 
-    stream, err := model.NewStreamingResponses(context.Background(), &responses.Request{
+    stream, err := client.NewStreamingResponses(context.Background(), &responses.Request{
+        Model: "OpenAI/gpt-4.1-mini",
         Input: responses.InputUnion{
             OfString: utils.Ptr("Generate a futuristic cityscape"),
         },

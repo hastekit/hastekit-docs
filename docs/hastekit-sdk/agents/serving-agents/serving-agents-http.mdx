@@ -9,28 +9,30 @@ Agents can be served as HTTP endpoints, allowing them to be invoked through stan
 Pass the SDK client directly to `http.ListenAndServe`:
 
 ```go
-client, err := sdk.New(&sdk.ClientOptions{
-    LLMConfigs: sdk.NewInMemoryConfigStore([]*gateway.ProviderConfig{
+client, err := hastekit.New(&hastekit.ClientOptions{
+    ProviderConfigs: []gateway.ProviderConfig{
         {
-            ProviderName: llm.ProviderNameOpenAI,
+            ProviderName:  llm.ProviderNameOpenAI,
+            BaseURL:       "",
+            CustomHeaders: nil,
             ApiKeys: []*gateway.APIKeyConfig{
                 {
                     Name:   "Key 1",
-                    APIKey: os.Getenv("OPENAI_API_KEY"),
+                    APIKey: "",
                 },
             },
         },
-    }),
+    },
 })
 if err != nil {
     log.Fatal(err)
 }
 
 // Create agents
-client.NewAgent(&sdk.AgentOptions{
+client.NewAgent(&hastekit.AgentOptions{
     Name:        "SampleAgent",
     Instruction: client.Prompt("You are helpful assistant."),
-    LLM: client.NewLLM(sdk.LLMOptions{
+    LLM: client.NewLLM(hastekit.LLMOptions{
         Provider: llm.ProviderNameOpenAI,
         Model:    "gpt-4o-mini",
     }),
@@ -88,12 +90,12 @@ import (
 
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
-	"github.com/hastekit/hastekit-sdk-go"
+	hastekit "github.com/hastekit/hastekit-sdk-go"
 )
 
 func main() {
-	client, err := sdk.New(&sdk.ClientOptions{
-		LLMConfigs: sdk.NewInMemoryConfigStore([]*gateway.ProviderConfig{
+	client, err := hastekit.New(&hastekit.ClientOptions{
+		ProviderConfigs: []gateway.ProviderConfig{
 			{
 				ProviderName:  llm.ProviderNameOpenAI,
 				BaseURL:       "",
@@ -105,20 +107,20 @@ func main() {
 					},
 				},
 			},
-		}),
+		},
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	model := client.NewLLM(sdk.LLMOptions{
+	model := client.NewLLM(hastekit.LLMOptions{
 		Provider: llm.ProviderNameOpenAI,
 		Model:    "gpt-4.1-mini",
 	})
 
 	history := client.NewConversationManager()
 	agentName := "SampleAgent"
-	_ = client.NewAgent(&sdk.AgentOptions{
+	_ = client.NewAgent(&hastekit.AgentOptions{
 		Name:        agentName,
 		Instruction: client.Prompt("You are helpful assistant."),
 		LLM:         model,

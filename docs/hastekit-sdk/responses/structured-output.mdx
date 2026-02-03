@@ -19,7 +19,7 @@ Structured output is configured using the `Text` parameter in your request. You 
 ```go
 import (
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
-    "github.com/curaious/uno/internal/utils"
+    "github.com/hastekit/hastekit-sdk-go/pkg/utils"
 )
 
 // Define your JSON schema
@@ -44,6 +44,7 @@ schema := map[string]any{
 }
 
 request := &responses.Request{
+    Model: "OpenAI/gpt-4.1-mini",
     Input: responses.InputUnion{
         OfString: utils.Ptr("Extract information about John Doe, age 30, email: john@example.com"),
     },
@@ -72,7 +73,7 @@ import (
     "encoding/json"
     "fmt"
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
-    "github.com/curaious/uno/internal/utils"
+    "github.com/hastekit/hastekit-sdk-go/pkg/utils"
 )
 
 func main() {
@@ -104,7 +105,8 @@ func main() {
         "required": []string{"contacts"},
     }
 
-    resp, err := model.NewResponses(context.Background(), &responses.Request{
+    resp, err := client.NewResponses(context.Background(), &responses.Request{
+        Model: "OpenAI/gpt-4.1-mini",
         Instructions: utils.Ptr("You are a data extraction assistant. Extract contact information from the given text."),
         Input: responses.InputUnion{
             OfString: utils.Ptr("Contact John at 555-1234 or john@example.com, and Sarah at 555-5678."),
@@ -238,7 +240,8 @@ Text: &responses.TextFormat{
 Structured output also works with streaming responses. The model will stream the JSON structure incrementally:
 
 ```go
-stream, err := model.NewStreamingResponses(ctx, &responses.Request{
+stream, err := client.NewStreamingResponses(ctx, &responses.Request{
+    Model: "OpenAI/gpt-4.1-mini",
     Input: responses.InputUnion{
         OfString: utils.Ptr("Extract information from: John Doe, 30 years old"),
     },

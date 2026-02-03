@@ -2,14 +2,15 @@
 title: Reasoning
 ---
 
-Reasoning models (like OpenAI's `o1` and `o3` series) perform internal chain-of-thought processing before generating a final answer. The Uno SDK allows you to configure reasoning parameters and access these reasoning steps.
+Reasoning models (like OpenAI's `o1` and `o3` series) perform internal chain-of-thought processing before generating a final answer. The HasteKit SDK allows you to configure reasoning parameters and access these reasoning steps.
 
 ## Enabling Reasoning
 
 To use reasoning features, you typically need to use a compatible model and configure the `Reasoning` parameters in your request.
 
 ```go
-resp, err := model.NewResponses(ctx, &responses.Request{
+resp, err := client.NewResponses(ctx, &responses.Request{
+    Model: "OpenAI/gpt-4o",
     Input: responses.InputUnion{
         OfString: utils.Ptr("If 2+4=6, what would be 22+44=?"),
     },
@@ -29,7 +30,7 @@ resp, err := model.NewResponses(ctx, &responses.Request{
 Reasoning steps are returned as distinct output items, separate from the final text response. You can access them like this:
 
 ```go
-resp, err := model.NewResponses(ctx, request)
+resp, err := client.NewResponses(ctx, request)
 if err != nil {
     panic(err)
 }

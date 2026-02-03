@@ -2,7 +2,7 @@
 title: Tool Calling
 ---
 
-Tool calling or function calling allows LLMs to interact with external systems by requesting the execution of specific functions. The Uno SDK provides a unified interface for defining tools and handling tool call requests from various LLM providers.
+Tool calling or function calling allows LLMs to interact with external systems by requesting the execution of specific functions. The HasteKit SDK provides a unified interface for defining tools and handling tool call requests from various LLM providers.
 
 ## Defining Tools
 
@@ -39,7 +39,8 @@ getWeatherTool := responses.ToolUnion{
 Include the defined tools in your request to the model.
 
 ```go
-resp, err := model.NewResponses(ctx, &responses.Request{
+resp, err := client.NewResponses(ctx, &responses.Request{
+    Model: "OpenAI/gpt-4.1-mini",
     Input: responses.InputUnion{
         OfString: utils.Ptr("What's the weather like in Paris?"),
     },
@@ -76,7 +77,7 @@ import (
 
 // ... request initialization with Tools ...
 
-stream, err := model.NewStreamingResponses(ctx, request)
+stream, err := client.NewStreamingResponses(ctx, request)
 if err != nil {
     panic(err)
 }

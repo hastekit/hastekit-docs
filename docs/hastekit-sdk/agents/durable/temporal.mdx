@@ -39,15 +39,17 @@ import (
 
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway"
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
-    "github.com/hastekit/hastekit-sdk-go"
+    hastekit "github.com/hastekit/hastekit-sdk-go"
 )
 
 func main() {
     // Initialize SDK with Temporal and Redis configuration
-    client, err := sdk.New(&sdk.ClientOptions{
-        LLMConfigs: sdk.NewInMemoryConfigStore([]*gateway.ProviderConfig{
+    client, err := hastekit.New(&hastekit.ClientOptions{
+        ProviderConfigs: []gateway.ProviderConfig{
             {
-                ProviderName: llm.ProviderNameOpenAI,
+                ProviderName:  llm.ProviderNameOpenAI,
+                BaseURL:       "",
+                CustomHeaders: nil,
                 ApiKeys: []*gateway.APIKeyConfig{
                     {
                         Name:   "Key 1",
@@ -55,11 +57,11 @@ func main() {
                     },
                 },
             },
-        }),
-        TemporalConfig: sdk.TemporalConfig{
+        },
+        TemporalConfig: hastekit.TemporalConfig{
             Endpoint: "0.0.0.0:7233", // Temporal server endpoint
         },
-        RedisConfig: sdk.RedisConfig{
+        RedisConfig: hastekit.RedisConfig{
             Endpoint: "localhost:6379", // Redis for streaming support
         },
     })
@@ -67,14 +69,14 @@ func main() {
         log.Fatal(err)
     }
 
-    model := client.NewLLM(sdk.LLMOptions{
+    model := client.NewLLM(hastekit.LLMOptions{
         Provider: llm.ProviderNameOpenAI,
         Model:    "gpt-4o-mini",
     })
 
     // Create a durable agent with NewTemporalAgent
     agentName := "SampleAgent"
-    agent := client.NewTemporalAgent(&sdk.AgentOptions{
+    agent := client.NewTemporalAgent(&hastekit.AgentOptions{
         Name:        agentName,
         Instruction: client.Prompt("You are helpful assistant."),
         LLM:         model,
@@ -127,14 +129,16 @@ import (
 
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway"
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
-    "github.com/hastekit/hastekit-sdk-go"
+    hastekit "github.com/hastekit/hastekit-sdk-go"
 )
 
 func main() {
-    client, err := sdk.New(&sdk.ClientOptions{
-        LLMConfigs: sdk.NewInMemoryConfigStore([]*gateway.ProviderConfig{
+    client, err := hastekit.New(&hastekit.ClientOptions{
+        ProviderConfigs: []gateway.ProviderConfig{
             {
-                ProviderName: llm.ProviderNameOpenAI,
+                ProviderName:  llm.ProviderNameOpenAI,
+                BaseURL:       "",
+                CustomHeaders: nil,
                 ApiKeys: []*gateway.APIKeyConfig{
                     {
                         Name:   "Key 1",
@@ -142,11 +146,11 @@ func main() {
                     },
                 },
             },
-        }),
-        TemporalConfig: sdk.TemporalConfig{
+        },
+        TemporalConfig: hastekit.TemporalConfig{
             Endpoint: "0.0.0.0:7233",
         },
-        RedisConfig: sdk.RedisConfig{
+        RedisConfig: hastekit.RedisConfig{
             Endpoint: "localhost:6379",
         },
     })
@@ -154,14 +158,14 @@ func main() {
         log.Fatal(err)
     }
 
-    model := client.NewLLM(sdk.LLMOptions{
+    model := client.NewLLM(hastekit.LLMOptions{
         Provider: llm.ProviderNameOpenAI,
         Model:    "gpt-4o-mini",
     })
 
     // Register the agent
     agentName := "my-agent"
-    _ = client.NewTemporalAgent(&sdk.AgentOptions{
+    _ = client.NewTemporalAgent(&hastekit.AgentOptions{
         Name:        agentName,
         Instruction: client.Prompt("You are a helpful assistant."),
         LLM:         model,
@@ -186,14 +190,16 @@ import (
 
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway"
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
-    "github.com/hastekit/hastekit-sdk-go"
+    hastekit "github.com/hastekit/hastekit-sdk-go"
 )
 
 func main() {
-    client, err := sdk.New(&sdk.ClientOptions{
-        LLMConfigs: sdk.NewInMemoryConfigStore([]*gateway.ProviderConfig{
+    client, err := hastekit.New(&hastekit.ClientOptions{
+        ProviderConfigs: []gateway.ProviderConfig{
             {
-                ProviderName: llm.ProviderNameOpenAI,
+                ProviderName:  llm.ProviderNameOpenAI,
+                BaseURL:       "",
+                CustomHeaders: nil,
                 ApiKeys: []*gateway.APIKeyConfig{
                     {
                         Name:   "Key 1",
@@ -201,11 +207,11 @@ func main() {
                     },
                 },
             },
-        }),
-        TemporalConfig: sdk.TemporalConfig{
+        },
+        TemporalConfig: hastekit.TemporalConfig{
             Endpoint: "0.0.0.0:7233",
         },
-        RedisConfig: sdk.RedisConfig{
+        RedisConfig: hastekit.RedisConfig{
             Endpoint: "localhost:6379",
         },
     })
@@ -213,14 +219,14 @@ func main() {
         log.Fatal(err)
     }
 
-    model := client.NewLLM(sdk.LLMOptions{
+    model := client.NewLLM(hastekit.LLMOptions{
         Provider: llm.ProviderNameOpenAI,
         Model:    "gpt-4o-mini",
     })
 
     // Register the SAME agent with the SAME configuration
     agentName := "my-agent"
-    _ = client.NewTemporalAgent(&sdk.AgentOptions{
+    _ = client.NewTemporalAgent(&hastekit.AgentOptions{
         Name:        agentName,
         Instruction: client.Prompt("You are a helpful assistant."),
         LLM:         model,
@@ -283,7 +289,7 @@ brew services start redis
 
 ## Example: Complete Durable Agent
 
-See the complete working example in the repository: [`examples/15_temporal_agent/main.go`](https://github.com/curaious/uno/tree/main/examples/15_temporal_agent)
+See the complete working example in the repository: [`examples/agents/9_temporal_agent/main.go`](https://github.com/hastekit/hastekit-docs/tree/main/examples/agents/9_temporal_agent)
 
 ## Learn More
 

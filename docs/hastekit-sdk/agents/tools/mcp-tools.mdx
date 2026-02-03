@@ -66,32 +66,32 @@ import (
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
-	"github.com/hastekit/hastekit-sdk-go"
+	hastekit "github.com/hastekit/hastekit-sdk-go"
 )
 
 func main() {
     // Initialize SDK client
-    client, err := sdk.New(&sdk.ClientOptions{
-		LLMConfigs: sdk.NewInMemoryConfigStore([]*gateway.ProviderConfig{
-			{
-				ProviderName:  llm.ProviderNameOpenAI,
-				BaseURL:       "",
-				CustomHeaders: nil,
-				ApiKeys: []*gateway.APIKeyConfig{
-					{
-						Name:   "Key 1",
-						APIKey: "",
-					},
-				},
-			},
-		}),
-	})
+    client, err := hastekit.New(&hastekit.ClientOptions{
+        ProviderConfigs: []gateway.ProviderConfig{
+            {
+                ProviderName:  llm.ProviderNameOpenAI,
+                BaseURL:       "",
+                CustomHeaders: nil,
+                ApiKeys: []*gateway.APIKeyConfig{
+                    {
+                        Name:   "Key 1",
+                        APIKey: os.Getenv("OPENAI_API_KEY"),
+                    },
+                },
+            },
+        },
+    })
     if err != nil {
         log.Fatal(err)
     }
 
     // Create LLM model
-    model := client.NewLLM(sdk.LLMOptions{
+    model := client.NewLLM(hastekit.LLMOptions{
         Provider: llm.ProviderNameOpenAI,
         Model:    "gpt-4o-mini",
     })
@@ -108,7 +108,7 @@ func main() {
 	)
 
     // Create agent with MCP tools
-    agent := client.NewAgent(&sdk.AgentOptions{
+    agent := client.NewAgent(&hastekit.AgentOptions{
         Name:        "Hello world agent",
         Instruction: client.Prompt("You are helpful assistant."),
         LLM:         model,

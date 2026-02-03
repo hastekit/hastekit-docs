@@ -1,21 +1,21 @@
 ---
 title: "Introduction"
-description: "Uno LLM Gateway & Agent Builder - A high-performance LLM gateway & no-code agent builder"
+description: "HasteKit LLM Gateway & Agent Builder - A high-performance LLM gateway & no-code agent builder"
 ---
 
-**Uno LLM Gateway** is a high-performance, open-source gateway written in Golang that provides a unified interface to interact with large language models from various providers. It sits between your application and LLM providers, offering access control via virtual keys, centralized configuration, and deep observability through OpenTelemetry traces.
+**HasteKit LLM Gateway** is a high-performance, open-source gateway written in Golang that provides a unified interface to interact with large language models from various providers. It sits between your application and LLM providers, offering access control via virtual keys, centralized configuration, and deep observability through OpenTelemetry traces.
 
 ## Key Features
 
 - **Unified API**: Interact with different LLM providers using a single, consistent request/response format
-- **Virtual Keys**: Protect your provider API keys by using Uno-generated virtual keys in your client applications
+- **Virtual Keys**: Protect your provider API keys by using HasteKit-generated virtual keys in your client applications
 - **Centralized Configuration**: Manage provider settings through a user-friendly UI without changing code
 - **Deep Observability**: Automatically capture traces, token usage, and latency metrics for every request using ClickHouse and OpenTelemetry
 - **No-Code Agent Builder**: Build and deploy AI agents with tools, conversation history, and structured outputs—all from the dashboard
 
 ## Capabilities
 
-Uno Gateway provides two primary capabilities:
+HasteKit Gateway provides two primary capabilities:
 
 ## LLM Gateway
 
@@ -72,7 +72,7 @@ const client = new OpenAI({
 Manage provider API keys and virtual keys with rate limits, all from a centralized dashboard.
 
 <Frame>
-    <img src="/images/llm-gateway.png" alt="Uno Gateway Dashboard" />
+    <img src="/images/llm-gateway.png" alt="HasteKit Gateway Dashboard" />
 </Frame>
 
 ### Gateway Logs
@@ -85,7 +85,7 @@ View all LLM requests with full details—prompts, responses, token usage, and l
 
 ## No-Code Agent Builder
 
-Beyond proxying LLM calls, Uno Gateway includes a complete no-code agent builder. Define model parameters, system prompts, MCP tool servers, and output schemas—all from the dashboard, without writing code.
+Beyond proxying LLM calls, HasteKit Gateway includes a complete no-code agent builder. Define model parameters, system prompts, MCP tool servers, and output schemas—all from the dashboard, without writing code.
 
 <Frame>
     <img src="/images/no-code-agent-builder.png" alt="No-Code Agent Builder" />
@@ -109,7 +109,7 @@ Every agent invocation is captured with detailed traces. Debug complex multi-ste
 
 ## Supported Providers
 
-Uno Gateway currently supports OpenAI, Anthropic, and Gemini. Support for additional providers is on the roadmap.
+HasteKit Gateway currently supports OpenAI, Anthropic, and Gemini. Support for additional providers is on the roadmap.
 
 | Provider | Text | Image | Tool Calls | Reasoning |
 | :--- | :---: | :---: | :---: | :---: |
@@ -123,7 +123,7 @@ Uno Gateway currently supports OpenAI, Anthropic, and Gemini. Support for additi
 
 <CardGroup cols={2}>
   <Card title="Quickstart" icon="rocket" href="/gateway/quickstart">
-    Get Uno running locally in less than 5 minutes.
+    Get HasteKit running locally in less than 5 minutes.
   </Card>
   <Card title="SDK Modes" icon="code" href="/gateway/sdk/gateway-mode-vs-direct-mode">
     Understand the difference between Gateway and Direct modes.

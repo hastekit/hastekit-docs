@@ -6,16 +6,16 @@ Tool calling agents can execute custom functions to interact with external syste
 
 ## Creating a Custom Tool
 
-To create a tool, you need to implement the `core.Tool` interface:
+To create a tool, you need to implement the `agents.Tool` interface:
 
 ```go
 type CustomTool struct {
-	*core.BaseTool
+	*agents.BaseTool
 }
 
 func NewCustomTool() *CustomTool {
 	return &CustomTool{
-		BaseTool: &core.BaseTool{
+		BaseTool: &agents.BaseTool{
 			ToolUnion: responses.ToolUnion{
 				OfFunction: &responses.FunctionTool{
 					Name:        "get_user_name",
@@ -36,7 +36,7 @@ func NewCustomTool() *CustomTool {
 	}
 }
 
-func (t *CustomTool) Execute(ctx context.Context, params *core.ToolCall) (*responses.FunctionCallOutputMessage, error) {
+func (t *CustomTool) Execute(ctx context.Context, params *agents.ToolCall) (*responses.FunctionCallOutputMessage, error) {
     // Parse arguments
     args := map[string]interface{}{}
     if err := json.Unmarshal([]byte(params.Arguments), &args); err != nil {
@@ -68,14 +68,14 @@ Here's a simple example of an agent with a custom tool:
 ```go
 func main() {
     // Create agent with tool
-    agent := client.NewAgent(&sdk.AgentOptions{
+    agent := client.NewAgent(&hastekit.AgentOptions{
         Name:        "Assistant",
         Instruction: client.Prompt("You are a helpful assistant. Use the get_user_name tool to get the user's name and greet them."),
-        LLM:         client.NewLLM(sdk.LLMOptions{
+        LLM:         client.NewLLM(hastekit.LLMOptions{
             Provider: llm.ProviderNameOpenAI,
             Model:    "gpt-4o-mini",
         }),
-        Tools: []core.Tool{
+        Tools: []agents.Tool{
             NewGetUserNameTool(),
         },
     })

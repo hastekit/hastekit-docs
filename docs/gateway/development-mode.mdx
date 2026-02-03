@@ -1,9 +1,9 @@
 ---
 title: Development Mode
-description: Learn how to start Uno in development mode for local development.
+description: Learn how to start HasteKit gateway in development mode for local development.
 ---
 
-This guide will help you set up Uno LLM Gateway for local development. In development mode, you'll run the backend and frontend locally while using Docker Compose for infrastructure services.
+This guide will help you set up HasteKit Gateway for local development. In development mode, you'll run the backend and frontend locally while using Docker Compose for infrastructure services.
 
 ## Prerequisites
 
@@ -25,11 +25,11 @@ go version      # Should be go1.25.3 or higher
 
 ## 1. Clone the Repository
 
-Clone the Uno repository:
+Clone the HasteKit gateway repository:
 
 ```bash
-git clone https://github.com/curaious/uno.git
-cd uno
+git clone https://github.com/hastekit/hastekit-ai-gateway.git
+cd hastekit-ai-gateway
 ```
 
 ## 2. Start Infrastructure Services
@@ -57,7 +57,7 @@ docker compose -f ./deployments/docker-compose.dev.yaml ps
 In the root directory, start the backend server:
 
 ```bash
-go run main.go agent-server
+go run main.go gateway
 ```
 
 The backend will start on `http://localhost:6060`. You should see logs indicating the server is running.

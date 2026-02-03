@@ -54,9 +54,9 @@ The conversation manager supports three persistence configurations for storing c
 
 When the SDK client is initialized without `endpoint` and `projectName`, messages are not persisted by default. History remains available in-memory for the lifetime of the client itself.
 
-### 2. Uno Gateway Persistence
+### 2. HasteKit Gateway Persistence
 
-When the SDK client is initialized with `endpoint` and `projectName`, the conversation manager automatically persists messages to the Uno Gateway server.
+When the SDK client is initialized with `endpoint` and `projectName`, the conversation manager automatically persists messages to the HasteKit's Gateway server.
 
 ### 3. Custom Persistence
 
@@ -94,30 +94,30 @@ import (
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
-	"github.com/hastekit/hastekit-sdk-go"
+	hastekit "github.com/hastekit/hastekit-sdk-go"
 )
 
 func main() {
-	client, err := sdk.New(&sdk.ClientOptions{
-		LLMConfigs: sdk.NewInMemoryConfigStore([]*gateway.ProviderConfig{
-			{
-				ProviderName:  llm.ProviderNameOpenAI,
-				BaseURL:       "",
-				CustomHeaders: nil,
-				ApiKeys: []*gateway.APIKeyConfig{
-					{
-						Name:   "Key 1",
-						APIKey: os.Getenv("OPENAI_API_KEY"),
-					},
-				},
-			},
-		}),
-	})
+	client, err := hastekit.New(&hastekit.ClientOptions{
+        ProviderConfigs: []gateway.ProviderConfig{
+            {
+                ProviderName:  llm.ProviderNameOpenAI,
+                BaseURL:       "",
+                CustomHeaders: nil,
+                ApiKeys: []*gateway.APIKeyConfig{
+                    {
+                        Name:   "Key 1",
+                        APIKey: os.Getenv("OPENAI_API_KEY"),
+                    },
+                },
+            },
+        },
+    })
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	model := client.NewLLM(sdk.LLMOptions{
+	model := client.NewLLM(hastekit.LLMOptions{
 		Provider: llm.ProviderNameOpenAI,
 		Model:    "gpt-4.1-mini",
 	})
@@ -144,7 +144,7 @@ func main() {
 	fmt.Println(string(b))
 
 	// Agent itself is stateless - you can either re-create another agent or reuse the same agent instance, but ensure to pass the correct `PreviousMessageID`
-	agent2 := client.NewAgent(&sdk.AgentOptions{
+	agent2 := client.NewAgent(&hastekit.AgentOptions{
 		Name:        "Hello world agent",
 		Instruction: client.Prompt("You are helpful assistant."),
 		LLM:         model,

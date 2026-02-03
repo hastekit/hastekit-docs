@@ -8,24 +8,24 @@ import (
 	"os"
 
 	"github.com/bytedance/sonic"
-	"github.com/curaious/uno/internal/utils"
-	"github.com/curaious/uno/pkg/agent-framework/agents"
-	"github.com/curaious/uno/pkg/agent-framework/core"
-	"github.com/curaious/uno/pkg/gateway"
-	"github.com/curaious/uno/pkg/llm"
-	"github.com/curaious/uno/pkg/llm/responses"
-	"github.com/curaious/uno/pkg/sdk"
 	"github.com/google/uuid"
+	hastekit "github.com/hastekit/hastekit-sdk-go"
+	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
+	"github.com/hastekit/hastekit-sdk-go/pkg/agents/agentstate"
+	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
+	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
+	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
+	"github.com/hastekit/hastekit-sdk-go/pkg/utils"
 )
 
 // GetUserTool - runs immediately (no approval needed)
 type GetUserTool struct {
-	*core.BaseTool
+	*agents.BaseTool
 }
 
 func NewGetUserTool() *GetUserTool {
 	return &GetUserTool{
-		BaseTool: &core.BaseTool{
+		BaseTool: &agents.BaseTool{
 			RequiresApproval: false,
 			ToolUnion: responses.ToolUnion{
 				OfFunction: &responses.FunctionTool{
@@ -44,7 +44,7 @@ func NewGetUserTool() *GetUserTool {
 	}
 }
 
-func (t *GetUserTool) Execute(ctx context.Context, params *core.ToolCall) (*responses.FunctionCallOutputMessage, error) {
+func (t *GetUserTool) Execute(ctx context.Context, params *agents.ToolCall) (*responses.FunctionCallOutputMessage, error) {
 	return &responses.FunctionCallOutputMessage{
 		ID:     params.ID,
 		CallID: params.CallID,
@@ -56,12 +56,12 @@ func (t *GetUserTool) Execute(ctx context.Context, params *core.ToolCall) (*resp
 
 // DeleteUserTool - requires approval
 type DeleteUserTool struct {
-	*core.BaseTool
+	*agents.BaseTool
 }
 
 func NewDeleteUserTool() *DeleteUserTool {
 	return &DeleteUserTool{
-		BaseTool: &core.BaseTool{
+		BaseTool: &agents.BaseTool{
 			RequiresApproval: true, // Human approval required
 			ToolUnion: responses.ToolUnion{
 				OfFunction: &responses.FunctionTool{
@@ -80,7 +80,7 @@ func NewDeleteUserTool() *DeleteUserTool {
 	}
 }
 
-func (t *DeleteUserTool) Execute(ctx context.Context, params *core.ToolCall) (*responses.FunctionCallOutputMessage, error) {
+func (t *DeleteUserTool) Execute(ctx context.Context, params *agents.ToolCall) (*responses.FunctionCallOutputMessage, error) {
 	args := map[string]any{}
 	json.Unmarshal([]byte(params.Arguments), &args)
 
@@ -96,8 +96,8 @@ func (t *DeleteUserTool) Execute(ctx context.Context, params *core.ToolCall) (*r
 func main() {
 	ctx := context.Background()
 
-	client, err := sdk.New(&sdk.ClientOptions{
-		LLMConfigs: sdk.NewInMemoryConfigStore([]*gateway.ProviderConfig{
+	client, err := hastekit.New(&hastekit.ClientOptions{
+		ProviderConfigs: []gateway.ProviderConfig{
 			{
 				ProviderName:  llm.ProviderNameOpenAI,
 				BaseURL:       "",
@@ -109,20 +109,20 @@ func main() {
 					},
 				},
 			},
-		}),
+		},
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	agent := client.NewAgent(&sdk.AgentOptions{
+	agent := client.NewAgent(&hastekit.AgentOptions{
 		Name:        "User Manager",
 		Instruction: client.Prompt("You help manage user accounts."),
-		LLM: client.NewLLM(sdk.LLMOptions{
+		LLM: client.NewLLM(hastekit.LLMOptions{
 			Provider: llm.ProviderNameOpenAI,
 			Model:    "gpt-4o-mini",
 		}),
-		Tools: []core.Tool{
+		Tools: []agents.Tool{
 			NewGetUserTool(),
 			NewDeleteUserTool(),
 		},
@@ -141,7 +141,7 @@ func main() {
 	}
 
 	// Check if approval is needed
-	if result.Status == core.RunStatusPaused {
+	if result.Status == agentstate.RunStatusPaused {
 		fmt.Println("Approval required for:", result.PendingApprovals)
 
 		// Simulate user approval

@@ -37,15 +37,17 @@ import (
 
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway"
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
-    "github.com/hastekit/hastekit-sdk-go"
+    hastekit "github.com/hastekit/hastekit-sdk-go"
 )
 
 func main() {
     // Initialize SDK with Restate configuration
-    client, err := sdk.New(&sdk.ClientOptions{
-        LLMConfigs: sdk.NewInMemoryConfigStore([]*gateway.ProviderConfig{
+    client, err := hastekit.New(&hastekit.ClientOptions{
+        ProviderConfigs: []gateway.ProviderConfig{
             {
-                ProviderName: llm.ProviderNameOpenAI,
+                ProviderName:  llm.ProviderNameOpenAI,
+                BaseURL:       "",
+                CustomHeaders: nil,
                 ApiKeys: []*gateway.APIKeyConfig{
                     {
                         Name:   "Key 1",
@@ -53,8 +55,8 @@ func main() {
                     },
                 },
             },
-        }),
-        RestateConfig: sdk.RestateConfig{
+        },
+        RestateConfig: hastekit.RestateConfig{
             Endpoint: "http://localhost:8081", // Restate server endpoint
         },
     })
@@ -62,14 +64,14 @@ func main() {
         log.Fatal(err)
     }
 
-    model := client.NewLLM(sdk.LLMOptions{
+    model := client.NewLLM(hastekit.LLMOptions{
         Provider: llm.ProviderNameOpenAI,
         Model:    "gpt-4o-mini",
     })
 
     // Create a durable agent with NewRestateAgent
     agentName := "SampleAgent"
-    agent := client.NewRestateAgent(&sdk.AgentOptions{
+    agent := client.NewRestateAgent(&hastekit.AgentOptions{
         Name:        agentName,
         Instruction: client.Prompt("You are helpful assistant."),
         LLM:         model,
@@ -126,14 +128,16 @@ import (
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway"
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
-    "github.com/hastekit/hastekit-sdk-go"
+    hastekit "github.com/hastekit/hastekit-sdk-go"
 )
 
 func main() {
-    client, err := sdk.New(&sdk.ClientOptions{
-        LLMConfigs: sdk.NewInMemoryConfigStore([]*gateway.ProviderConfig{
+    client, err := hastekit.New(&hastekit.ClientOptions{
+        ProviderConfigs: []gateway.ProviderConfig{
             {
-                ProviderName: llm.ProviderNameOpenAI,
+                ProviderName:  llm.ProviderNameOpenAI,
+                BaseURL:       "",
+                CustomHeaders: nil,
                 ApiKeys: []*gateway.APIKeyConfig{
                     {
                         Name:   "Key 1",
@@ -141,8 +145,8 @@ func main() {
                     },
                 },
             },
-        }),
-        RestateConfig: sdk.RestateConfig{
+        },
+        RestateConfig: hastekit.RestateConfig{
             Endpoint: "http://localhost:8081", // Restate server
         },
     })
@@ -150,14 +154,14 @@ func main() {
         log.Fatal(err)
     }
 
-    model := client.NewLLM(sdk.LLMOptions{
+    model := client.NewLLM(hastekit.LLMOptions{
         Provider: llm.ProviderNameOpenAI,
         Model:    "gpt-4o-mini",
     })
 
     // Register the agent
     agentName := "my-agent"
-    _ = client.NewRestateAgent(&sdk.AgentOptions{
+    _ = client.NewRestateAgent(&hastekit.AgentOptions{
         Name:        agentName,
         Instruction: client.Prompt("You are a helpful assistant."),
         LLM:         model,
@@ -183,14 +187,16 @@ import (
     "github.com/hastekit/hastekit-sdk-go/pkg/agents/prompts""
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway"
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
-    "github.com/hastekit/hastekit-sdk-go"
+    hastekit "github.com/hastekit/hastekit-sdk-go"
 )
 
 func main() {
-    client, err := sdk.New(&sdk.ClientOptions{
-        LLMConfigs: sdk.NewInMemoryConfigStore([]*gateway.ProviderConfig{
+    client, err := hastekit.New(&hastekit.ClientOptions{
+        ProviderConfigs: []gateway.ProviderConfig{
             {
-                ProviderName: llm.ProviderNameOpenAI,
+                ProviderName:  llm.ProviderNameOpenAI,
+                BaseURL:       "",
+                CustomHeaders: nil,
                 ApiKeys: []*gateway.APIKeyConfig{
                     {
                         Name:   "Key 1",
@@ -198,8 +204,8 @@ func main() {
                     },
                 },
             },
-        }),
-        RestateConfig: sdk.RestateConfig{
+        },
+        RestateConfig: hastekit.RestateConfig{
             Endpoint: "http://localhost:8081",
         },
     })
@@ -207,14 +213,14 @@ func main() {
         log.Fatal(err)
     }
 
-    model := client.NewLLM(sdk.LLMOptions{
+    model := client.NewLLM(hastekit.LLMOptions{
         Provider: llm.ProviderNameOpenAI,
         Model:    "gpt-4o-mini",
     })
 
     // Register the SAME agent with the SAME configuration
     agentName := "my-agent"
-    _ = client.NewRestateAgent(&sdk.AgentOptions{
+    _ = client.NewRestateAgent(&hastekit.AgentOptions{
         Name:        agentName,
         Instruction: client.Prompt("You are a helpful assistant."),
         LLM:         model,
@@ -283,7 +289,7 @@ See the [Restate deployment documentation](https://docs.restate.dev/services/ver
 
 ## Example: Complete Durable Agent
 
-See the complete working example in the repository: [`examples/13_durable_agent/main.go`](https://github.com/curaious/uno/tree/main/examples/13_durable_agent)
+See the complete working example in the repository: [`examples/agents/8_restate_agent/main.go`](https://github.com/hastekit/hastekit-docs/tree/main/examples/agents/8_restate_agent)
 
 ## Learn More
 

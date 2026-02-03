@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
-  title: Uno Agent Server API
-  description: API specification for the Uno Agent Server
+  title: HasteKit Gateway API
+  description: API specification for the HasteKit Gateway
   version: 1.0.0
 servers:
   - url: http://localhost:6060

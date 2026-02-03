@@ -2,7 +2,7 @@
 title: Simple Agent
 ---
 
-A simple agent is the most basic type of agent in the Uno SDK. It executes in-process without durability, making it perfect for stateless interactions, testing, and simple use cases that don't require crash recovery or long-running workflows.
+A simple agent is the most basic type of agent in the HasteKit SDK. It executes in-process without durability, making it perfect for stateless interactions, testing, and simple use cases that don't require crash recovery or long-running workflows.
 
 ## Overview
 
@@ -25,34 +25,39 @@ import (
     "fmt"
     "log"
 
-    "github.com/curaious/uno/internal/utils"
+    "github.com/hastekit/hastekit-sdk-go/pkg/utils"
     "github.com/hastekit/hastekit-sdk-go/pkg/agents"
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway"
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
-    "github.com/hastekit/hastekit-sdk-go"
+    hastekit "github.com/hastekit/hastekit-sdk-go"
 )
 
 // Initialize the SDK client
-client, err := sdk.New(&sdk.ClientOptions{
-    LLMConfigs: sdk.NewInMemoryConfigStore([]*gateway.ProviderConfig{
+client, err := hastekit.New(&hastekit.ClientOptions{
+    ProviderConfigs: []gateway.ProviderConfig{
         {
-            ProviderName: llm.ProviderNameOpenAI,
+            ProviderName:  llm.ProviderNameOpenAI,
+            BaseURL:       "",
+            CustomHeaders: nil,
             ApiKeys: []*gateway.APIKeyConfig{
-                {Name: "default", APIKey: os.Getenv("OPENAI_API_KEY")},
+                {
+                    Name:   "Key 1",
+                    APIKey: "",
+                },
             },
         },
-    }),
+    },
 })
 if err != nil {
     log.Fatal(err)
 }
 
 // Create the agent
-agent := client.NewAgent(&sdk.AgentOptions{
+agent := client.NewAgent(&hastekit.AgentOptions{
     Name:        "Hello world agent",
     Instruction: client.Prompt("You are helpful assistant. You greet user with a light-joke"),
-    LLM: client.NewLLM(sdk.LLMOptions{
+    LLM: client.NewLLM(hastekit.LLMOptions{
         Provider: llm.ProviderNameOpenAI,
         Model:    "gpt-4o-mini",
     }),
@@ -90,7 +95,7 @@ if err != nil {
 }
 
 // Access the response
-fmt.Println(out[0].OfOutputMessage.Content[0].OfOutputText.Text)
+fmt.Println(out.Output[0].OfOutputMessage.Content[0].OfOutputText.Text)
 ```
 
 ### AgentInput Fields
@@ -124,60 +129,60 @@ Here's a complete working example:
 package main
 
 import (
-    "context"
-    "fmt"
-    "log"
-    "os"
+	"context"
+	"fmt"
+	"log"
+	"os"
 
-    "github.com/curaious/uno/internal/utils"
-    "github.com/hastekit/hastekit-sdk-go/pkg/agents"
-    "github.com/hastekit/hastekit-sdk-go/pkg/gateway"
-    "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
-    "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
-    "github.com/hastekit/hastekit-sdk-go"
+	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
+	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
+	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
+	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
+	hastekit "github.com/hastekit/hastekit-sdk-go"
+	"github.com/hastekit/hastekit-sdk-go/pkg/utils"
 )
 
 func main() {
-    // Initialize SDK client
-    client, err := sdk.New(&sdk.ClientOptions{
-        LLMConfigs: sdk.NewInMemoryConfigStore([]*gateway.ProviderConfig{
-            {
-                ProviderName: llm.ProviderNameOpenAI,
-                ApiKeys: []*gateway.APIKeyConfig{
-                    {Name: "default", APIKey: os.Getenv("OPENAI_API_KEY")},
-                },
-            },
-        }),
-    })
-    if err != nil {
-        log.Fatal(err)
-    }
+	// Initialize SDK client
+	client, err := hastekit.New(&hastekit.ClientOptions{
+		ProviderConfigs: []gateway.ProviderConfig{
+			{
+				ProviderName: llm.ProviderNameOpenAI,
+				ApiKeys: []*gateway.APIKeyConfig{
+					{Name: "default", APIKey: os.Getenv("OPENAI_API_KEY")},
+				},
+			},
+		},
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
 
-    // Create agent
-    agent := client.NewAgent(&sdk.AgentOptions{
-        Name:        "Hello world agent",
-        Instruction: client.Prompt("You are helpful assistant. You greet user with a light-joke"),
-        LLM: client.NewLLM(sdk.LLMOptions{
-            Provider: llm.ProviderNameOpenAI,
-            Model:    "gpt-4o-mini",
-        }),
-        Parameters: responses.Parameters{
-            Temperature: utils.Ptr(0.2),
-        },
-    })
+	// Create agent
+	agent := client.NewAgent(&hastekit.AgentOptions{
+		Name:        "Hello world agent",
+		Instruction: client.Prompt("You are helpful assistant. You greet user with a light-joke"),
+		LLM: client.NewLLM(hastekit.LLMOptions{
+			Provider: llm.ProviderNameOpenAI,
+			Model:    "gpt-4o-mini",
+		}),
+		Parameters: responses.Parameters{
+			Temperature: utils.Ptr(0.2),
+		},
+	})
 
-    // Execute agent
-    out, err := agent.Execute(context.Background(), &agents.AgentInput{
-        Messages: []responses.InputMessageUnion{
-            responses.UserMessage("Hello!"),
-        },
-    })
-    if err != nil {
-        log.Fatal(err)
-    }
+	// Execute agent
+	out, err := agent.Execute(context.Background(), &agents.AgentInput{
+		Messages: []responses.InputMessageUnion{
+			responses.UserMessage("Hello!"),
+		},
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
 
-    // Print response
-    fmt.Println(out[0].OfOutputMessage.Content[0].OfOutputText.Text)
+	// Print response
+	fmt.Println(out.Output[0].OfOutputMessage.Content[0].OfOutputText.Text)
 }
 ```
 

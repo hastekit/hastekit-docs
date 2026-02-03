@@ -20,7 +20,7 @@ To enable web search capabilities, add the `WebSearchTool` to your request's `To
 ```go
 import (
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
-    "github.com/curaious/uno/internal/utils"
+    "github.com/hastekit/hastekit-sdk-go/pkg/utils"
 )
 
 webSearchTool := responses.ToolUnion{
@@ -86,7 +86,8 @@ webSearchTool := responses.ToolUnion{
 Include the web search tool in your request:
 
 ```go
-resp, err := model.NewResponses(ctx, &responses.Request{
+resp, err := client.NewResponses(ctx, &responses.Request{
+    Model: "OpenAI/gpt-4.1-mini",
     Input: responses.InputUnion{
         OfString: utils.Ptr("What are the latest developments in AI?"),
     },
@@ -172,7 +173,8 @@ type WebSearchCallActionOfFind struct {
 When using streaming responses, web search calls are delivered through specific chunk types:
 
 ```go
-stream, err := model.NewStreamingResponses(ctx, &responses.Request{
+stream, err := client.NewStreamingResponses(ctx, &responses.Request{
+    Model: "OpenAI/gpt-4.1-mini",
     Input: responses.InputUnion{
         OfString: utils.Ptr("What's happening in the tech world today?"),
     },
@@ -224,32 +226,32 @@ import (
     "log"
     "os"
 
-    "github.com/curaious/uno/internal/utils"
+    "github.com/hastekit/hastekit-sdk-go/pkg/utils"
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway"
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
-    "github.com/hastekit/hastekit-sdk-go"
+    hastekit "github.com/hastekit/hastekit-sdk-go"
 )
 
 func main() {
-    client, err := sdk.New(&sdk.ClientOptions{
-        LLMConfigs: sdk.NewInMemoryConfigStore([]*gateway.ProviderConfig{
+    client, err := hastekit.New(&hastekit.ClientOptions{
+        ProviderConfigs: []gateway.ProviderConfig{
             {
-                ProviderName: llm.ProviderNameOpenAI,
+                ProviderName:  llm.ProviderNameOpenAI,
+                BaseURL:       "",
+                CustomHeaders: nil,
                 ApiKeys: []*gateway.APIKeyConfig{
-                    {Name: "default", APIKey: os.Getenv("OPENAI_API_KEY")},
+                    {
+                        Name:   "Key 1",
+                        APIKey: os.Getenv("OPENAI_API_KEY"),
+                    },
                 },
             },
-        }),
+        },
     })
     if err != nil {
         log.Fatal(err)
     }
-
-    model := client.NewLLM(sdk.LLMOptions{
-        Provider: llm.ProviderNameOpenAI,
-        Model:    "gpt-4o",
-    })
 
     // Define web search tool
     webSearchTool := responses.ToolUnion{
@@ -261,7 +263,8 @@ func main() {
     }
 
     // Make request with web search
-    resp, err := model.NewResponses(context.Background(), &responses.Request{
+    resp, err := client.NewResponses(context.Background(), &responses.Request{
+        Model: "OpenAI/gpt-4o",
         Input: responses.InputUnion{
             OfString: utils.Ptr("What are the latest news about artificial intelligence?"),
         },

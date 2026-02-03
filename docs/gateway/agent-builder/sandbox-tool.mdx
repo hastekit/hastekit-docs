@@ -73,7 +73,7 @@ Timeouts are enforced by the daemon (default 60 seconds). On timeout, the respon
 ### Server / environment
 
 - **SANDBOX_ENABLED** – If set (e.g. `true`), the server initializes a sandbox manager (Docker or Kubernetes). If unset or disabled, the Sandbox tool is not available.
-- **SANDBOX_DEFAULT_IMAGE** – Default Docker image for sandbox containers/pods (e.g. `praveenraj9495/uno-sandbox:latest`). Must be an image that runs the Uno sandbox daemon (e.g. `uno sandbox-daemon`).
+- **SANDBOX_DEFAULT_IMAGE** – Default Docker image for sandbox containers/pods (e.g. `praveenraj9495/hastekit-ai-sandbox:latest`). Must be an image that runs the HasteKit sandbox daemon (e.g. `hastekit-ai-sandbox sandbox-daemon`).
 - **SANDBOX_ROOT** – (Inside the sandbox container.) Root directory for the workspace and file API; default `/sandbox/workspace`.
 - **SANDBOX_PORT** – (Inside the sandbox container.) Port the daemon listens on; default `8080`.
 
@@ -87,7 +87,7 @@ Kubernetes vs Docker is chosen at server startup (e.g. via config or env) and is
 ## Relation to other features
 
 - **Skills** – Skills are stored under the agent’s sandbox data and mounted into the sandbox. The agent is instructed to use **execute_bash_commands** to read skill files (e.g. `SKILL.md`). Therefore, enabling the Sandbox tool is required for skills to work at runtime.
-- **Provider Code Execution** – The provider’s built-in code execution tool (e.g. for short snippets) is separate. The Sandbox tool is Uno-managed, session-scoped, and supports full bash and a persistent workspace plus file access.
+- **Provider Code Execution** – The provider’s built-in code execution tool (e.g. for short snippets) is separate. The Sandbox tool is HasteKit-managed, session-scoped, and supports full bash and a persistent workspace plus file access.
 
 ## Summary
 

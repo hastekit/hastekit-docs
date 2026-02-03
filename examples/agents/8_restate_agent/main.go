@@ -5,14 +5,14 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/curaious/uno/pkg/gateway"
-	"github.com/curaious/uno/pkg/llm"
-	"github.com/curaious/uno/pkg/sdk"
+	hastekit "github.com/hastekit/hastekit-sdk-go"
+	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
+	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
 )
 
 func main() {
-	client, err := sdk.New(&sdk.ClientOptions{
-		LLMConfigs: sdk.NewInMemoryConfigStore([]*gateway.ProviderConfig{
+	client, err := hastekit.New(&hastekit.ClientOptions{
+		ProviderConfigs: []gateway.ProviderConfig{
 			{
 				ProviderName:  llm.ProviderNameOpenAI,
 				BaseURL:       "",
@@ -24,11 +24,11 @@ func main() {
 					},
 				},
 			},
-		}),
-		RestateConfig: sdk.RestateConfig{
+		},
+		RestateConfig: hastekit.RestateConfig{
 			Endpoint: "http://localhost:8081",
 		},
-		RedisConfig: sdk.RedisConfig{
+		RedisConfig: hastekit.RedisConfig{
 			Endpoint: "localhost:6379",
 		},
 	})
@@ -36,14 +36,14 @@ func main() {
 		log.Fatal(err)
 	}
 
-	model := client.NewLLM(sdk.LLMOptions{
+	model := client.NewLLM(hastekit.LLMOptions{
 		Provider: llm.ProviderNameOpenAI,
 		Model:    "gpt-4.1-mini",
 	})
 
 	history := client.NewConversationManager()
 	agentName := "SampleAgent"
-	_ = client.NewRestateAgent(&sdk.AgentOptions{
+	_ = client.NewRestateAgent(&hastekit.AgentOptions{
 		Name:        agentName,
 		Instruction: client.Prompt("You are helpful assistant. You are interacting with the user named {{name}}"),
 		LLM:         model,

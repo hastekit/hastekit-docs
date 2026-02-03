@@ -16,7 +16,7 @@ When you attach the Sandbox tool to an agent:
 
 ## Example: Agent with Sandbox
 
-The following example uses the Uno SDK to create an agent with the Sandbox tool, using the Docker-backed sandbox manager. It runs a single turn asking for the current time; the agent will use **execute_bash_commands** to run e.g. `date`.
+The following example uses the HasteKit SDK to create an agent with the Sandbox tool, using the Docker-backed sandbox manager. It runs a single turn asking for the current time; the agent will use **execute_bash_commands** to run e.g. `date`.
 
 ```go
 package main
@@ -29,36 +29,35 @@ import (
 
 	"github.com/bytedance/sonic"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
-	"github.com/curaious/uno/pkg/agent-framework/core"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents/tools""
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
-	"github.com/curaious/uno/pkg/sandbox/docker_sandbox"
-	"github.com/hastekit/hastekit-sdk-go"
+	"github.com/hastekit/hastekit-sdk-go/pkg/sandbox/docker_sandbox"
+	hastekit "github.com/hastekit/hastekit-sdk-go"
 )
 
 func main() {
-	client, err := sdk.New(&sdk.ClientOptions{
-		LLMConfigs: sdk.NewInMemoryConfigStore([]*gateway.ProviderConfig{
-			{
-				ProviderName:  llm.ProviderNameOpenAI,
-				BaseURL:       "",
-				CustomHeaders: nil,
-				ApiKeys: []*gateway.APIKeyConfig{
-					{
-						Name:   "Key 1",
-						APIKey: os.Getenv("OPENAI_API_KEY"),
-					},
-				},
-			},
-		}),
-	})
+	client, err := hastekit.New(&hastekit.ClientOptions{
+        ProviderConfigs: []gateway.ProviderConfig{
+            {
+                ProviderName:  llm.ProviderNameOpenAI,
+                BaseURL:       "",
+                CustomHeaders: nil,
+                ApiKeys: []*gateway.APIKeyConfig{
+                    {
+                        Name:   "Key 1",
+                        APIKey: os.Getenv("OPENAI_API_KEY"),
+                    },
+                },
+            },
+        },
+    })
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	model := client.NewLLM(sdk.LLMOptions{
+	model := client.NewLLM(hastekit.LLMOptions{
 		Provider: llm.ProviderNameOpenAI,
 		Model:    "gpt-4.1-mini",
 	})
@@ -72,7 +71,7 @@ func main() {
 		Tools: []core.Tool{
 			tools.NewSandboxTool(docker_sandbox.NewManager(docker_sandbox.Config{
 				AgentDataPath: "/path/to/agent-data",
-			}), "uno-sandbox:v7"),
+			}), "hastekit-ai-sandbox:v7"),
 		},
 	})
 
@@ -96,10 +95,10 @@ The full example is in `examples/agents/10_agent_with_sandbox/main.go`.
 
 ## Key pieces
 
-- **SDK client** – `sdk.New` with `LLMConfigs` (e.g. OpenAI). The client is used to create an LLM, conversation history, and prompts.
+- **SDK client** – `hastekit.New` with `LLMConfigs` (e.g. OpenAI). The client is used to create an LLM, conversation history, and prompts.
 - **Sandbox manager** – `docker_sandbox.NewManager(docker_sandbox.Config{...})` for local or Docker-based sandboxes. For production you would typically use a Kubernetes-backed manager that implements `sandbox.Manager`. The manager creates and tracks one sandbox per session.
 - **AgentDataPath** – Host path where agent data (e.g. skills) lives; it is mounted into the sandbox so the agent can read it via bash. Must exist and be writable if you use skills.
-- **Sandbox image** – The Docker image for the sandbox container (e.g. `uno-sandbox:v7`). It must run the Uno sandbox daemon (e.g. `uno sandbox-daemon`). Build from `deployments/sandbox/Dockerfile` or use a pre-built image.
+- **Sandbox image** – The Docker image for the sandbox container (e.g. `hastekit-ai-sandbox`). It must run the HasteKit sandbox daemon (e.g. `hastekit-ai-sandbox sandbox-daemon`). Build from `deployments/sandbox/Dockerfile` or use a pre-built image.
 - **Tool registration** – `tools.NewSandboxTool(manager, image)` returns a `core.Tool` that exposes **execute_bash_commands** to the LLM. Pass it in `AgentOptions.Tools` along with any other tools.
 
 ## Tool: execute_bash_commands

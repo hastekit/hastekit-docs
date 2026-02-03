@@ -1,27 +1,27 @@
 ---
-title: Uno SDK
-description: Use the Uno SDK to make LLM calls through the Uno LLM Gateway.
+title: HasteKit SDK
+description: Use the HasteKit SDK to make LLM calls through the HasteKit LLM Gateway.
 ---
 
-The Uno SDK provides a Go client library for making LLM calls through the Uno LLM Gateway. It abstracts away provider differences and provides a unified interface for interacting with multiple LLM providers (OpenAI, Anthropic, Gemini, xAI, and Ollama).
+The HasteKit SDK provides a Go client library for making LLM calls through the HasteKit LLM Gateway. It abstracts away provider differences and provides a unified interface for interacting with multiple LLM providers (OpenAI, Anthropic, Gemini, xAI, and Ollama).
 
 ## Prerequisites
 
 - Golang v1.25.0 or later
-- A running Uno LLM Gateway instance
+- A running HasteKit LLM Gateway instance
 - A virtual key configured in the gateway (see [Virtual Keys](/gateway/llm/virtual-keys))
 
 ## Installation
 
-Install the Uno SDK:
+Install the HasteKit SDK:
 
 ```bash
-go get -u github.com/curaious/uno
+go get -u github.com/hastekit/hastekit-sdk-go
 ```
 
 ## Setting Up the SDK
 
-To use the SDK with the Uno LLM Gateway, you need to configure it with the gateway endpoint and a virtual key.
+To use the SDK with the HasteKit LLM Gateway, you need to configure it with the gateway endpoint and a virtual key.
 
 ```go
 package main
@@ -31,7 +31,7 @@ import (
     "fmt"
     "log"
 
-    "github.com/hastekit/hastekit-sdk-go"
+    hastekit "github.com/hastekit/hastekit-sdk-go"
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
     "github.com/hastekit/hastekit-sdk-go/internal/utils"
@@ -39,26 +39,24 @@ import (
 
 func main() {
     // Initialize the SDK with gateway configuration
-    client, err := sdk.New(&sdk.ClientOptions{
-        ServerConfig: sdk.ServerConfig{
-            Endpoint:  "http://localhost:6060",  // Your Uno gateway endpoint
-            VirtualKey: "sk-uno-your-virtual-key-here",  // Your virtual key
+    client, err := hastekit.New(&hastekit.ClientOptions{
+
+    })
+    client, err := hastekit.New(&hastekit.ClientOptions{
+        ServerConfig: hastekit.ServerConfig{
+            Endpoint:  "http://localhost:6060",  // Your HasteKit gateway endpoint
+            VirtualKey: "sk-hk-your-virtual-key-here",  // Your virtual key
         },
     })
     if err != nil {
         log.Fatal(err)
     }
 
-    // Create an LLM model instance
-    model := client.NewLLM(sdk.LLMOptions{
-        Provider: llm.ProviderNameOpenAI,
-        Model:    "gpt-4.1-mini",
-    })
-
     // Make an LLM call
-    resp, err := model.NewResponses(
+    resp, err := client.NewResponses(
         context.Background(),
         &responses.Request{
+            Model: "OpenAI/gpt-4.1-mini",
             Instructions: utils.Ptr("You are a helpful assistant."),
             Input: responses.InputUnion{
                 OfString: utils.Ptr("What is the capital of France?"),
@@ -88,25 +86,25 @@ func main() {
 
 The `ServerConfig` struct contains the gateway connection settings:
 
-- **Endpoint**: The base URL of your Uno LLM Gateway (e.g., `http://localhost:6060` or `https://your-gateway.com`)
-- **VirtualKey**: Your virtual key from the gateway (prefixed with `sk-uno-`)
+- **Endpoint**: The base URL of your HasteKit LLM Gateway (e.g., `http://localhost:6060` or `https://your-gateway.com`)
+- **VirtualKey**: Your virtual key from the gateway (prefixed with `sk-hk-`)
 
 **Example:**
 
 ```go
-client, err := sdk.New(&sdk.ClientOptions{
-    ServerConfig: sdk.ServerConfig{
+client, err := hastekit.New(&hastekit.ClientOptions{
+    ServerConfig: hastekit.ServerConfig{
         Endpoint:   "https://gateway.example.com",
-        VirtualKey: "sk-uno-P7MjwUHAuLbkb16W5z2j8YD-4BSXSg9gKhDiRYEBQ",
+        VirtualKey: "sk-hk-P7MjwUHAuLbkb16W5z2j8YD-4BSXSg9gKhDiRYEBQ",
     },
 })
 ```
 
 ### Getting Your Virtual Key
 
-1. Navigate to the **Virtual Keys** page in the Uno gateway dashboard
+1. Navigate to the **Virtual Keys** page in the HasteKit gateway dashboard
 2. Create a new virtual key or use an existing one
-3. Copy the secret key (it starts with `sk-uno-`)
+3. Copy the secret key (it starts with `sk-hk-`)
 4. Use it in your SDK configuration
 
 See the [Virtual Keys documentation](/gateway/llm/virtual-keys) for more details.
@@ -116,16 +114,11 @@ See the [Virtual Keys documentation](/gateway/llm/virtual-keys) for more details
 ### Basic Example
 
 ```go
-// Create a model instance
-model := client.NewLLM(sdk.LLMOptions{
-    Provider: llm.ProviderNameOpenAI,
-    Model:    "gpt-4.1-mini",
-})
-
 // Make a request
 resp, err := model.NewResponses(
     context.Background(),
     &responses.Request{
+        Model: "OpenAI/gpt-4.1-mini",
         Instructions: utils.Ptr("You are a helpful assistant."),
         Input: responses.InputUnion{
             OfString: utils.Ptr("Hello, how are you?"),
@@ -151,37 +144,32 @@ for _, output := range resp.Output {
 
 ### Supported Providers
 
-You can switch between providers by changing the `Provider` field:
+You can switch between providers by changing the `Model` field:
 
 ```go
 // OpenAI
-model := client.NewLLM(sdk.LLMOptions{
-    Provider: llm.ProviderNameOpenAI,
-    Model:    "gpt-4.1-mini",
+resp, err := client.NewResponses(ctx, &responses.Request{
+    Model:    "OpenAI/gpt-4.1-mini",
 })
 
 // Anthropic
-model := client.NewLLM(sdk.LLMOptions{
-    Provider: llm.ProviderNameAnthropic,
-    Model:    "claude-3-5-sonnet-20241022",
+resp, err := client.NewResponses(ctx, &responses.Request{
+    Model:    "Anthropic/claude-3-5-sonnet-20241022",
 })
 
 // Gemini
-model := client.NewLLM(sdk.LLMOptions{
-    Provider: llm.ProviderNameGemini,
-    Model:    "gemini-1.5-pro",
+resp, err := client.NewResponses(ctx, &responses.Request{
+    Model:    "Gemini/gemini-1.5-pro",
 })
 
 // xAI
-model := client.NewLLM(sdk.LLMOptions{
-    Provider: llm.ProviderNameXAI,
-    Model:    "grok-beta",
+resp, err := client.NewResponses(ctx, &responses.Request{
+    Model:    "xAI/grok-beta",
 })
 
 // Ollama
-model := client.NewLLM(sdk.LLMOptions{
-    Provider: llm.ProviderNameOllama,
-    Model:    "llama2",
+resp, err := client.NewResponses(ctx, &responses.Request{
+    Model:    "Ollama/llama2",
 })
 ```
 

@@ -11,7 +11,7 @@ The Virtual Keys page displays all configured virtual keys in a table format, sh
 
 ## What are Virtual Keys?
 
-Virtual Keys are unique secret keys (prefixed with `sk-uno-`) that you can use instead of provider API keys in your applications. When a request comes in with a virtual key:
+Virtual Keys are unique secret keys (prefixed with `sk-hk-`) that you can use instead of provider API keys in your applications. When a request comes in with a virtual key:
 
 1. The gateway validates the virtual key
 2. Checks which providers and models are allowed
@@ -101,7 +101,7 @@ Once created, you can use virtual keys in your applications just like provider A
 ```bash
 # Using curl
 curl -X POST https://your-gateway.com/api/gateway/openai/v1/chat/completions \
-  -H "Authorization: Bearer sk-uno-your-virtual-key-here" \
+  -H "Authorization: Bearer sk-hk-your-virtual-key-here" \
   -H "Content-Type: application/json" \
   -d '{"model": "gpt-4", "messages": [...]}'
 ```
@@ -112,7 +112,7 @@ from openai import OpenAI
 
 client = OpenAI(
     base_url="https://your-gateway.com/api/gateway/openai",
-    api_key="sk-uno-your-virtual-key-here"
+    api_key="sk-hk-your-virtual-key-here"
 )
 
 response = client.chat.completions.create(

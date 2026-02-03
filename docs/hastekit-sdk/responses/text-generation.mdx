@@ -2,25 +2,15 @@
 title: Text Generation
 ---
 
-Uno SDK supports generating text content with various LLM providers like OpenAI, Anthropic, and Gemini.
-
-## Instantiate a model
-
-You first need to create an LLM model instance from your initialized Uno client by specifying the provider name and the model name you want to use.
-
-```go
-model := client.NewLLM(sdk.LLMOptions{
-    Provider: llm.ProviderNameOpenAI,
-    Model:    "gpt-4.1-mini",
-})
-```
+HasteKit SDK supports generating text content with various LLM providers like OpenAI, Anthropic, and Gemini.
 
 ## Invoke the model
 
-You can then invoke the model with parameters like system instruction, temperature, topK etc.
+You can then invoke the model with parameters like model identifer, system instruction, temperature, topK, user message, etc.
 
 ```go
-resp, err := model.NewResponses(context.Background(), &responses.Request{
+resp, err := client.NewResponses(ctx, &responses.Request{
+    Model:        "OpenAI/gpt-4.1-mini",
     Instructions: utils.Ptr("You are a helpful assistant."),
     Input: responses.InputUnion{
         OfString: utils.Ptr("What is the capital of France?"),
@@ -56,13 +46,14 @@ import (
     "context"
     "fmt"
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
-    "github.com/curaious/uno/internal/utils"
+    "github.com/hastekit/hastekit-sdk-go/pkg/utils"
 )
 
 func main() {
     // ... client and model initialization ...
 
-    stream, err := model.NewStreamingResponses(context.Background(), &responses.Request{
+    stream, err := client.NewStreamingResponses(context.Background(), &responses.Request{
+        Model:        "OpenAI/gpt-4.1-mini",
         Input: responses.InputUnion{
             OfString: utils.Ptr("Write a poem about coding."),
         },
@@ -85,7 +76,8 @@ func main() {
 Instead of a single string, you can pass a list of messages for context-aware conversations.
 
 ```go
-resp, err := model.NewResponses(ctx, &responses.Request{
+resp, err := client.NewResponses(ctx, &responses.Request{
+    Model: "OpenAI/gpt-4.1-mini",
     Input: responses.InputUnion{
         OfInputMessageList: responses.InputMessageList{
             {

@@ -7,17 +7,17 @@ import (
 	"os"
 
 	"github.com/bytedance/sonic"
-	"github.com/curaious/uno/pkg/agent-framework/agents"
-	"github.com/curaious/uno/pkg/agent-framework/mcpclient"
-	"github.com/curaious/uno/pkg/gateway"
-	"github.com/curaious/uno/pkg/llm"
-	"github.com/curaious/uno/pkg/llm/responses"
-	"github.com/curaious/uno/pkg/sdk"
+	hastekit "github.com/hastekit/hastekit-sdk-go"
+	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
+	"github.com/hastekit/hastekit-sdk-go/pkg/agents/mcpclient"
+	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
+	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
+	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
 )
 
 func main() {
-	client, err := sdk.New(&sdk.ClientOptions{
-		LLMConfigs: sdk.NewInMemoryConfigStore([]*gateway.ProviderConfig{
+	client, err := hastekit.New(&hastekit.ClientOptions{
+		ProviderConfigs: []gateway.ProviderConfig{
 			{
 				ProviderName:  llm.ProviderNameOpenAI,
 				BaseURL:       "",
@@ -29,13 +29,13 @@ func main() {
 					},
 				},
 			},
-		}),
+		},
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	model := client.NewLLM(sdk.LLMOptions{
+	model := client.NewLLM(hastekit.LLMOptions{
 		Provider: llm.ProviderNameOpenAI,
 		Model:    "gpt-4.1-mini",
 	})
@@ -51,7 +51,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	agent := client.NewAgent(&sdk.AgentOptions{
+	agent := client.NewAgent(&hastekit.AgentOptions{
 		Name:        "Hello world agent",
 		Instruction: client.Prompt("You are helpful assistant."),
 		LLM:         model,

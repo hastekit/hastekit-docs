@@ -7,22 +7,21 @@ import (
 	"os"
 
 	"github.com/bytedance/sonic"
-	"github.com/curaious/uno/internal/utils"
-	"github.com/curaious/uno/pkg/agent-framework/agents"
-	"github.com/curaious/uno/pkg/agent-framework/core"
-	"github.com/curaious/uno/pkg/gateway"
-	"github.com/curaious/uno/pkg/llm"
-	"github.com/curaious/uno/pkg/llm/responses"
-	"github.com/curaious/uno/pkg/sdk"
+	hastekit "github.com/hastekit/hastekit-sdk-go"
+	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
+	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
+	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
+	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
+	"github.com/hastekit/hastekit-sdk-go/pkg/utils"
 )
 
 type CustomTool struct {
-	*core.BaseTool
+	*agents.BaseTool
 }
 
 func NewCustomTool() *CustomTool {
 	return &CustomTool{
-		BaseTool: &core.BaseTool{
+		BaseTool: &agents.BaseTool{
 			ToolUnion: responses.ToolUnion{
 				OfFunction: &responses.FunctionTool{
 					Name:        "get_user_name",
@@ -43,7 +42,7 @@ func NewCustomTool() *CustomTool {
 	}
 }
 
-func (t *CustomTool) Execute(ctx context.Context, params *core.ToolCall) (*responses.FunctionCallOutputMessage, error) {
+func (t *CustomTool) Execute(ctx context.Context, params *agents.ToolCall) (*responses.FunctionCallOutputMessage, error) {
 	return &responses.FunctionCallOutputMessage{
 		ID:     params.ID,
 		CallID: params.CallID,
@@ -54,8 +53,8 @@ func (t *CustomTool) Execute(ctx context.Context, params *core.ToolCall) (*respo
 }
 
 func main() {
-	client, err := sdk.New(&sdk.ClientOptions{
-		LLMConfigs: sdk.NewInMemoryConfigStore([]*gateway.ProviderConfig{
+	client, err := hastekit.New(&hastekit.ClientOptions{
+		ProviderConfigs: []gateway.ProviderConfig{
 			{
 				ProviderName:  llm.ProviderNameOpenAI,
 				BaseURL:       "",
@@ -67,13 +66,13 @@ func main() {
 					},
 				},
 			},
-		}),
+		},
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	model := client.NewLLM(sdk.LLMOptions{
+	model := client.NewLLM(hastekit.LLMOptions{
 		Provider: llm.ProviderNameOpenAI,
 		Model:    "gpt-4.1-mini",
 	})
@@ -84,7 +83,7 @@ func main() {
 		Instruction: client.Prompt("You are a helpful assistant. Use the get_user_name tool to get the user's name and greet them."),
 		LLM:         model,
 		History:     history,
-		Tools: []core.Tool{
+		Tools: []agents.Tool{
 			NewCustomTool(),
 		},
 	})

@@ -9,7 +9,7 @@ System instructions define the behavior and personality of an agent. The SDK pro
 The simplest way to provide a system instruction is using a plain string:
 
 ```go
-agent := client.NewAgent(&sdk.AgentOptions{
+agent := client.NewAgent(&hastekit.AgentOptions{
     Name:        "Assistant",
     Instruction: client.Prompt("You are a helpful assistant."),
     LLM:         model,
@@ -30,7 +30,7 @@ contextData := map[string]any{
     "role": "developer",
 }
 
-agent := client.NewAgent(&sdk.AgentOptions{
+agent := client.NewAgent(&hastekit.AgentOptions{
     Name:        "Personalized Assistant",
     Instruction: client.Prompt(
         "You are a helpful assistant. You are interacting with {{name}}, who is a {{role}}.",
@@ -59,7 +59,7 @@ customResolver := func(promptStr string, data map[string]any) (string, error) {
     // Your logic to resolve the prompt into the final system format
 }
 
-agent := client.NewAgent(&sdk.AgentOptions{
+agent := client.NewAgent(&hastekit.AgentOptions{
     Name:        "Dynamic Assistant",
     Instruction: client.Prompt("Hello {{userName}}, current time is {{timestamp}}", prompts.WithResolver(customResolver)),
     LLM:         model,
@@ -68,10 +68,10 @@ agent := client.NewAgent(&sdk.AgentOptions{
 
 ## Remote Prompts
 
-You can load system instructions from the Uno Gateway server using `RemotePrompt`.
+You can load system instructions from the HasteKit Gateway server using `RemotePrompt`.
 
 ```go
-agent := client.NewAgent(&sdk.AgentOptions{
+agent := client.NewAgent(&hastekit.AgentOptions{
     Name:        "Remote Assistant",
     Instruction: client.RemotePrompt("my-prompt-name", "production"),
     LLM:         model,
@@ -80,7 +80,7 @@ agent := client.NewAgent(&sdk.AgentOptions{
 
 ### Parameters
 
-- **`name`**: The name of the prompt stored in the Uno Gateway server
+- **`name`**: The name of the prompt stored in the HasteKit Gateway server
 - **`label`**: The prompt label (`"production"` or `"latest"`)
 - **`resolvers`**: Optional resolvers for template variable resolution
 
@@ -91,7 +91,7 @@ agent := client.NewAgent(&sdk.AgentOptions{
 You can combine remote prompts with resolvers for dynamic content:
 
 ```go
-agent := client.NewAgent(&sdk.AgentOptions{
+agent := client.NewAgent(&hastekit.AgentOptions{
     Name:        "Versioned Assistant",
     Instruction: client.RemotePrompt(
         "assistant-prompt",
@@ -126,7 +126,7 @@ func (l *CustomLoader) LoadPrompt(ctx context.Context) (string, error) {
 }
 
 customLoader := &CustomLoader{}
-agent := client.NewAgent(&sdk.AgentOptions{
+agent := client.NewAgent(&hastekit.AgentOptions{
     Name:        "Custom Assistant",
     Instruction: client.CustomPrompt(customLoader),
     LLM:         model,
@@ -141,20 +141,20 @@ Here's a complete example demonstrating different ways to use system instruction
 package main
 
 import (
-    "context"
-    "log"
+	"context"
+	"log"
 
-    "github.com/curaious/uno/pkg/agent-framework/core"
-    "github.com/hastekit/hastekit-sdk-go/pkg/agents/prompts""
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
-    "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
-    "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
-    "github.com/hastekit/hastekit-sdk-go"
+	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
+	"github.com/hastekit/hastekit-sdk-go/pkg/agents/prompts"
+"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
+"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
+"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
+hastekit "github.com/hastekit/hastekit-sdk-go"
 )
 
 func main() {
-    client, err := sdk.New(&sdk.ClientOptions{
-		LLMConfigs: sdk.NewInMemoryConfigStore([]*gateway.ProviderConfig{
+	client, err := hastekit.New(&hastekit.ClientOptions{
+		ProviderConfigs: []gateway.ProviderConfig{
 			{
 				ProviderName:  llm.ProviderNameOpenAI,
 				BaseURL:       "",
@@ -166,55 +166,55 @@ func main() {
 					},
 				},
 			},
-		}),
+		},
 	})
-    if err != nil {
-        log.Fatal(err)
-    }
+	if err != nil {
+		log.Fatal(err)
+	}
 
-    model := client.NewLLM(sdk.LLMOptions{
-        Provider: llm.ProviderNameOpenAI,
-        Model:    "gpt-4o-mini",
-    })
+	model := client.NewLLM(hastekit.LLMOptions{
+		Provider: llm.ProviderNameOpenAI,
+		Model:    "gpt-4o-mini",
+	})
 
-    // Example 1: Simple string instruction
-    agent1 := client.NewAgent(&sdk.AgentOptions{
-        Name:        "Simple Assistant",
-        Instruction: client.Prompt("You are a helpful assistant."),
-        LLM:         model,
-    })
+	// Example 1: Simple string instruction
+	agent1 := client.NewAgent(&hastekit.AgentOptions{
+		Name:        "Simple Assistant",
+		Instruction: client.Prompt("You are a helpful assistant."),
+		LLM:         model,
+	})
 
-    // Example 2: Template with variables
-    agent2 := client.NewAgent(&sdk.AgentOptions{
-        Name:        "Personalized Assistant",
-        Instruction: client.Prompt(
-            "You are a helpful assistant for {{userName}}, who is a {{userRole}}.",
-        ),
-        LLM: model,
-    })
+	// Example 2: Template with variables
+	agent2 := client.NewAgent(&hastekit.AgentOptions{
+		Name:        "Personalized Assistant",
+		Instruction: client.Prompt(
+			"You are a helpful assistant for {{userName}}, who is a {{userRole}}.",
+		),
+		LLM: model,
+	})
 
-    // Example 3: Remote prompt (requires endpoint and projectName)
-    // agent3 := client.NewAgent(&sdk.AgentOptions{
-    //     Name:        "Remote Assistant",
-    //     Instruction: client.RemotePrompt("my-prompt", "production"),
-    //     LLM:         model,
-    // })
+	// Example 3: Remote prompt (requires endpoint and projectName)
+	// agent3 := client.NewAgent(&hastekit.AgentOptions{
+	//     Name:        "Remote Assistant",
+	//     Instruction: client.RemotePrompt("my-prompt", "production"),
+	//     LLM:         model,
+	// })
 
-    // Execute agent
+	// Execute agent
 	out, err := agent2.Execute(context.Background(), &agents.AgentInput{
-        Messages: []responses.InputMessageUnion{
-            responses.UserMessage("Hello!"),
-        },
-        RunContext: map[string]any{
-            "userName": "Bob",
-            "userRole": "developer",
-        },
-    })
-    if err != nil {
-        log.Fatal(err)
-    }
+		Messages: []responses.InputMessageUnion{
+			responses.UserMessage("Hello!"),
+		},
+		RunContext: map[string]any{
+			"userName": "Bob",
+			"userRole": "developer",
+		},
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
 
-    log.Println(out[0].OfOutputMessage.Content[0].OfOutputText.Text)
+	log.Println(out.Output[0].OfOutputMessage.Content[0].OfOutputText.Text)
 }
 ```
 

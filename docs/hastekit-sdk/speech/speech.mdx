@@ -2,19 +2,7 @@
 title: Speech
 ---
 
-Uno SDK supports text-to-speech generation with various LLM providers like OpenAI.
-
-## Instantiate a model
-
-Create an LLM model instance with a speech model from your provider.
-
-```go
-// OpenAI
-model := client.NewLLM(sdk.LLMOptions{
-    Provider: llm.ProviderNameOpenAI,
-    Model:    "tts-1",
-})
-```
+HasteKit SDK supports text-to-speech generation with various LLM providers like OpenAI.
 
 ## Generate speech
 
@@ -29,9 +17,9 @@ import (
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/speech"
 )
 
-resp, err := model.NewSpeech(context.Background(), &speech.Request{
+resp, err := client.NewSpeech(context.Background(), &speech.Request{
+    Model: "OpenAI/tts-1",
     Input: "Hello, this is a test of the text-to-speech system.",
-    Model: "tts-1",
     Voice: "alloy",
 })
 if err != nil {
@@ -73,13 +61,13 @@ For real-time applications, the SDK supports streaming speech generation. This r
 import (
     "context"
     "fmt"
-    "github.com/curaious/uno/internal/utils"
+    "github.com/hastekit/hastekit-sdk-go/pkg/utils"
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/speech"
 )
 
-stream, err := model.NewStreamingSpeech(context.Background(), &speech.Request{
+stream, err := client.NewStreamingSpeech(context.Background(), &speech.Request{
+    Model: "OpenAI/tts-1",
     Input: "This is a streaming text-to-speech example.",
-    Model: "tts-1",
     Voice: "alloy",
     Speed: utils.Ptr(1), // Speed parameter enables streaming
 })
@@ -160,17 +148,17 @@ import (
     "log"
     "os"
     
-    "github.com/curaious/uno/internal/utils"
+    "github.com/hastekit/hastekit-sdk-go/pkg/utils"
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway"
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/speech"
-    "github.com/hastekit/hastekit-sdk-go"
+    hastekit "github.com/hastekit/hastekit-sdk-go"
 )
 
 func main() {
     // Initialize SDK client
-    client, err := sdk.New(&sdk.ClientOptions{
-        LLMConfigs: sdk.NewInMemoryConfigStore([]*gateway.ProviderConfig{
+    client, err := hastekit.New(&hastekit.ClientOptions{
+        ProviderConfigs: []gateway.ProviderConfig{
             {
                 ProviderName:  llm.ProviderNameOpenAI,
                 BaseURL:       "",
@@ -182,22 +170,16 @@ func main() {
                     },
                 },
             },
-        }),
+        },
     })
     if err != nil {
         log.Fatal(err)
     }
 
-    // Create speech model
-    model := client.NewLLM(sdk.LLMOptions{
-        Provider: llm.ProviderNameOpenAI,
-        Model:    "tts-1",
-    })
-
     // Generate speech
     resp, err := model.NewSpeech(context.Background(), &speech.Request{
-        Input:          "Hello! This is a text-to-speech example using Uno SDK.",
-        Model:          "tts-1",
+        Model:          "OpenAI/tts-1",
+        Input:          "Hello! This is a text-to-speech example using HasteKit SDK.",
         Voice:          "alloy",
         ResponseFormat: utils.Ptr("mp3"),
     })

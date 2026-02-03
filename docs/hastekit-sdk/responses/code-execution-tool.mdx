@@ -11,9 +11,10 @@ Supported in OpenAI, Anthropic, and Gemini models. The `container` parameter is 
 To enable code execution, include the `CodeExecutionTool` in your request's `Tools` array:
 
 ```go
-resp, err := model.NewResponses(
+resp, err := client.NewResponses(
     context.Background(),
     &responses.Request{
+        Model: "OpenAI/gpt-4.1-mini",
         Instructions: utils.Ptr("You are a personal math tutor. When asked a math question, write and run code using the python tool to answer the question."),
         Input: responses.InputUnion{
             OfString: utils.Ptr("I need to solve the equation 3x + 11 = 14. Can you help me?"),
@@ -72,13 +73,14 @@ import (
     "context"
     "fmt"
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
-    "github.com/curaious/uno/internal/utils"
+    "github.com/hastekit/hastekit-sdk-go/pkg/utils"
 )
 
 func main() {
     // ... client initialization ...
 
-    resp, err := model.NewResponses(context.Background(), &responses.Request{
+    resp, err := client.NewResponses(context.Background(), &responses.Request{
+        Model: "OpenAI/gpt-4.1-mini",
         Instructions: utils.Ptr("You are a helpful assistant that can run code."),
         Input: responses.InputUnion{
             OfString: utils.Ptr("Calculate 15 * 23"),
@@ -134,18 +136,14 @@ import (
     "context"
     "fmt"
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
-    "github.com/curaious/uno/internal/utils"
+    "github.com/hastekit/hastekit-sdk-go/pkg/utils"
 )
 
 func main() {
     // ... client initialization ...
 
-<<<<<<< Updated upstream
-    stream, err := model.NewStreamingResponses(context.Background(), &responses.Request{
-=======
     stream, err := client.NewStreamingResponses(context.Background(), &responses.Request{
         Model: "OpenAI/gpt-4.1-mini",
->>>>>>> Stashed changes
         Instructions: utils.Ptr("You are a personal math tutor. When asked a math question, write and run code using the python tool to answer the question."),
         Input: responses.InputUnion{
             OfInputMessageList: responses.InputMessageList{

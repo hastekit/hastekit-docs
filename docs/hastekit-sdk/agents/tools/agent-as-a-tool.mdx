@@ -13,14 +13,14 @@ To create an agent tool, you need to:
 
 ```go
 import (
-    "github.com/curaious/uno/internal/utils"
+    hastekit "github.com/hastekit/hastekit-sdk-go"
     "github.com/hastekit/hastekit-sdk-go/pkg/agents/tools""
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
-    "github.com/hastekit/hastekit-sdk-go"
+    "github.com/hastekit/hastekit-sdk-go/pkg/utils"
 )
 
 // Create a specialized agent
-subAgent := client.NewAgent(&sdk.AgentOptions{
+subAgent := client.NewAgent(&hastekit.AgentOptions{
     Name:        "User lookup agent",
     Instruction: client.Prompt("You are a helpful assistant that looks up user information."),
     LLM:         model,
@@ -58,11 +58,11 @@ Once created, you can use the agent tool in another agent's tools list:
 
 ```go
 // Create a parent agent that uses the agent tool
-agent := client.NewAgent(&sdk.AgentOptions{
+agent := client.NewAgent(&hastekit.AgentOptions{
     Name:        "Main agent",
     Instruction: client.Prompt("You are a helpful assistant. Use the get_user_name tool when needed."),
     LLM:         model,
-    Tools:       []core.Tool{agentTool},
+    Tools:       []agents.Tool{agentTool},
 })
 ```
 
@@ -74,24 +74,24 @@ Here's a complete example demonstrating an agent using another agent as a tool:
 package main
 
 import (
-    "context"
-    "fmt"
-    "log"
+	"context"
+	"fmt"
+	"log"
 
-    "github.com/bytedance/sonic"
-    "github.com/curaious/uno/internal/utils"
-    "github.com/curaious/uno/pkg/agent-framework/core"
-    "github.com/hastekit/hastekit-sdk-go/pkg/agents/tools""
-    "github.com/hastekit/hastekit-sdk-go/pkg/gateway"
-    "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
-    "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
-    "github.com/hastekit/hastekit-sdk-go"
+	"github.com/bytedance/sonic"
+	hastekit "github.com/hastekit/hastekit-sdk-go"
+	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
+	"github.com/hastekit/hastekit-sdk-go/pkg/agents/tools"
+	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
+	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
+	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
+	"github.com/hastekit/hastekit-sdk-go/pkg/utils"
 )
 
 func main() {
-    // Initialize SDK client
-    client, err := sdk.New(&sdk.ClientOptions{
-		LLMConfigs: sdk.NewInMemoryConfigStore([]*gateway.ProviderConfig{
+	// Initialize SDK client
+	client, err := hastekit.New(&hastekit.ClientOptions{
+		ProviderConfigs: []gateway.ProviderConfig{
 			{
 				ProviderName:  llm.ProviderNameOpenAI,
 				BaseURL:       "",
@@ -103,62 +103,63 @@ func main() {
 					},
 				},
 			},
-		}),
+		},
 	})
-    if err != nil {
-        log.Fatal(err)
-    }
+	if err != nil {
+		log.Fatal(err)
+	}
 
-    // Create LLM model
-    model := client.NewLLM(sdk.LLMOptions{
-        Provider: llm.ProviderNameOpenAI,
-        Model:    "gpt-4o-mini",
-    })
+	// Create LLM model
+	model := client.NewLLM(hastekit.LLMOptions{
+		Provider: llm.ProviderNameOpenAI,
+		Model:    "gpt-4o-mini",
+	})
 
-    // Create a specialized agent that will act as a tool
-    subAgent := client.NewAgent(&sdk.AgentOptions{
-        Name:        "Hello world agent",
-        Instruction: client.Prompt("You are helpful assistant."),
-        LLM:         model,
-    })
+	// Create a specialized agent that will act as a tool
+	subAgent := client.NewAgent(&hastekit.AgentOptions{
+		Name:        "Hello world agent",
+		Instruction: client.Prompt("You are helpful assistant."),
+		LLM:         model,
+	})
 
-    // Wrap the agent as a tool
-    agentTool := tools.NewAgentTool(&responses.ToolUnion{
-        OfFunction: &responses.FunctionTool{
-            Name:        "get_user_name",
-            Description: utils.Ptr("Returns the user's name"),
-            Parameters: map[string]any{
-                "type": "object",
-                "properties": map[string]any{
-                    "user_id": map[string]any{
-                        "type":        "string",
-                        "description": "The user ID to look up",
-                    },
-                },
-                "required": []string{"user_id"},
-            },
-        },
-    }, subAgent)
+	// Wrap the agent as a tool
+	agentTool := tools.NewAgentTool(&responses.ToolUnion{
+		OfFunction: &responses.FunctionTool{
+			Name:        "get_user_name",
+			Description: utils.Ptr("Returns the user's name"),
+			Parameters: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"user_id": map[string]any{
+						"type":        "string",
+						"description": "The user ID to look up",
+					},
+				},
+				"required": []string{"user_id"},
+			},
+		},
+	}, subAgent)
 
-    // Create the main agent that uses the agent tool
-    agent := client.NewAgent(&sdk.AgentOptions{
-        Name:        "Hello world agent",
-        Instruction: client.Prompt("You are helpful assistant."),
-        LLM:         model,
-        Tools:       []core.Tool{agentTool},
-    })
+	// Create the main agent that uses the agent tool
+	agent := client.NewAgent(&hastekit.AgentOptions{
+		Name:        "Hello world agent",
+		Instruction: client.Prompt("You are helpful assistant."),
+		LLM:         model,
+		Tools:       []agents.Tool{agentTool},
+	})
 
-    // Execute the main agent
+	// Execute the main agent
 	out, err := agent.Execute(context.Background(), &agents.AgentInput{
-        Messages: []responses.InputMessageUnion{
-            responses.UserMessage("Hello!"),
-        },
-    })
-    if err != nil {
-        log.Fatal(err)
-    }
+		Messages: []responses.InputMessageUnion{
+			responses.UserMessage("Hello!"),
+		},
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
 
-    b, _ := sonic.Marshal(out)
-    fmt.Println(string(b))
+	b, _ := sonic.Marshal(out)
+	fmt.Println(string(b))
 }
+
 ```

@@ -2,32 +2,15 @@
 title: Embeddings
 ---
 
-Uno SDK supports generating text embeddings with various LLM providers like OpenAI and Gemini.
-
-## Instantiate a model
-
-Create an LLM model instance with an embedding model from your provider.
-
-```go
-// OpenAI
-model := client.NewLLM(sdk.LLMOptions{
-    Provider: llm.ProviderNameOpenAI,
-    Model:    "text-embedding-ada-002",
-})
-
-// Gemini
-model := client.NewLLM(sdk.LLMOptions{
-    Provider: llm.ProviderNameGemini,
-    Model:    "models/gemini-embedding-001",
-})
-```
+HasteKit SDK supports generating text embeddings with various LLM providers like OpenAI and Gemini.
 
 ## Generate embeddings
 
 Generate embeddings for a single text input.
 
 ```go
-resp, err := model.NewEmbedding(context.Background(), &embeddings.Request{
+resp, err := client.NewEmbedding(context.Background(), &embeddings.Request{
+    Model: "Gemini/models/gemini-embedding-001",
     Input: embeddings.InputUnion{
         OfString: utils.Ptr("The food was delicious and the waiter..."),
     },
@@ -69,7 +52,8 @@ if resp.Usage != nil {
 Generate embeddings for multiple texts in a single request.
 
 ```go
-resp, err := model.NewEmbedding(context.Background(), &embeddings.Request{
+resp, err := client.NewEmbedding(context.Background(), &embeddings.Request{
+    Model: "Gemini/models/gemini-embedding-001",
     Input: embeddings.InputUnion{
         OfList: []string{
             "The food was delicious",
