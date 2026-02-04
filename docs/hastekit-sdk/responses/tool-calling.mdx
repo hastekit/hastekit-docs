@@ -103,7 +103,8 @@ for chunk := range stream {
 After executing the requested tool, you can send the results back to the model to continue the conversation. Use the `OfFunctionCallOutput` message type in the `InputMessageList`.
 
 ```go
-resp, err := model.NewResponses(ctx, &responses.Request{
+resp, err := client.NewResponses(ctx, &responses.Request{
+    Model: "OpenAI/gpt-4.1-mini",
     Input: responses.InputUnion{
         OfInputMessageList: responses.InputMessageList{
             // ... original user message ...

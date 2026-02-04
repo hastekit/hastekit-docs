@@ -46,17 +46,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	//model := client.NewLLM(hastekit.LLMOptions{
-	//	Provider: llm.ProviderNameOpenAI,
-	//	Model:    "text-embedding-ada-002",
-	//})
-
-	model := client.NewLLM(hastekit.LLMOptions{
-		Provider: llm.ProviderNameGemini,
-		Model:    "models/gemini-embedding-001",
-	})
-
-	resp, err := model.NewEmbedding(context.Background(), &embeddings.Request{
+	resp, err := client.NewEmbedding(context.Background(), &embeddings.Request{
+		Model: "OpenAI/text-embedding-ada-002", // "Gemini/models/gemini-embedding-001",
 		Input: embeddings.InputUnion{
 			OfString: utils.Ptr("The food was delicious and the waiter..."),
 		},

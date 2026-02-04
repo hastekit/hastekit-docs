@@ -35,14 +35,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	model := client.NewLLM(hastekit.LLMOptions{
-		Provider: llm.ProviderNameOpenAI,
-		Model:    "gpt-4.1-mini",
-	})
-
-	stream, err := model.NewStreamingResponses(
+	stream, err := client.NewStreamingResponses(
 		context.Background(),
 		&responses.Request{
+			Model:        "OpenAI/gpt-4.1-mini",
 			Instructions: utils.Ptr("You are helpful assistant. You will greet the user by their name."),
 			Input: responses.InputUnion{
 				OfString: utils.Ptr("Hello!"),

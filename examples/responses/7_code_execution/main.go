@@ -35,14 +35,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	model := client.NewLLM(hastekit.LLMOptions{
-		Provider: llm.ProviderNameOpenAI,
-		Model:    "gpt-4.1-mini",
-	})
-
-	stream, err := model.NewStreamingResponses(
+	stream, err := client.NewStreamingResponses(
 		context.Background(),
 		&responses.Request{
+			Model:        "OpenAI/gpt-4.1-mini",
 			Instructions: utils.Ptr("You are a personal math tutor. When asked a math question, write and run code using the python tool to answer the question."),
 			Input: responses.InputUnion{
 				OfInputMessageList: responses.InputMessageList{

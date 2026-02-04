@@ -34,14 +34,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	model := client.NewLLM(hastekit.LLMOptions{
-		Provider: llm.ProviderNameOpenAI,
-		Model:    "o4-mini",
-	})
-
-	stream, err := model.NewStreamingResponses(
+	stream, err := client.NewStreamingResponses(
 		context.Background(),
 		&responses.Request{
+			Model:        "OpenAI/o4-mini",
 			Instructions: utils.Ptr("You are helpful assistant. Reason before answering."),
 			Input: responses.InputUnion{
 				OfString: utils.Ptr("If 2+4=6, what would be 22+44=?"),

@@ -177,7 +177,7 @@ func main() {
     }
 
     // Generate speech
-    resp, err := model.NewSpeech(context.Background(), &speech.Request{
+    resp, err := client.NewSpeech(context.Background(), &speech.Request{
         Model:          "OpenAI/tts-1",
         Input:          "Hello! This is a text-to-speech example using HasteKit SDK.",
         Voice:          "alloy",

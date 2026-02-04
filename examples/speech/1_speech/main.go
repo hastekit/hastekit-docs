@@ -2,18 +2,18 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 
 	hastekit "github.com/hastekit/hastekit-sdk-go"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
+	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/speech"
 	"github.com/hastekit/hastekit-sdk-go/pkg/utils"
 )
 
 func main() {
+	// Initialize SDK client
 	client, err := hastekit.New(&hastekit.ClientOptions{
 		ProviderConfigs: []gateway.ProviderConfig{
 			{
@@ -29,30 +29,27 @@ func main() {
 			},
 		},
 	})
-
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	stream, err := client.NewStreamingResponses(
-		context.Background(),
-		&responses.Request{
-			Model:        "OpenAI/gpt-4.1-mini",
-			Instructions: utils.Ptr("You are helpful assistant. You greet user with a light-joke"),
-			Input: responses.InputUnion{
-				OfString: utils.Ptr("Hello!"),
-			},
-		},
-	)
+	// Generate speech
+	resp, err := client.NewSpeech(context.Background(), &speech.Request{
+		Model:          "OpenAI/tts-1",
+		Input:          "Hello! This is a text-to-speech example using HasteKit SDK.",
+		Voice:          "alloy",
+		ResponseFormat: utils.Ptr("mp3"),
+	})
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	acc := ""
-	for chunk := range stream {
-		if chunk.OfOutputTextDelta != nil {
-			acc += chunk.OfOutputTextDelta.Delta
-		}
+	// Save audio file
+	err = os.WriteFile("output.mp3", resp.Audio, 0644)
+	if err != nil {
+		log.Fatal(err)
 	}
-	fmt.Println(acc)
+
+	log.Printf("Audio generated successfully! Size: %d bytes, Type: %s\n",
+		len(resp.Audio), resp.ContentType)
 }
