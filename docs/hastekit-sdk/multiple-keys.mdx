@@ -41,7 +41,7 @@ import (
 
 func main() {
 	// Define multiple API keys for OpenAI with different weights
-	openAIConfig := &gateway.ProviderConfig{
+	providerConfigs := []gateway.ProviderConfig{{
 		ProviderName: llm.ProviderNameOpenAI,
 		ApiKeys: []*gateway.APIKeyConfig{
 			{
@@ -53,14 +53,11 @@ func main() {
 				Weight: 30, // This key will be used ~30% of the time
 			},
 		},
-	}
-
-	// Initialize the config store
-	configStore := hastekit.NewInMemoryConfigStore([]*gateway.ProviderConfig{openAIConfig})
+	}}
 
 	// Create the HasteKit client
 	HasteKit, err := hastekit.New(&hastekit.ClientOptions{
-		LLMConfigs: configStore,
+		ProviderConfigs: providerConfigs,
 	})
 	if err != nil {
 		log.Fatalf("failed to create HasteKit client: %v", err)

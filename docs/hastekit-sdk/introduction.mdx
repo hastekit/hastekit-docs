@@ -5,7 +5,7 @@ description: A Golang SDK for making LLM calls, building AI agents, and orchestr
 
 ## HasteKit SDK
 
-A Golang SDK for developers who want fine-grained control over LLM interactions and agent orchestration. The HasteKit SDK abstracts away provider differences, letting you switch between OpenAI, Anthropic, and Gemini with a single line change. Build agents, connect MCP tools, and get structured outputs—all through a unified API.
+A Golang SDK for developers who want fine-grained control over LLM interactions and agent orchestration. The HasteKit SDK abstracts away provider differences, letting you switch between OpenAI, Anthropic, Gemini and more with a single line change. Build agents, connect MCP tools, and get structured outputs—all through a unified API.
 
 ### Core Capabilities
 
@@ -14,7 +14,7 @@ A Golang SDK for developers who want fine-grained control over LLM interactions 
     Access to multiple providers through a unified API. Seamlessly switch between OpenAI, Anthropic, Gemini, and more.
   </Card>
   <Card title="Agent SDK" icon="robot">
-    Build sophisticated AI agents with system instructions, tools, conversation history, summarization, and multi-step reasoning.
+    Build sophisticated AI agents with dynamic system instructions, tools, conversation history, summarization, and multi-step reasoning.
   </Card>
   <Card title="Human-in-the-loop" icon="person">
     Integrate human feedback into agent workflows for review and approval.
@@ -31,12 +31,8 @@ A Golang SDK for developers who want fine-grained control over LLM interactions 
     Use the SDK as a lightweight wrapper to call any LLM provider. Simply change the `Provider` and `Model` to switch between providers—your application logic stays the same:
 
 ```go
-model := client.NewLLM(hastekit.LLMOptions{
-    Provider: llm.ProviderNameOpenAI,
-    Model:    "gpt-4.1-mini",
-})
-
-resp, _ := model.NewResponses(ctx, &responses.Request{
+resp, _ := client.NewResponses(ctx, &responses.Request{
+    Model: "OpenAI/gpt-4.1-mini", // or "Anthropic/claude-haiku-4-5" or "Gemini/gemini-2.5-flash"
     Instructions: utils.Ptr("You are a helpful assistant."),
     Input: responses.InputUnion{
         OfString: utils.Ptr("What is the capital of France?"),
