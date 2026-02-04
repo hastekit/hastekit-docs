@@ -40,9 +40,6 @@ import (
 func main() {
     // Initialize the SDK with gateway configuration
     client, err := hastekit.New(&hastekit.ClientOptions{
-
-    })
-    client, err := hastekit.New(&hastekit.ClientOptions{
         ServerConfig: hastekit.ServerConfig{
             Endpoint:  "http://localhost:6060",  // Your HasteKit gateway endpoint
             VirtualKey: "sk-hk-your-virtual-key-here",  // Your virtual key
