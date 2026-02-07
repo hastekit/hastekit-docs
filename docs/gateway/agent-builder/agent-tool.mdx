@@ -1,0 +1,38 @@
+---
+title: Agent as a Tool
+description: Configure an agent to use another agent as a tool
+---
+
+Use other agents in the same project as callable tools. When enabled, the main agent can invoke the selected agent(s) as tools during a run, letting you compose agents (e.g., a planner that delegates to specialist agents).
+
+## Overview
+
+The **Agent as a Tool** feature lets you:
+
+- Choose one or more agents from the same project to act as tools
+- Pin each tool to a specific version or use **$LATEST**
+- Optionally add a description so the model knows when to use the tool
+
+Only agents in the same project are listed. The current agent is excluded so you cannot add an agent as a tool to itself.
+
+## Runtime behavior
+
+When the main agent calls an agent tool:
+
+- **No history** – The sub-agent runs without conversation history; each call is a fresh run with only the inputs passed for that tool call.
+- **No streaming** – Intermediate outputs from the sub-agent are not streamed. Only the **final output** is returned to the main agent as the tool call result.
+
+## Configuring Agent as a Tool
+
+1. Open your agent in the Agent Builder and go to the **Tools** tab.
+2. In the **Agent as a Tool** section, click **Add Agent Tool**.
+3. For each tool entry:
+   - **Agent** – Select the agent from the dropdown (other agents in the project; current agent is excluded).
+   - **Version** – Choose **$LATEST** (always use the latest version) or a specific version.
+   - **Description** – Optional. Describe what this agent tool does; this is shown to the model when the tool is available and can help it decide when to call the tool.
+4. Add more tools by clicking **Add Agent Tool** again.
+5. Remove a tool with the delete (trash) icon on its row.
+6. Save your agent configuration.
+
+You can add multiple agents as tools. Each entry is an independent tool the main agent can call.
+
