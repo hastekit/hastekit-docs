@@ -7,7 +7,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initNavbar();
     initMobileMenu();
     initCodeTabs();
-    initGatewayTabs();
     initSmoothScroll();
     initScrollAnimations();
 });

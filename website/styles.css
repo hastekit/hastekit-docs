@@ -718,6 +718,10 @@ section {
     background-clip: text;
 }
 
+.gateway-section {
+    background: var(--color-bg-elevated);
+}
+
 .gateway-section .product-title {
     background: linear-gradient(135deg, #38bdf8 0%, #818cf8 50%, #a78bfa 100%);
     -webkit-background-clip: text;
@@ -795,12 +799,8 @@ section {
 
 /* Gateway Panels */
 .gateway-panel {
-    display: none;
-    padding: 80px 0;
-}
-
-.gateway-panel.active {
     display: block;
+    padding: 80px 0;
 }
 
 #llm-gateway {
@@ -808,7 +808,7 @@ section {
 }
 
 #agent-gateway {
-    background: var(--color-bg);
+    background: var(--color-bg-elevated);
 }
 
 /* ================================
@@ -1324,6 +1324,23 @@ section {
     font-size: 13px;
     color: var(--color-text-muted);
     line-height: 1.5;
+}
+
+/* SDK Install */
+.sdk-install {
+    max-width: 600px;
+    margin: 0 auto 48px;
+    text-align: center;
+}
+
+.sdk-install h3 {
+    font-size: 18px;
+    margin-bottom: 16px;
+    color: var(--color-text);
+}
+
+.sdk-install .code-window {
+    text-align: left;
 }
 
 .sdk-cta {
