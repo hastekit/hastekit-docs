@@ -1,7 +1,7 @@
 {
     "$schema": "https://mintlify.com/docs.json",
     "theme": "aspen",
-    "name": "HasteKit",
+    "name": "⚡ HasteKit",
     "colors": {
       "primary": "#9F8DF8",
       "light": "#9F8DF8",
@@ -9,6 +9,9 @@
     },
     "appearance": {
         "default": "dark"
+    },
+    "background": {
+      "decoration": "grid"
     },
     "navbar": {
       "links": [
@@ -31,6 +34,11 @@
   },
   "navigation": {
         "tabs": [
+          {
+            "tab": "Home",
+            "icon": "home",
+            "href": "https://hastekit.ai"
+          },
           {
             "tab": "HasteKit SDK",
             "icon": "tools",
