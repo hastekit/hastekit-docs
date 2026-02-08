@@ -1033,6 +1033,56 @@ section {
     background: #a78bfa;
 }
 
+/* Feature Documentation Link */
+.feature-doc-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 24px;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--color-text-muted);
+    text-decoration: none;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.feature-doc-link:hover {
+    color: var(--color-text);
+    border-color: var(--color-text-muted);
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.feature-doc-link svg {
+    width: 16px;
+    height: 16px;
+    transition: transform 0.2s ease;
+}
+
+.feature-doc-link:hover svg {
+    transform: translate(2px, -2px);
+}
+
+.sdk-feature .feature-doc-link:hover {
+    color: #4ade80;
+    border-color: rgba(74, 222, 128, 0.4);
+    background: rgba(74, 222, 128, 0.05);
+}
+
+.llm-gateway-feature .feature-doc-link:hover {
+    color: #38bdf8;
+    border-color: rgba(56, 189, 248, 0.4);
+    background: rgba(56, 189, 248, 0.05);
+}
+
+.agent-gateway-feature .feature-doc-link:hover {
+    color: #a78bfa;
+    border-color: rgba(167, 139, 250, 0.4);
+    background: rgba(167, 139, 250, 0.05);
+}
+
 .feature-detail-visual {
     display: flex;
     justify-content: center;
@@ -1141,6 +1191,50 @@ section {
     font-weight: 600;
     color: #38bdf8;
     text-align: right;
+}
+
+/* Activity Graph */
+.activity-graph {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.graph-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    height: 120px;
+    padding: 16px 0;
+}
+
+.graph-bar {
+    flex: 1;
+    height: var(--height, 50%);
+    background: linear-gradient(to top, #38bdf8, #818cf8);
+    border-radius: 4px 4px 0 0;
+    opacity: 0.8;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.graph-bar:hover {
+    opacity: 1;
+    transform: scaleY(1.05);
+    transform-origin: bottom;
+}
+
+.graph-labels {
+    display: flex;
+    justify-content: space-between;
+    padding-top: 12px;
+    border-top: 1px solid var(--color-border);
+}
+
+.graph-labels span {
+    font-size: 11px;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
 /* Metrics Grid */
@@ -1372,10 +1466,11 @@ section {
 
     .feature-detail-text {
         max-width: 100%;
+        order: -1; /* Text/description comes first on mobile */
     }
 
     .feature-detail-visual {
-        order: -1;
+        order: 1; /* Visual/code comes second on mobile */
     }
 
     .info-card,
