@@ -3,7 +3,9 @@
     "theme": "aspen",
     "name": "HasteKit",
     "colors": {
-        "primary": "#9F8DF8"
+      "primary": "#9F8DF8",
+      "light": "#9F8DF8",
+      "dark": "#9F8DF8"
     },
     "appearance": {
         "default": "dark"
