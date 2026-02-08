@@ -3,7 +3,7 @@
     "theme": "aspen",
     "name": "HasteKit",
     "colors": {
-        "primary": "#4ade80"
+        "primary": "##9F8DF8"
     },
     "appearance": {
         "default": "dark"
@@ -24,7 +24,7 @@
   },
   "seo": {
     "metatags": {
-      "canonical": "https://docs.hastekit.ai"
+      "canonical": "https://hastekit.ai"
     }
   },
   "navigation": {

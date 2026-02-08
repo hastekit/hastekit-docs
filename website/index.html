@@ -10,6 +10,15 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-VMGGRQQQV8"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'G-VMGGRQQQV8');
+    </script>
 </head>
 <body>
     <!-- Navigation -->
@@ -171,10 +180,9 @@
                 <div class="feature-detail-text">
                     <span class="feature-number">01</span>
                     <h3>Provider Abstraction</h3>
-                    <p>Switch between LLM providers with a single line change. The SDK provides a unified interface across OpenAI, Anthropic, Gemini, xAI, and Ollama — same code, any provider.</p>
+                    <p>Switch between LLM providers with a single line change. The SDK provides a unified interface across OpenAI, Anthropic, Gemini, xAI, and Ollama - same code, any provider.</p>
                     <ul class="feature-highlights">
                         <li>Unified Responses API across all providers</li>
-                        <li>Provider-specific features accessible when needed</li>
                         <li>Automatic response normalization</li>
                         <li>Streaming support for all providers</li>
                     </ul>
@@ -216,7 +224,6 @@ resp, _ := client.NewResponses(ctx, &responses.Request{
                         <li>Model Context Protocol (MCP) server integration</li>
                         <li>Type-safe function tool definitions</li>
                         <li>Agent-as-tool for hierarchical workflows</li>
-                        <li>Automatic tool result handling</li>
                     </ul>
                     <a href="https://hastekit.ai/docs/hastekit-sdk/agents/tools/function-tools" target="_blank" class="feature-doc-link">
                         <span>View Documentation</span>
@@ -302,7 +309,7 @@ out, _ := agent.Execute(ctx, &agents.AgentInput{
                 <div class="feature-detail-text">
                     <span class="feature-number">04</span>
                     <h3>Durable Execution</h3>
-                    <p>Build agents that survive failures. Integrate with Temporal or Restate for crash recovery, automatic retries, and long-running workflows that can span hours or days.</p>
+                    <p>Build agents that survive failures. Integrate with Temporal or Restate for crash recovery, automatic retries, and long-running workflows that can span hours or even days.</p>
                     <ul class="feature-highlights">
                         <li>Temporal workflow integration</li>
                         <li>Restate durable execution support</li>
@@ -350,8 +357,6 @@ agent := client.NewRestateAgent(&hastekit.AgentOptions{
                     <ul class="feature-highlights">
                         <li>Tool-level approval requirements</li>
                         <li>Async approval workflows</li>
-                        <li>Customizable approval handlers</li>
-                        <li>Timeout and fallback behavior</li>
                     </ul>
                     <a href="https://hastekit.ai/docs/hastekit-sdk/agents/tools/human-in-the-loop" target="_blank" class="feature-doc-link">
                         <span>View Documentation</span>
@@ -459,11 +464,10 @@ agent := client.NewRestateAgent(&hastekit.AgentOptions{
                 <div class="feature-detail-text">
                     <span class="feature-number">01</span>
                     <h3>Virtual Keys</h3>
-                    <p>Generate secure <code>sk-hk-*</code> API keys with fine-grained access control. Distribute keys to teams, applications, or customers without exposing your actual provider API keys.</p>
+                    <p>Generate secure virtual API keys with fine-grained access control. Distribute keys to teams, applications, or customers without exposing your actual provider API keys.</p>
                     <ul class="feature-highlights">
                         <li>Model-level access restrictions</li>
                         <li>Per-key rate limiting (requests, tokens)</li>
-                        <li>Budget caps and usage alerts</li>
                         <li>Instant key revocation</li>
                     </ul>
                     <a href="https://hastekit.ai/docs/gateway/llm/virtual-keys" target="_blank" class="feature-doc-link">
@@ -506,9 +510,7 @@ response = client.responses.create(
                     <p>Distribute load across multiple provider API keys to maximize throughput and avoid rate limits. Configure weighted distribution, automatic failover, and key rotation.</p>
                     <ul class="feature-highlights">
                         <li>Weighted round-robin distribution</li>
-                        <li>Automatic failover on rate limits</li>
-                        <li>Per-key usage tracking</li>
-                        <li>Priority-based routing</li>
+                        <li>Enable / disable API keys quickly</li>
                     </ul>
                     <a href="https://hastekit.ai/docs/gateway/llm/providers#adding-api-keys" target="_blank" class="feature-doc-link">
                         <span>View Documentation</span>
@@ -555,7 +557,6 @@ response = client.responses.create(
                     <ul class="feature-highlights">
                         <li>Request/response logging with ClickHouse</li>
                         <li>OpenTelemetry traces and metrics</li>
-                        <li>Per-model cost tracking</li>
                         <li>Real-time dashboards</li>
                     </ul>
                     <a href="https://hastekit.ai/docs/gateway/llm/tracing" target="_blank" class="feature-doc-link">
@@ -607,7 +608,7 @@ response = client.responses.create(
             <div class="section-header">
                 <span class="section-badge badge-purple">Agent Gateway</span>
                 <h2 class="section-title">No-Code Agent Runtime</h2>
-                <p class="section-subtitle">Build, configure, and deploy AI agents through a visual dashboard. No code required — from simple chatbots to complex multi-step workflows with full observability.</p>
+                <p class="section-subtitle">Build, configure, and deploy AI agents through a visual dashboard. No code required - from simple chatbots to complex multi-step workflows with versioning and full observability.</p>
             </div>
         </div>
     </section>
@@ -619,7 +620,7 @@ response = client.responses.create(
                 <div class="feature-detail-text">
                     <span class="feature-number">01</span>
                     <h3>Visual Agent Builder</h3>
-                    <p>Configure every aspect of your agent through an intuitive UI. Set system prompts, model parameters, structured output schemas, and connect MCP servers, function tools, or other agents — with optional human-in-the-loop approval for sensitive operations.</p>
+                    <p>Configure every aspect of your agent through an intuitive UI. Set system prompts, model parameters, structured output schemas, and connect MCP servers, function tools, or other agents - with optional human-in-the-loop approval and more.</p>
                     <ul class="feature-highlights">
                         <li>System prompt & model configuration</li>
                         <li>Structured output with JSON schemas</li>
@@ -684,12 +685,10 @@ response = client.responses.create(
                 <div class="feature-detail-text">
                     <span class="feature-number">02</span>
                     <h3>Agent Skills</h3>
-                    <p>Package reusable capabilities as skills that can be shared across agents. Skills bundle prompts, tools, and configuration into portable modules that agents can learn and use.</p>
+                    <p>Skills bundle prompts, tools, and configuration into portable modules that agents can learn and use only when it is required.</p>
                     <ul class="feature-highlights">
-                        <li>Reusable skill packages</li>
-                        <li>Version-controlled skill library</li>
-                        <li>Cross-agent skill sharing</li>
-                        <li>Skill marketplace integration</li>
+                        <li>Skills made available to agents through Filesystem</li>
+                        <li>Progressively load skills to optimize context window</li>
                     </ul>
                     <a href="https://hastekit.ai/docs/gateway/agent-builder/skills" target="_blank" class="feature-doc-link">
                         <span>View Documentation</span>
@@ -736,9 +735,8 @@ response = client.responses.create(
                     <p>Execute agent code in isolated, secure Kubernetes sandboxes. Each execution runs in its own container with configurable resource limits, network policies, and filesystem isolation.</p>
                     <ul class="feature-highlights">
                         <li>Isolated Kubernetes pods per execution</li>
-                        <li>Configurable resource limits</li>
-                        <li>Network policy enforcement</li>
                         <li>Secure filesystem access</li>
+                        <li>Customise docker image for sandbox</li>
                     </ul>
                     <a href="https://hastekit.ai/docs/gateway/agent-builder/sandbox-tool" target="_blank" class="feature-doc-link">
                         <span>View Documentation</span>
@@ -920,14 +918,14 @@ response = client.responses.create(
                         <tr>
                             <td><strong>Anthropic</strong></td>
                             <td class="check">✓</td>
-                            <td class="cross">—</td>
+                            <td class="cross">-</td>
                             <td class="check">✓</td>
                             <td class="check">✓</td>
                             <td class="check">✓</td>
                             <td class="check">✓</td>
                             <td class="check">✓</td>
-                            <td class="cross">—</td>
-                            <td class="cross">—</td>
+                            <td class="cross">-</td>
+                            <td class="cross">-</td>
                         </tr>
                         <tr>
                             <td><strong>Gemini</strong></td>
@@ -944,26 +942,26 @@ response = client.responses.create(
                         <tr>
                             <td><strong>xAI</strong></td>
                             <td class="check">✓</td>
-                            <td class="cross">—</td>
-                            <td class="cross">—</td>
+                            <td class="cross">-</td>
+                            <td class="cross">-</td>
                             <td class="check">✓</td>
                             <td class="check">✓</td>
                             <td class="check">✓</td>
                             <td class="check">✓</td>
-                            <td class="cross">—</td>
-                            <td class="cross">—</td>
+                            <td class="cross">-</td>
+                            <td class="cross">-</td>
                         </tr>
                         <tr>
                             <td><strong>Ollama</strong></td>
                             <td class="check">✓</td>
-                            <td class="cross">—</td>
-                            <td class="cross">—</td>
+                            <td class="cross">-</td>
+                            <td class="cross">-</td>
                             <td class="check">✓</td>
                             <td class="check">✓</td>
                             <td class="check">✓</td>
                             <td class="check">✓</td>
-                            <td class="cross">—</td>
-                            <td class="cross">—</td>
+                            <td class="cross">-</td>
+                            <td class="cross">-</td>
                         </tr>
                     </tbody>
                 </table>
@@ -984,7 +982,7 @@ response = client.responses.create(
                     <div class="step-number">1</div>
                     <div class="step-content">
                         <h3>Launch the Gateway</h3>
-                        <p>Run the HasteKit gateway with a single command. Includes dashboard, gateway, and all required infrastructure.</p>
+                        <p>Run the HasteKit gateway with a single command. Includes both LLM gateway and Agent gateway.</p>
                         <div class="code-window small">
                             <div class="code-header">
                                 <div class="code-dots">
