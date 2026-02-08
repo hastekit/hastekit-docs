@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HasteKit - Open Source LLM Infrastructure</title>
-    <meta name="description" content="HasteKit provides two powerful products: Gateway (LLM Gateway + Agent Gateway) for unified API access and observability, and SDK for building production-ready AI agents in Go.">
+    <title>HasteKit - GenAI Application Development Kit</title>
+    <meta name="description" content="HasteKit provides two powerful products: Gateway (LLM Gateway + Agent Gateway) for unified API access and observability, and Golang SDK for building production-ready AI agents in Go.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -20,13 +20,7 @@
                 <span class="logo-text">HasteKit</span>
             </a>
             <div class="nav-links">
-                <div class="nav-dropdown">
-                    <a href="#gateway" class="nav-dropdown-trigger">Gateway <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M6 9l6 6 6-6"/></svg></a>
-                    <div class="nav-dropdown-menu">
-                        <a href="#llm-gateway">LLM Gateway</a>
-                        <a href="#agent-gateway">Agent Gateway</a>
-                    </div>
-                </div>
+                <a href="#gateway">Gateway</a>
                 <a href="#sdk">SDK</a>
                 <a href="https://docs.hastekit.ai" target="_blank">Docs</a>
             </div>
@@ -54,16 +48,16 @@
         <div class="container hero-container">
             <div class="hero-badge">
                 <span class="badge-dot"></span>
-                Open Source LLM Infrastructure
+                GenAI Development Toolkit
             </div>
             <h1 class="hero-title">
                 Build AI Applications<br>
                 <span class="gradient-text">Faster & Smarter</span>
             </h1>
             <p class="hero-subtitle">
-                HasteKit provides the complete infrastructure for AI applications. 
-                <strong>Gateway</strong> for unified LLM access and agent hosting. 
-                <strong>SDK</strong> for building production-ready agents in Go.
+                HasteKit provides the toolkits for developing AI applications -
+                <strong>Go SDK</strong> for building production-ready agents in Go.
+                <strong>Gateway</strong> a platform for unified LLM access and building agents with full observability.
             </p>
             <div class="hero-cta">
                 <a href="#gateway" class="btn btn-primary btn-lg">
@@ -174,6 +168,177 @@
         </div>
     </section>
 
+
+
+    <!-- ============================================ -->
+    <!-- PRODUCT 2: SDK                              -->
+    <!-- ============================================ -->
+
+    <section id="sdk" class="product-section sdk-section">
+        <div class="container">
+            <div class="product-section-header">
+                <div class="product-label">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                    <span>Product</span>
+                </div>
+                <h2 class="product-title">HasteKit SDK</h2>
+                <p class="product-description">
+                    Go SDK for building production-ready AI agents. Multi-provider support, tool calling,
+                    durable execution, and everything you need to build sophisticated AI applications in code.
+                </p>
+            </div>
+
+            <!-- SDK Features Grid -->
+            <div class="sdk-features">
+                <div class="sdk-card">
+                    <div class="sdk-icon green">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                    </div>
+                    <h3>Multi-Provider Support</h3>
+                    <p>Switch between OpenAI, Anthropic, Gemini, and more with minimal configuration changes.</p>
+                </div>
+                <div class="sdk-card">
+                    <div class="sdk-icon green">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                    </div>
+                    <h3>Tool Calling</h3>
+                    <p>Define functions that agents can call. Supports MCP servers and custom tools.</p>
+                </div>
+                <div class="sdk-card">
+                    <div class="sdk-icon green">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+                    </div>
+                    <h3>Structured Output</h3>
+                    <p>Define JSON schemas for consistent, validated responses from your agents.</p>
+                </div>
+                <div class="sdk-card">
+                    <div class="sdk-icon green">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    </div>
+                    <h3>Durable Execution</h3>
+                    <p>Temporal and Restate support for crash recovery and long-running workflows.</p>
+                </div>
+                <div class="sdk-card">
+                    <div class="sdk-icon green">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    </div>
+                    <h3>Conversation History</h3>
+                    <p>Built-in conversation management with automatic summarization.</p>
+                </div>
+                <div class="sdk-card">
+                    <div class="sdk-icon green">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                    </div>
+                    <h3>Streaming Responses</h3>
+                    <p>Real-time response streaming for responsive user experiences.</p>
+                </div>
+            </div>
+
+            <!-- Code Examples -->
+            <div class="code-examples">
+                <div class="code-tabs">
+                    <button class="code-tab active" data-tab="setup">Setup</button>
+                    <button class="code-tab" data-tab="responses">LLM Calls</button>
+                    <button class="code-tab" data-tab="agent">Agent</button>
+                </div>
+                <div class="code-window large">
+                    <div class="code-header">
+                        <div class="code-dots">
+                            <span></span><span></span><span></span>
+                        </div>
+                        <span class="code-title">main.go</span>
+                    </div>
+                    <div class="code-panels">
+                        <pre class="code-content code-panel active" data-panel="setup"><code><span class="code-keyword">package</span> main
+
+<span class="code-keyword">import</span> (
+    <span class="code-string">"os"</span>
+    hastekit <span class="code-string">"github.com/hastekit/hastekit-sdk-go"</span>
+    <span class="code-string">"github.com/hastekit/hastekit-sdk-go/pkg/gateway"</span>
+    <span class="code-string">"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"</span>
+)
+
+<span class="code-keyword">func</span> main() {
+    <span class="code-comment">// Initialize the SDK with provider configuration</span>
+    client, err := hastekit.New(&hastekit.ClientOptions{
+        ProviderConfigs: []gateway.ProviderConfig{
+            {
+                ProviderName: llm.ProviderNameOpenAI,
+                ApiKeys: []*gateway.APIKeyConfig{
+                    {
+                        Name:   <span class="code-string">"Key 1"</span>,
+                        APIKey: os.Getenv(<span class="code-string">"OPENAI_API_KEY"</span>),
+                    },
+                },
+            },
+        },
+    })
+}</code></pre>
+                        <pre class="code-content code-panel" data-panel="responses"><code><span class="code-keyword">import</span> <span class="code-string">"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"</span>
+
+<span class="code-comment">// Make LLM calls with the Responses API</span>
+resp, err := client.NewResponses(ctx, &responses.Request{
+    Model:        <span class="code-string">"OpenAI/gpt-4.1-mini"</span>,
+    Instructions: utils.Ptr(<span class="code-string">"You are a helpful assistant."</span>),
+    Input: responses.InputUnion{
+        OfString: utils.Ptr(<span class="code-string">"What is the capital of France?"</span>),
+    },
+})
+
+<span class="code-comment">// Extract the generated text from the response</span>
+<span class="code-keyword">for</span> _, output := <span class="code-keyword">range</span> resp.Output {
+    <span class="code-keyword">if</span> output.OfOutputMessage != <span class="code-keyword">nil</span> {
+        <span class="code-keyword">for</span> _, content := <span class="code-keyword">range</span> output.OfOutputMessage.Content {
+            <span class="code-keyword">if</span> content.OfOutputText != <span class="code-keyword">nil</span> {
+                fmt.Println(content.OfOutputText.Text)
+            }
+        }
+    }
+}</code></pre>
+                        <pre class="code-content code-panel" data-panel="agent"><code><span class="code-comment">// Create an agent with system instructions</span>
+agent := client.NewAgent(&hastekit.AgentOptions{
+    Name:        <span class="code-string">"Assistant"</span>,
+    Instruction: client.Prompt(<span class="code-string">"You are a helpful assistant."</span>),
+    LLM: client.NewLLM(hastekit.LLMOptions{
+        Provider: llm.ProviderNameOpenAI,
+        Model:    <span class="code-string">"gpt-4o-mini"</span>,
+    }),
+})
+
+<span class="code-comment">// Execute the agent with user messages</span>
+out, err := agent.Execute(ctx, &agents.AgentInput{
+    Messages: []responses.InputMessageUnion{
+        responses.UserMessage(<span class="code-string">"Hello!"</span>),
+    },
+})
+
+<span class="code-comment">// Extract the agent's response</span>
+<span class="code-keyword">for</span> _, output := <span class="code-keyword">range</span> out.Output {
+    <span class="code-keyword">if</span> output.OfOutputMessage != <span class="code-keyword">nil</span> {
+        <span class="code-keyword">for</span> _, content := <span class="code-keyword">range</span> output.OfOutputMessage.Content {
+            <span class="code-keyword">if</span> content.OfOutputText != <span class="code-keyword">nil</span> {
+                fmt.Println(content.OfOutputText.Text)
+            }
+        }
+    }
+}</code></pre>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sdk-cta">
+                <a href="https://github.com/hastekit/hastekit-sdk-go" target="_blank" class="btn btn-primary btn-lg">
+                    <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                    <span>View SDK on GitHub</span>
+                </a>
+                <a href="https://docs.hastekit.ai/hastekit-sdk" target="_blank" class="btn btn-secondary btn-lg">
+                    <span>Read SDK Docs</span>
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                </a>
+            </div>
+        </div>
+    </section>
+
     <!-- ============================================ -->
     <!-- PRODUCT 1: GATEWAY                          -->
     <!-- ============================================ -->
@@ -187,8 +352,7 @@
                 </div>
                 <h2 class="product-title">HasteKit Gateway</h2>
                 <p class="product-description">
-                    Deploy a single gateway that provides unified LLM access and a powerful agent runtime. 
-                    Two gateways in one — manage API keys, observe requests, and host intelligent agents.
+                    Platform that provides unified LLM access, governance, observability, powerful agent runtime and more.
                 </p>
             </div>
 
@@ -472,10 +636,10 @@ print(response.output_text)</code></pre>
                             <td class="check">✓</td>
                             <td class="cross">—</td>
                             <td class="cross">—</td>
-                            <td class="cross">—</td>
-                            <td class="cross">—</td>
-                            <td class="cross">—</td>
-                            <td class="cross">—</td>
+                            <td class="check">✓</td>
+                            <td class="check">✓</td>
+                            <td class="check">✓</td>
+                            <td class="check">✓</td>
                             <td class="cross">—</td>
                             <td class="cross">—</td>
                         </tr>
@@ -484,184 +648,15 @@ print(response.output_text)</code></pre>
                             <td class="check">✓</td>
                             <td class="cross">—</td>
                             <td class="cross">—</td>
-                            <td class="cross">—</td>
-                            <td class="cross">—</td>
-                            <td class="cross">—</td>
-                            <td class="cross">—</td>
+                            <td class="check">✓</td>
+                            <td class="check">✓</td>
+                            <td class="check">✓</td>
+                            <td class="check">✓</td>
                             <td class="cross">—</td>
                             <td class="cross">—</td>
                         </tr>
                     </tbody>
                 </table>
-            </div>
-        </div>
-    </section>
-
-    <!-- ============================================ -->
-    <!-- PRODUCT 2: SDK                              -->
-    <!-- ============================================ -->
-
-    <section id="sdk" class="product-section sdk-section">
-        <div class="container">
-            <div class="product-section-header">
-                <div class="product-label">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-                    <span>Product</span>
-                </div>
-                <h2 class="product-title">HasteKit SDK</h2>
-                <p class="product-description">
-                    Go SDK for building production-ready AI agents. Multi-provider support, tool calling, 
-                    durable execution, and everything you need to build sophisticated AI applications in code.
-                </p>
-            </div>
-
-            <!-- SDK Features Grid -->
-            <div class="sdk-features">
-                <div class="sdk-card">
-                    <div class="sdk-icon green">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-                    </div>
-                    <h3>Multi-Provider Support</h3>
-                    <p>Switch between OpenAI, Anthropic, Gemini, and more with minimal configuration changes.</p>
-                </div>
-                <div class="sdk-card">
-                    <div class="sdk-icon green">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-                    </div>
-                    <h3>Tool Calling</h3>
-                    <p>Define functions that agents can call. Supports MCP servers and custom tools.</p>
-                </div>
-                <div class="sdk-card">
-                    <div class="sdk-icon green">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
-                    </div>
-                    <h3>Structured Output</h3>
-                    <p>Define JSON schemas for consistent, validated responses from your agents.</p>
-                </div>
-                <div class="sdk-card">
-                    <div class="sdk-icon green">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                    </div>
-                    <h3>Durable Execution</h3>
-                    <p>Temporal and Restate support for crash recovery and long-running workflows.</p>
-                </div>
-                <div class="sdk-card">
-                    <div class="sdk-icon green">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                    </div>
-                    <h3>Conversation History</h3>
-                    <p>Built-in conversation management with automatic summarization.</p>
-                </div>
-                <div class="sdk-card">
-                    <div class="sdk-icon green">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-                    </div>
-                    <h3>Streaming Responses</h3>
-                    <p>Real-time response streaming for responsive user experiences.</p>
-                </div>
-            </div>
-
-            <!-- Code Examples -->
-            <div class="code-examples">
-                <div class="code-tabs">
-                    <button class="code-tab active" data-tab="setup">Setup</button>
-                    <button class="code-tab" data-tab="responses">LLM Calls</button>
-                    <button class="code-tab" data-tab="agent">Agent</button>
-                </div>
-                <div class="code-window large">
-                    <div class="code-header">
-                        <div class="code-dots">
-                            <span></span><span></span><span></span>
-                        </div>
-                        <span class="code-title">main.go</span>
-                    </div>
-                    <div class="code-panels">
-                        <pre class="code-content code-panel active" data-panel="setup"><code><span class="code-keyword">package</span> main
-
-<span class="code-keyword">import</span> (
-    <span class="code-string">"os"</span>
-    hastekit <span class="code-string">"github.com/hastekit/hastekit-sdk-go"</span>
-    <span class="code-string">"github.com/hastekit/hastekit-sdk-go/pkg/gateway"</span>
-    <span class="code-string">"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"</span>
-)
-
-<span class="code-keyword">func</span> main() {
-    <span class="code-comment">// Initialize the SDK with provider configuration</span>
-    client, err := hastekit.New(&hastekit.ClientOptions{
-        ProviderConfigs: []gateway.ProviderConfig{
-            {
-                ProviderName: llm.ProviderNameOpenAI,
-                ApiKeys: []*gateway.APIKeyConfig{
-                    {
-                        Name:   <span class="code-string">"Key 1"</span>,
-                        APIKey: os.Getenv(<span class="code-string">"OPENAI_API_KEY"</span>),
-                    },
-                },
-            },
-        },
-    })
-}</code></pre>
-                        <pre class="code-content code-panel" data-panel="responses"><code><span class="code-keyword">import</span> <span class="code-string">"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"</span>
-
-<span class="code-comment">// Make LLM calls with the Responses API</span>
-resp, err := client.NewResponses(ctx, &responses.Request{
-    Model:        <span class="code-string">"OpenAI/gpt-4.1-mini"</span>,
-    Instructions: utils.Ptr(<span class="code-string">"You are a helpful assistant."</span>),
-    Input: responses.InputUnion{
-        OfString: utils.Ptr(<span class="code-string">"What is the capital of France?"</span>),
-    },
-})
-
-<span class="code-comment">// Extract the generated text from the response</span>
-<span class="code-keyword">for</span> _, output := <span class="code-keyword">range</span> resp.Output {
-    <span class="code-keyword">if</span> output.OfOutputMessage != <span class="code-keyword">nil</span> {
-        <span class="code-keyword">for</span> _, content := <span class="code-keyword">range</span> output.OfOutputMessage.Content {
-            <span class="code-keyword">if</span> content.OfOutputText != <span class="code-keyword">nil</span> {
-                fmt.Println(content.OfOutputText.Text)
-            }
-        }
-    }
-}</code></pre>
-                        <pre class="code-content code-panel" data-panel="agent"><code><span class="code-comment">// Create an agent with system instructions</span>
-agent := client.NewAgent(&hastekit.AgentOptions{
-    Name:        <span class="code-string">"Assistant"</span>,
-    Instruction: client.Prompt(<span class="code-string">"You are a helpful assistant."</span>),
-    LLM: client.NewLLM(hastekit.LLMOptions{
-        Provider: llm.ProviderNameOpenAI,
-        Model:    <span class="code-string">"gpt-4o-mini"</span>,
-    }),
-})
-
-<span class="code-comment">// Execute the agent with user messages</span>
-out, err := agent.Execute(ctx, &agents.AgentInput{
-    Messages: []responses.InputMessageUnion{
-        responses.UserMessage(<span class="code-string">"Hello!"</span>),
-    },
-})
-
-<span class="code-comment">// Extract the agent's response</span>
-<span class="code-keyword">for</span> _, output := <span class="code-keyword">range</span> out.Output {
-    <span class="code-keyword">if</span> output.OfOutputMessage != <span class="code-keyword">nil</span> {
-        <span class="code-keyword">for</span> _, content := <span class="code-keyword">range</span> output.OfOutputMessage.Content {
-            <span class="code-keyword">if</span> content.OfOutputText != <span class="code-keyword">nil</span> {
-                fmt.Println(content.OfOutputText.Text)
-            }
-        }
-    }
-}</code></pre>
-                    </div>
-                </div>
-            </div>
-
-            <div class="sdk-cta">
-                <a href="https://github.com/hastekit/hastekit-sdk-go" target="_blank" class="btn btn-primary btn-lg">
-                    <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
-                    <span>View SDK on GitHub</span>
-                </a>
-                <a href="https://docs.hastekit.ai/hastekit-sdk" target="_blank" class="btn btn-secondary btn-lg">
-                    <span>Read SDK Docs</span>
-                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-                </a>
             </div>
         </div>
     </section>
@@ -751,7 +746,7 @@ client = OpenAI(
                 <h2>Ready to Build with HasteKit?</h2>
                 <p>Join the open-source community building the future of LLM infrastructure.</p>
                 <div class="cta-buttons">
-                    <a href="https://github.com/hastekit/hastekit-ai-gateway" target="_blank" class="btn btn-white btn-lg">
+                    <a href="https://github.com/hastekit/hastekit-sdk-go" target="_blank" class="btn btn-white btn-lg">
                         <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
                         <span>Star on GitHub</span>
                     </a>
