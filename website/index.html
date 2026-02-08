@@ -135,72 +135,22 @@
 
 
     <!-- ============================================ -->
-    <!-- PRODUCT 2: SDK                              -->
+    <!-- SDK                                         -->
     <!-- ============================================ -->
 
     <section id="sdk" class="product-section sdk-section">
         <div class="container">
-            <div class="product-section-header">
-                <div class="product-label">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-                    <span>Product</span>
-                </div>
-                <h2 class="product-title">HasteKit SDK</h2>
-                <p class="product-description">
+            <div class="section-header">
+                <span class="section-badge badge-green">Go SDK</span>
+                <h2 class="section-title">Build AI Agents in Go</h2>
+                <p class="section-subtitle">
                     Go SDK for building production-ready AI agents. Multi-provider support, tool calling,
                     durable execution, and everything you need to build sophisticated AI applications in code.
                 </p>
             </div>
 
-            <!-- SDK Features Grid -->
-            <div class="sdk-features">
-                <div class="sdk-card">
-                    <div class="sdk-icon green">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-                    </div>
-                    <h3>Multi-Provider Support</h3>
-                    <p>Switch between OpenAI, Anthropic, Gemini, and more with minimal configuration changes.</p>
-                </div>
-                <div class="sdk-card">
-                    <div class="sdk-icon green">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-                    </div>
-                    <h3>Tool Calling</h3>
-                    <p>Define functions that agents can call. Supports MCP servers and custom tools.</p>
-                </div>
-                <div class="sdk-card">
-                    <div class="sdk-icon green">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
-                    </div>
-                    <h3>Structured Output</h3>
-                    <p>Define JSON schemas for consistent, validated responses from your agents.</p>
-                </div>
-                <div class="sdk-card">
-                    <div class="sdk-icon green">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                    </div>
-                    <h3>Durable Execution</h3>
-                    <p>Temporal and Restate support for crash recovery and long-running workflows.</p>
-                </div>
-                <div class="sdk-card">
-                    <div class="sdk-icon green">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                    </div>
-                    <h3>Conversation History</h3>
-                    <p>Built-in conversation management with automatic summarization.</p>
-                </div>
-                <div class="sdk-card">
-                    <div class="sdk-icon green">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-                    </div>
-                    <h3>Streaming Responses</h3>
-                    <p>Real-time response streaming for responsive user experiences.</p>
-                </div>
-            </div>
-
             <!-- SDK Installation -->
             <div class="sdk-install">
-                <h3>Installation</h3>
                 <div class="code-window small">
                     <div class="code-header">
                         <div class="code-dots">
@@ -211,100 +161,212 @@
                     <pre class="code-content"><code>go get -u github.com/hastekit/hastekit-sdk-go</code></pre>
                 </div>
             </div>
+        </div>
+    </section>
 
-            <!-- Code Examples -->
-            <div class="code-examples">
-                <div class="code-tabs">
-                    <button class="code-tab active" data-tab="setup">Setup</button>
-                    <button class="code-tab" data-tab="responses">LLM Calls</button>
-                    <button class="code-tab" data-tab="agent">Agent</button>
+    <!-- SDK Feature: Provider Abstraction -->
+    <section class="feature-detail sdk-feature">
+        <div class="container">
+            <div class="feature-detail-content">
+                <div class="feature-detail-text">
+                    <span class="feature-number">01</span>
+                    <h3>Provider Abstraction</h3>
+                    <p>Switch between LLM providers with a single line change. The SDK provides a unified interface across OpenAI, Anthropic, Gemini, xAI, and Ollama — same code, any provider.</p>
+                    <ul class="feature-highlights">
+                        <li>Unified Responses API across all providers</li>
+                        <li>Provider-specific features accessible when needed</li>
+                        <li>Automatic response normalization</li>
+                        <li>Streaming support for all providers</li>
+                    </ul>
                 </div>
-                <div class="code-window large">
-                    <div class="code-header">
-                        <div class="code-dots">
-                            <span></span><span></span><span></span>
+                <div class="feature-detail-visual">
+                    <div class="code-window">
+                        <div class="code-header">
+                            <div class="code-dots"><span></span><span></span><span></span></div>
+                            <span class="code-title">main.go</span>
                         </div>
-                        <span class="code-title">main.go</span>
+                        <pre class="code-content"><code><span class="code-comment">// Switch providers by changing the model string</span>
+resp, _ := client.NewResponses(ctx, &responses.Request{
+    Model: <span class="code-string">"OpenAI/gpt-4o-mini"</span>,       <span class="code-comment">// OpenAI</span>
+    <span class="code-comment">// Model: "Anthropic/claude-sonnet-4-5" // Anthropic</span>
+    <span class="code-comment">// Model: "Gemini/gemini-2.5-flash"    // Gemini</span>
+    Input: responses.InputUnion{
+        OfString: utils.Ptr(<span class="code-string">"Hello!"</span>),
+    },
+})</code></pre>
                     </div>
-                    <div class="code-panels">
-                        <pre class="code-content code-panel active" data-panel="setup"><code><span class="code-keyword">package</span> main
+                </div>
+            </div>
+        </div>
+    </section>
 
-<span class="code-keyword">import</span> (
-    <span class="code-string">"os"</span>
-    hastekit <span class="code-string">"github.com/hastekit/hastekit-sdk-go"</span>
-    <span class="code-string">"github.com/hastekit/hastekit-sdk-go/pkg/gateway"</span>
-    <span class="code-string">"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"</span>
+    <!-- SDK Feature: MCP, Tools & Agent as Tool -->
+    <section class="feature-detail sdk-feature alt">
+        <div class="container">
+            <div class="feature-detail-content reverse">
+                <div class="feature-detail-text">
+                    <span class="feature-number">02</span>
+                    <h3>MCP, Tools & Agent as Tool</h3>
+                    <p>Equip your agents with powerful capabilities. Connect to MCP servers, define custom function tools, or compose agents together by using one agent as a tool for another.</p>
+                    <ul class="feature-highlights">
+                        <li>Model Context Protocol (MCP) server integration</li>
+                        <li>Type-safe function tool definitions</li>
+                        <li>Agent-as-tool for hierarchical workflows</li>
+                        <li>Automatic tool result handling</li>
+                    </ul>
+                </div>
+                <div class="feature-detail-visual">
+                    <div class="code-window">
+                        <div class="code-header">
+                            <div class="code-dots"><span></span><span></span><span></span></div>
+                            <span class="code-title">tools.go</span>
+                        </div>
+                        <pre class="code-content"><code><span class="code-comment">// Connect to MCP server</span>
+mcpClient, _ := mcpclient.NewSSEClient(ctx, 
+    <span class="code-string">"http://localhost:9001/sse"</span>,
 )
 
-<span class="code-keyword">func</span> main() {
-    <span class="code-comment">// Initialize the SDK with provider configuration</span>
-    client, err := hastekit.New(&hastekit.ClientOptions{
-        ProviderConfigs: []gateway.ProviderConfig{
-            {
-                ProviderName: llm.ProviderNameOpenAI,
-                ApiKeys: []*gateway.APIKeyConfig{
-                    {
-                        Name:   <span class="code-string">"Key 1"</span>,
-                        APIKey: os.Getenv(<span class="code-string">"OPENAI_API_KEY"</span>),
-                    },
-                },
-            },
-        },
-    })
-}</code></pre>
-                        <pre class="code-content code-panel" data-panel="responses"><code><span class="code-keyword">import</span> <span class="code-string">"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"</span>
-
-<span class="code-comment">// Make LLM calls with the Responses API</span>
-resp, err := client.NewResponses(ctx, &responses.Request{
-    Model:        <span class="code-string">"OpenAI/gpt-4.1-mini"</span>,
-    Instructions: utils.Ptr(<span class="code-string">"You are a helpful assistant."</span>),
-    Input: responses.InputUnion{
-        OfString: utils.Ptr(<span class="code-string">"What is the capital of France?"</span>),
-    },
-})
-
-<span class="code-comment">// Extract the generated text from the response</span>
-<span class="code-keyword">for</span> _, output := <span class="code-keyword">range</span> resp.Output {
-    <span class="code-keyword">if</span> output.OfOutputMessage != <span class="code-keyword">nil</span> {
-        <span class="code-keyword">for</span> _, content := <span class="code-keyword">range</span> output.OfOutputMessage.Content {
-            <span class="code-keyword">if</span> content.OfOutputText != <span class="code-keyword">nil</span> {
-                fmt.Println(content.OfOutputText.Text)
-            }
-        }
-    }
-}</code></pre>
-                        <pre class="code-content code-panel" data-panel="agent"><code><span class="code-comment">// Create an agent with system instructions</span>
+<span class="code-comment">// Create agent with MCP + custom tools</span>
 agent := client.NewAgent(&hastekit.AgentOptions{
-    Name:        <span class="code-string">"Assistant"</span>,
-    Instruction: client.Prompt(<span class="code-string">"You are a helpful assistant."</span>),
-    LLM: client.NewLLM(hastekit.LLMOptions{
-        Provider: llm.ProviderNameOpenAI,
-        Model:    <span class="code-string">"gpt-4o-mini"</span>,
-    }),
+    Name:       <span class="code-string">"Assistant"</span>,
+    LLM:        model,
+    McpServers: []agents.MCPToolset{mcpClient},
+    Tools:      []agents.Tool{NewWeatherTool()},
+})</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SDK Feature: History & Summarization -->
+    <section class="feature-detail sdk-feature">
+        <div class="container">
+            <div class="feature-detail-content">
+                <div class="feature-detail-text">
+                    <span class="feature-number">03</span>
+                    <h3>History & Summarization</h3>
+                    <p>Built-in conversation management that scales. Automatically track conversation history, summarize long conversations to stay within context limits, and persist state across sessions.</p>
+                    <ul class="feature-highlights">
+                        <li>Automatic conversation tracking</li>
+                        <li>Intelligent summarization for long contexts</li>
+                        <li>Configurable history window</li>
+                        <li>Pluggable storage backends</li>
+                    </ul>
+                </div>
+                <div class="feature-detail-visual">
+                    <div class="code-window">
+                        <div class="code-header">
+                            <div class="code-dots"><span></span><span></span><span></span></div>
+                            <span class="code-title">history.go</span>
+                        </div>
+                        <pre class="code-content"><code><span class="code-comment">// Create conversation manager</span>
+history := client.NewConversationManager()
+
+agent := client.NewAgent(&hastekit.AgentOptions{
+    Name:    <span class="code-string">"Assistant"</span>,
+    LLM:     model,
+    History: history,  <span class="code-comment">// Enable history</span>
 })
 
-<span class="code-comment">// Execute the agent with user messages</span>
-out, err := agent.Execute(ctx, &agents.AgentInput{
+<span class="code-comment">// Conversations linked by namespace + PreviousMessageID</span>
+out, _ := agent.Execute(ctx, &agents.AgentInput{
+    Namespace:         <span class="code-string">"user-123"</span>,
+    PreviousMessageID: lastRunID,
     Messages: []responses.InputMessageUnion{
-        responses.UserMessage(<span class="code-string">"Hello!"</span>),
+        responses.UserMessage(<span class="code-string">"What's my name?"</span>),
+    },
+})</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SDK Feature: Durable Execution -->
+    <section class="feature-detail sdk-feature alt">
+        <div class="container">
+            <div class="feature-detail-content reverse">
+                <div class="feature-detail-text">
+                    <span class="feature-number">04</span>
+                    <h3>Durable Execution</h3>
+                    <p>Build agents that survive failures. Integrate with Temporal or Restate for crash recovery, automatic retries, and long-running workflows that can span hours or days.</p>
+                    <ul class="feature-highlights">
+                        <li>Temporal workflow integration</li>
+                        <li>Restate durable execution support</li>
+                        <li>Automatic state persistence</li>
+                        <li>Resume from any failure point</li>
+                    </ul>
+                </div>
+                <div class="feature-detail-visual">
+                    <div class="code-window">
+                        <div class="code-header">
+                            <div class="code-dots"><span></span><span></span><span></span></div>
+                            <span class="code-title">durable.go</span>
+                        </div>
+                        <pre class="code-content"><code><span class="code-comment">// Initialize SDK with Restate</span>
+client, _ := hastekit.New(&hastekit.ClientOptions{
+    ProviderConfigs: providerConfigs,
+    RestateConfig: hastekit.RestateConfig{
+        Endpoint: <span class="code-string">"http://localhost:8081"</span>,
     },
 })
 
-<span class="code-comment">// Extract the agent's response</span>
-<span class="code-keyword">for</span> _, output := <span class="code-keyword">range</span> out.Output {
-    <span class="code-keyword">if</span> output.OfOutputMessage != <span class="code-keyword">nil</span> {
-        <span class="code-keyword">for</span> _, content := <span class="code-keyword">range</span> output.OfOutputMessage.Content {
-            <span class="code-keyword">if</span> content.OfOutputText != <span class="code-keyword">nil</span> {
-                fmt.Println(content.OfOutputText.Text)
-            }
-        }
+<span class="code-comment">// Create durable agent - survives crashes</span>
+agent := client.NewRestateAgent(&hastekit.AgentOptions{
+    Name: <span class="code-string">"DurableAgent"</span>,
+    LLM:  model,
+})</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SDK Feature: Human in the Loop -->
+    <section class="feature-detail sdk-feature">
+        <div class="container">
+            <div class="feature-detail-content">
+                <div class="feature-detail-text">
+                    <span class="feature-number">05</span>
+                    <h3>Human in the Loop</h3>
+                    <p>Keep humans in control of critical decisions. Pause agent execution for approval, collect additional input, or implement review workflows before sensitive operations.</p>
+                    <ul class="feature-highlights">
+                        <li>Tool-level approval requirements</li>
+                        <li>Async approval workflows</li>
+                        <li>Customizable approval handlers</li>
+                        <li>Timeout and fallback behavior</li>
+                    </ul>
+                </div>
+                <div class="feature-detail-visual">
+                    <div class="code-window">
+                        <div class="code-header">
+                            <div class="code-dots"><span></span><span></span><span></span></div>
+                            <span class="code-title">approval.go</span>
+                        </div>
+                        <pre class="code-content"><code><span class="code-comment">// Create tool that requires human approval</span>
+<span class="code-keyword">type</span> DeleteTool <span class="code-keyword">struct</span> {
+    *agents.BaseTool
+}
+
+<span class="code-keyword">func</span> NewDeleteTool() *DeleteTool {
+    <span class="code-keyword">return</span> &DeleteTool{
+        BaseTool: &agents.BaseTool{
+            RequiresApproval: <span class="code-keyword">true</span>,  <span class="code-comment">// Requires approval</span>
+            ToolUnion: responses.ToolUnion{...},
+        },
     }
 }</code></pre>
                     </div>
                 </div>
             </div>
+        </div>
+    </section>
 
-            <div class="sdk-cta">
+    <!-- SDK CTA -->
+    <section class="product-cta sdk-cta-section">
+        <div class="container">
+            <div class="product-cta-content">
                 <a href="https://github.com/hastekit/hastekit-sdk-go" target="_blank" class="btn btn-primary btn-lg">
                     <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
                     <span>View SDK on GitHub</span>
@@ -316,8 +378,6 @@ out, err := agent.Execute(ctx, &agents.AgentInput{
             </div>
         </div>
     </section>
-
-
 
     <!-- Providers Section -->
     <section class="providers">
@@ -338,7 +398,6 @@ out, err := agent.Execute(ctx, &agents.AgentInput{
                 </div>
                 <div class="provider-card">
                     <div class="provider-logo gemini">
-                    
                         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 2L13 8L20 10L13 12L10 18L7 12L0 10L7 8L10 2Z" fill="currentColor"></path><path d="M10 5L12 9L16 10L12 11L10 15L8 11L4 10L8 9L10 5Z" fill="currentColor" opacity="0.4"></path></svg>
                     </div>
                     <span>Gemini</span>
@@ -360,198 +419,182 @@ out, err := agent.Execute(ctx, &agents.AgentInput{
     </section>
 
     <!-- ============================================ -->
-    <!-- PRODUCT 1: GATEWAY                          -->
+    <!-- LLM GATEWAY                                 -->
     <!-- ============================================ -->
     
     <section id="llm-gateway" class="product-section gateway-section">
         <div class="container">
-            <div class="product-section-header">
-                <div class="product-label">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
-                    <span>Product</span>
-                </div>
-                <h2 class="product-title">HasteKit LLM Gateway</h2>
-                <p class="product-description">
-                    Platform that provides unified LLM access, governance, and fully observability.
-                </p>
-            </div>
-
-
-
-            <!-- LLM Gateway Features Grid -->
-            <div class="features-grid">
-                <div class="feature-card">
-                    <div class="feature-icon blue">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                    </div>
-                    <h3>Virtual Keys</h3>
-                    <p>Generate secure API keys with usage limits, model restrictions, and per-key rate limiting.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon blue">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/></svg>
-                    </div>
-                    <h3>Request Logging</h3>
-                    <p>Full request/response capture for debugging, compliance, and cost tracking.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon blue">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/></svg>
-                    </div>
-                    <h3>Rate Limiting</h3>
-                    <p>Configurable limits per minute, hour, day, week, or month per virtual key.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon blue">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                    </div>
-                    <h3>Multi-Key Load Balancing</h3>
-                    <p>Weighted distribution across multiple provider API keys to avoid rate limits.</p>
-                </div>
+            <div class="section-header">
+                <span class="section-badge badge-blue">LLM Gateway</span>
+                <h2 class="section-title">Unified Access to All LLM Providers</h2>
+                <p class="section-subtitle">Route requests to any LLM provider through a single, secure gateway. Drop-in replacement for OpenAI, Anthropic, and Gemini SDKs with unified access, governance, and full observability.</p>
             </div>
         </div>
     </section>
 
-    <!-- LLM Gateway Section -->
-    <section class="gateway-panel" data-panel="llm">
+    <!-- LLM Gateway Feature: Virtual Keys -->
+    <section class="feature-detail llm-gateway-feature">
         <div class="container">
-            <div class="gateway-content">
-                <div class="gateway-text">
-                    <span class="section-badge badge-blue">LLM Gateway</span>
-                    <h2 class="section-title">Unified Access to All LLM Providers</h2>
-                    <p class="section-subtitle">Route requests to any LLM provider through a single, secure gateway. No more managing multiple API keys in your applications.</p>
-                    <ul class="feature-list">
-                        <li>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                            <span><strong>Provider Abstraction</strong> — Access OpenAI, Anthropic, Gemini, xAI, and Ollama through unified endpoints</span>
-                        </li>
-                        <li>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                            <span><strong>Virtual Keys</strong> — Generate <code>sk-hk-*</code> keys with fine-grained access control and rate limits</span>
-                        </li>
-                        <li>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                            <span><strong>Drop-in Replacement</strong> — Works with existing OpenAI, Anthropic, and Gemini SDKs</span>
-                        </li>
-                        <li>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                            <span><strong>Deep Observability</strong> — OpenTelemetry traces, token usage, latency metrics via ClickHouse</span>
-                        </li>
+            <div class="feature-detail-content">
+                <div class="feature-detail-text">
+                    <span class="feature-number">01</span>
+                    <h3>Virtual Keys</h3>
+                    <p>Generate secure <code>sk-hk-*</code> API keys with fine-grained access control. Distribute keys to teams, applications, or customers without exposing your actual provider API keys.</p>
+                    <ul class="feature-highlights">
+                        <li>Model-level access restrictions</li>
+                        <li>Per-key rate limiting (requests, tokens)</li>
+                        <li>Budget caps and usage alerts</li>
+                        <li>Instant key revocation</li>
                     </ul>
                 </div>
-                <div class="gateway-visual">
+                <div class="feature-detail-visual">
                     <div class="code-window">
                         <div class="code-header">
-                            <div class="code-dots">
-                                <span></span><span></span><span></span>
-                            </div>
+                            <div class="code-dots"><span></span><span></span><span></span></div>
                             <span class="code-title">main.py</span>
                         </div>
                         <pre class="code-content"><code><span class="code-keyword">from</span> openai <span class="code-keyword">import</span> OpenAI
 
-<span class="code-comment"># Point to HasteKit Gateway instead of OpenAI directly</span>
+<span class="code-comment"># Use your HasteKit virtual key</span>
 client = OpenAI(
-    base_url=<span class="code-string">"http://localhost:6060/api/gateway/openai"</span>,
-    api_key=<span class="code-string">"your-virtual-key--or--provider-api-key"</span>,
+    base_url=<span class="code-string">"http://gateway.example.com/api/gateway/openai"</span>,
+    api_key=<span class="code-string">"sk-hk-abc123..."</span>,  <span class="code-comment"># Virtual key</span>
 )
 
-<span class="code-comment"># Use the Responses API</span>
+<span class="code-comment"># Works exactly like OpenAI SDK</span>
 response = client.responses.create(
     model=<span class="code-string">"gpt-4.1-mini"</span>,
-    instructions=<span class="code-string">"You are a coding assistant that talks like a pirate."</span>,
     input=<span class="code-string">"Hello!"</span>,
-)
-
-print(response.output_text)</code></pre>
+)</code></pre>
                     </div>
                 </div>
             </div>
         </div>
     </section>
 
-    <section id="agent-gateway" class="product-section gateway-section">
+    <!-- LLM Gateway Feature: API Key Balancing -->
+    <section class="feature-detail llm-gateway-feature alt">
         <div class="container">
-            <div class="product-section-header">
-                <div class="product-label">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
-                    <span>Product</span>
-                </div>
-                <h2 class="product-title">HasteKit Agent Gateway</h2>
-                <p class="product-description">
-                    Platform that provides no-code agent runtime, governance, and fully observability.
-                </p>
-            </div>
-
-
-
-            <!-- LLM Gateway Features Grid -->
-            <div class="features-grid">
-                <div class="feature-card">
-                    <div class="feature-icon purple">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                    </div>
-                    <h3>Conversational UI</h3>
-                    <p>Built-in chat interface for testing agents directly in the dashboard.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon purple">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-                    </div>
-                    <h3>Sandbox Execution</h3>
-                    <p>Run agent code in isolated Kubernetes sandboxes for security.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon purple">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
-                    </div>
-                    <h3>Versioning & Rollback</h3>
-                    <p>Automatic versioning with one-click rollback to previous configurations.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon purple">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
-                    </div>
-                    <h3>Structured Output</h3>
-                    <p>Define JSON schemas for consistent, validated agent responses.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Agent Gateway Section -->
-    <section class="gateway-panel" data-panel="agent">
-        <div class="container">
-            <div class="gateway-content reverse">
-                <div class="gateway-text">
-                    <span class="section-badge badge-purple">Agent Gateway</span>
-                    <h2 class="section-title">No-Code Agent Runtime</h2>
-                    <p class="section-subtitle">Build, configure, and deploy AI agents through a visual dashboard. No code required — from simple chatbots to complex multi-step workflows.</p>
-                    <ul class="feature-list">
-                        <li>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                            <span><strong>Visual Agent Builder</strong> — Configure models, prompts, tools, and behavior via UI</span>
-                        </li>
-                        <li>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                            <span><strong>MCP & Tool Integration</strong> — Connect Model Context Protocol servers and function tools</span>
-                        </li>
-                        <li>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                            <span><strong>Human-in-the-Loop</strong> — Require approval for sensitive operations</span>
-                        </li>
-                        <li>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                            <span><strong>Agent Traces</strong> — Detailed execution traces for debugging multi-step workflows</span>
-                        </li>
+            <div class="feature-detail-content reverse">
+                <div class="feature-detail-text">
+                    <span class="feature-number">02</span>
+                    <h3>API Key Balancing</h3>
+                    <p>Distribute load across multiple provider API keys to maximize throughput and avoid rate limits. Configure weighted distribution, automatic failover, and key rotation.</p>
+                    <ul class="feature-highlights">
+                        <li>Weighted round-robin distribution</li>
+                        <li>Automatic failover on rate limits</li>
+                        <li>Per-key usage tracking</li>
+                        <li>Priority-based routing</li>
                     </ul>
                 </div>
-                <div class="gateway-visual">
+                <div class="feature-detail-visual">
+                    <div class="info-card blue">
+                        <div class="info-card-header">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                            <span>Load Balancer</span>
+                        </div>
+                        <div class="info-card-content">
+                            <div class="balance-item">
+                                <span class="balance-key">OpenAI Key 1</span>
+                                <div class="balance-bar"><div class="balance-fill" style="width: 60%"></div></div>
+                                <span class="balance-weight">60%</span>
+                            </div>
+                            <div class="balance-item">
+                                <span class="balance-key">OpenAI Key 2</span>
+                                <div class="balance-bar"><div class="balance-fill" style="width: 30%"></div></div>
+                                <span class="balance-weight">30%</span>
+                            </div>
+                            <div class="balance-item">
+                                <span class="balance-key">OpenAI Key 3</span>
+                                <div class="balance-bar"><div class="balance-fill" style="width: 10%"></div></div>
+                                <span class="balance-weight">10%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- LLM Gateway Feature: Observability -->
+    <section class="feature-detail llm-gateway-feature">
+        <div class="container">
+            <div class="feature-detail-content">
+                <div class="feature-detail-text">
+                    <span class="feature-number">03</span>
+                    <h3>Observability</h3>
+                    <p>Full visibility into every LLM request. Track token usage, latency, costs, and errors across all providers. Export to your existing observability stack via OpenTelemetry.</p>
+                    <ul class="feature-highlights">
+                        <li>Request/response logging with ClickHouse</li>
+                        <li>OpenTelemetry traces and metrics</li>
+                        <li>Per-model cost tracking</li>
+                        <li>Real-time dashboards</li>
+                    </ul>
+                </div>
+                <div class="feature-detail-visual">
+                    <div class="info-card blue">
+                        <div class="info-card-header">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/></svg>
+                            <span>Request Metrics</span>
+                        </div>
+                        <div class="info-card-content metrics-grid">
+                            <div class="metric-item">
+                                <span class="metric-value">1.2M</span>
+                                <span class="metric-label">Total Requests</span>
+                            </div>
+                            <div class="metric-item">
+                                <span class="metric-value">142ms</span>
+                                <span class="metric-label">Avg Latency</span>
+                            </div>
+                            <div class="metric-item">
+                                <span class="metric-value">$847</span>
+                                <span class="metric-label">Total Cost</span>
+                            </div>
+                            <div class="metric-item">
+                                <span class="metric-value">99.9%</span>
+                                <span class="metric-label">Success Rate</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================ -->
+    <!-- AGENT GATEWAY                               -->
+    <!-- ============================================ -->
+
+    <section id="agent-gateway" class="product-section agent-gateway-section">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-badge badge-purple">Agent Gateway</span>
+                <h2 class="section-title">No-Code Agent Runtime</h2>
+                <p class="section-subtitle">Build, configure, and deploy AI agents through a visual dashboard. No code required — from simple chatbots to complex multi-step workflows with full observability.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Agent Gateway Feature: Agent Builder -->
+    <section class="feature-detail agent-gateway-feature">
+        <div class="container">
+            <div class="feature-detail-content">
+                <div class="feature-detail-text">
+                    <span class="feature-number">01</span>
+                    <h3>Visual Agent Builder</h3>
+                    <p>Configure every aspect of your agent through an intuitive UI. Set system prompts, model parameters, structured output schemas, and connect MCP servers, function tools, or other agents — with optional human-in-the-loop approval for sensitive operations.</p>
+                    <ul class="feature-highlights">
+                        <li>System prompt & model configuration</li>
+                        <li>Structured output with JSON schemas</li>
+                        <li>MCP servers, tools & agent-as-tool</li>
+                        <li>Human-in-the-loop approval workflows</li>
+                    </ul>
+                </div>
+                <div class="feature-detail-visual">
                     <div class="agent-builder-preview">
                         <div class="preview-header">
-                            <div class="preview-dots">
-                                <span></span><span></span><span></span>
-                            </div>
-                            <span>Agent Builder Dashboard</span>
+                            <div class="preview-dots"><span></span><span></span><span></span></div>
+                            <span>Agent Builder</span>
                         </div>
                         <div class="preview-content">
                             <div class="builder-sidebar">
@@ -566,10 +609,6 @@ print(response.output_text)</code></pre>
                                 <div class="sidebar-item">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                                     <span>Chat</span>
-                                </div>
-                                <div class="sidebar-item">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
-                                    <span>Traces</span>
                                 </div>
                             </div>
                             <div class="builder-main">
@@ -586,9 +625,196 @@ print(response.output_text)</code></pre>
                                     <div class="tools-list">
                                         <span class="tool-tag">MCP: filesystem</span>
                                         <span class="tool-tag">Web Search</span>
-                                        <span class="tool-tag dashed">+ Add</span>
+                                        <span class="tool-tag approval">Delete (approval)</span>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Agent Gateway Feature: Agent Skills -->
+    <section class="feature-detail agent-gateway-feature alt">
+        <div class="container">
+            <div class="feature-detail-content reverse">
+                <div class="feature-detail-text">
+                    <span class="feature-number">02</span>
+                    <h3>Agent Skills</h3>
+                    <p>Package reusable capabilities as skills that can be shared across agents. Skills bundle prompts, tools, and configuration into portable modules that agents can learn and use.</p>
+                    <ul class="feature-highlights">
+                        <li>Reusable skill packages</li>
+                        <li>Version-controlled skill library</li>
+                        <li>Cross-agent skill sharing</li>
+                        <li>Skill marketplace integration</li>
+                    </ul>
+                </div>
+                <div class="feature-detail-visual">
+                    <div class="info-card purple">
+                        <div class="info-card-header">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                            <span>Skill Library</span>
+                        </div>
+                        <div class="info-card-content skills-grid">
+                            <div class="skill-item">
+                                <span class="skill-icon">📊</span>
+                                <span class="skill-name">Data Analysis</span>
+                            </div>
+                            <div class="skill-item">
+                                <span class="skill-icon">🔍</span>
+                                <span class="skill-name">Web Research</span>
+                            </div>
+                            <div class="skill-item">
+                                <span class="skill-icon">📝</span>
+                                <span class="skill-name">Document Writing</span>
+                            </div>
+                            <div class="skill-item">
+                                <span class="skill-icon">💻</span>
+                                <span class="skill-name">Code Review</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Agent Gateway Feature: Sandbox Environment -->
+    <section class="feature-detail agent-gateway-feature">
+        <div class="container">
+            <div class="feature-detail-content">
+                <div class="feature-detail-text">
+                    <span class="feature-number">03</span>
+                    <h3>Sandbox Environment</h3>
+                    <p>Execute agent code in isolated, secure Kubernetes sandboxes. Each execution runs in its own container with configurable resource limits, network policies, and filesystem isolation.</p>
+                    <ul class="feature-highlights">
+                        <li>Isolated Kubernetes pods per execution</li>
+                        <li>Configurable resource limits</li>
+                        <li>Network policy enforcement</li>
+                        <li>Secure filesystem access</li>
+                    </ul>
+                </div>
+                <div class="feature-detail-visual">
+                    <div class="info-card purple">
+                        <div class="info-card-header">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+                            <span>Sandbox Cluster</span>
+                        </div>
+                        <div class="info-card-content sandbox-visual">
+                            <div class="sandbox-pod">
+                                <span class="pod-status running"></span>
+                                <span class="pod-name">agent-exec-a1b2c</span>
+                                <span class="pod-resources">256Mi / 0.5 CPU</span>
+                            </div>
+                            <div class="sandbox-pod">
+                                <span class="pod-status running"></span>
+                                <span class="pod-name">agent-exec-d3e4f</span>
+                                <span class="pod-resources">512Mi / 1 CPU</span>
+                            </div>
+                            <div class="sandbox-pod">
+                                <span class="pod-status completed"></span>
+                                <span class="pod-name">agent-exec-g5h6i</span>
+                                <span class="pod-resources">128Mi / 0.25 CPU</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Agent Gateway Feature: Durable Agent Runtime -->
+    <section class="feature-detail agent-gateway-feature alt">
+        <div class="container">
+            <div class="feature-detail-content reverse">
+                <div class="feature-detail-text">
+                    <span class="feature-number">04</span>
+                    <h3>Durable Agent Runtime</h3>
+                    <p>Run agents that survive infrastructure failures. Built on durable execution primitives, agents automatically checkpoint state and resume from failures without losing progress.</p>
+                    <ul class="feature-highlights">
+                        <li>Automatic state checkpointing</li>
+                        <li>Resume from any failure point</li>
+                        <li>Long-running workflow support</li>
+                        <li>Distributed execution</li>
+                    </ul>
+                </div>
+                <div class="feature-detail-visual">
+                    <div class="info-card purple">
+                        <div class="info-card-header">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                            <span>Execution Timeline</span>
+                        </div>
+                        <div class="info-card-content timeline-visual">
+                            <div class="timeline-step completed">
+                                <span class="step-dot"></span>
+                                <span class="step-label">Start</span>
+                            </div>
+                            <div class="timeline-step completed">
+                                <span class="step-dot"></span>
+                                <span class="step-label">Tool Call</span>
+                            </div>
+                            <div class="timeline-step failed">
+                                <span class="step-dot"></span>
+                                <span class="step-label">Failure</span>
+                            </div>
+                            <div class="timeline-step resumed">
+                                <span class="step-dot"></span>
+                                <span class="step-label">Resume</span>
+                            </div>
+                            <div class="timeline-step completed">
+                                <span class="step-dot"></span>
+                                <span class="step-label">Complete</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Agent Gateway Feature: Observability -->
+    <section class="feature-detail agent-gateway-feature">
+        <div class="container">
+            <div class="feature-detail-content">
+                <div class="feature-detail-text">
+                    <span class="feature-number">05</span>
+                    <h3>Agent Observability</h3>
+                    <p>Deep visibility into agent execution. Trace every step, tool call, and decision. Debug complex multi-step workflows with detailed execution traces and performance metrics.</p>
+                    <ul class="feature-highlights">
+                        <li>Step-by-step execution traces</li>
+                        <li>Tool call visualization</li>
+                        <li>Token usage & cost tracking</li>
+                        <li>Performance analytics</li>
+                    </ul>
+                </div>
+                <div class="feature-detail-visual">
+                    <div class="info-card purple">
+                        <div class="info-card-header">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
+                            <span>Agent Trace</span>
+                        </div>
+                        <div class="info-card-content trace-visual">
+                            <div class="trace-item">
+                                <span class="trace-icon llm">LLM</span>
+                                <span class="trace-name">claude-sonnet-4</span>
+                                <span class="trace-duration">1.2s</span>
+                            </div>
+                            <div class="trace-item indent">
+                                <span class="trace-icon tool">Tool</span>
+                                <span class="trace-name">search_database</span>
+                                <span class="trace-duration">340ms</span>
+                            </div>
+                            <div class="trace-item">
+                                <span class="trace-icon llm">LLM</span>
+                                <span class="trace-name">claude-sonnet-4</span>
+                                <span class="trace-duration">890ms</span>
+                            </div>
+                            <div class="trace-item indent">
+                                <span class="trace-icon tool">Tool</span>
+                                <span class="trace-name">format_response</span>
+                                <span class="trace-duration">12ms</span>
                             </div>
                         </div>
                     </div>

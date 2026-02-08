@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initCodeTabs();
     initSmoothScroll();
     initScrollAnimations();
+    initProductNav();
 });
 
 // ================================
@@ -456,3 +457,307 @@ function animateCounters() {
 
 // Initialize counter animation
 document.addEventListener('DOMContentLoaded', animateCounters);
+
+// ================================
+// Fixed Product Indicator
+// ================================
+function initProductNav() {
+    // Create fixed product indicator that shows current section
+    const indicator = document.createElement('div');
+    indicator.className = 'product-indicator';
+    indicator.innerHTML = `
+        <div class="product-indicator-content">
+            <span class="product-indicator-badge"></span>
+            <span class="product-indicator-title"></span>
+            <span class="product-indicator-feature"></span>
+        </div>
+    `;
+    document.body.appendChild(indicator);
+
+    // Add styles
+    const style = document.createElement('style');
+    style.textContent = `
+        .product-indicator {
+            position: fixed;
+            top: 72px;
+            left: 0;
+            right: 0;
+            z-index: 90;
+            padding: 12px 0;
+            opacity: 0;
+            transform: translateY(-100%);
+            transition: all 0.3s ease;
+            pointer-events: none;
+        }
+        .product-indicator.visible {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+        .product-indicator::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            backdrop-filter: blur(12px);
+            z-index: -1;
+        }
+        .product-indicator-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .product-indicator-badge {
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .product-indicator-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--color-text);
+        }
+        .product-indicator-feature {
+            font-size: 14px;
+            color: var(--color-text-muted);
+            margin-left: auto;
+        }
+        .product-indicator-feature::before {
+            content: '—';
+            margin-right: 12px;
+            opacity: 0.3;
+        }
+        
+        /* SDK styling */
+        .product-indicator.sdk {
+            background: linear-gradient(to bottom, rgba(10, 18, 12, 0.95), rgba(10, 18, 12, 0.85));
+            border-bottom: 1px solid rgba(74, 222, 128, 0.2);
+        }
+        .product-indicator.sdk .product-indicator-badge {
+            background: rgba(74, 222, 128, 0.15);
+            color: #4ade80;
+            border: 1px solid rgba(74, 222, 128, 0.3);
+        }
+        .product-indicator.sdk .product-indicator-title {
+            color: #4ade80;
+        }
+        
+        /* LLM Gateway styling */
+        .product-indicator.llm-gateway {
+            background: linear-gradient(to bottom, rgba(8, 15, 22, 0.95), rgba(8, 15, 22, 0.85));
+            border-bottom: 1px solid rgba(56, 189, 248, 0.2);
+        }
+        .product-indicator.llm-gateway .product-indicator-badge {
+            background: rgba(56, 189, 248, 0.15);
+            color: #38bdf8;
+            border: 1px solid rgba(56, 189, 248, 0.3);
+        }
+        .product-indicator.llm-gateway .product-indicator-title {
+            color: #38bdf8;
+        }
+        
+        /* Agent Gateway styling */
+        .product-indicator.agent-gateway {
+            background: linear-gradient(to bottom, rgba(15, 10, 22, 0.95), rgba(15, 10, 22, 0.85));
+            border-bottom: 1px solid rgba(167, 139, 250, 0.2);
+        }
+        .product-indicator.agent-gateway .product-indicator-badge {
+            background: rgba(167, 139, 250, 0.15);
+            color: #a78bfa;
+            border: 1px solid rgba(167, 139, 250, 0.3);
+        }
+        .product-indicator.agent-gateway .product-indicator-title {
+            color: #a78bfa;
+        }
+
+        @media (max-width: 768px) {
+            .product-indicator {
+                top: 64px;
+                padding: 10px 0;
+            }
+            .product-indicator-content {
+                padding: 0 16px;
+                gap: 8px;
+            }
+            .product-indicator-badge {
+                font-size: 10px;
+                padding: 3px 8px;
+            }
+            .product-indicator-title {
+                font-size: 14px;
+            }
+            .product-indicator-feature {
+                display: none;
+            }
+        }
+    `;
+    document.head.appendChild(style);
+
+    // Feature data
+    const featureData = {
+        sdk: {
+            badge: 'SDK',
+            title: 'Go SDK',
+            features: [
+                'Provider Abstraction',
+                'MCP, Tools & Agent as Tool',
+                'History & Summarization',
+                'Durable Execution',
+                'Human in the Loop'
+            ]
+        },
+        'llm-gateway': {
+            badge: 'Gateway',
+            title: 'LLM Gateway',
+            features: [
+                'Virtual Keys',
+                'API Key Balancing',
+                'Observability'
+            ]
+        },
+        'agent-gateway': {
+            badge: 'Gateway',
+            title: 'Agent Gateway',
+            features: [
+                'Visual Agent Builder',
+                'Agent Skills',
+                'Sandbox Environment',
+                'Durable Agent Runtime',
+                'Agent Observability'
+            ]
+        }
+    };
+
+    // Get feature sections
+    const sdkFeatures = document.querySelectorAll('.sdk-feature');
+    const llmFeatures = document.querySelectorAll('.llm-gateway-feature');
+    const agentFeatures = document.querySelectorAll('.agent-gateway-feature');
+    
+    const sdkSection = document.querySelector('#sdk');
+    const llmSection = document.querySelector('#llm-gateway');
+    const agentSection = document.querySelector('#agent-gateway');
+    const comparisonSection = document.querySelector('.comparison');
+
+    const badge = indicator.querySelector('.product-indicator-badge');
+    const title = indicator.querySelector('.product-indicator-title');
+    const feature = indicator.querySelector('.product-indicator-feature');
+
+    let ticking = false;
+    let currentSection = null;
+    let currentFeatureIndex = -1;
+
+    function updateIndicator() {
+        const scrollTop = window.pageYOffset;
+        const windowHeight = window.innerHeight;
+        const navbarHeight = 72;
+
+        // Determine visibility range
+        const sdkTop = sdkSection ? sdkSection.offsetTop : 0;
+        const firstSdkFeature = sdkFeatures[0];
+        const startTop = firstSdkFeature ? firstSdkFeature.offsetTop - navbarHeight - 100 : sdkTop;
+        const endTop = comparisonSection ? comparisonSection.offsetTop - windowHeight / 2 : document.body.scrollHeight;
+
+        // Show/hide indicator
+        if (scrollTop > startTop && scrollTop < endTop) {
+            indicator.classList.add('visible');
+        } else {
+            indicator.classList.remove('visible');
+            ticking = false;
+            return;
+        }
+
+        // Determine active section and feature
+        let activeSection = null;
+        let activeFeatureIndex = -1;
+
+        // Check SDK features
+        sdkFeatures.forEach((el, index) => {
+            const rect = el.getBoundingClientRect();
+            if (rect.top < windowHeight / 2 && rect.bottom > navbarHeight + 50) {
+                activeSection = 'sdk';
+                activeFeatureIndex = index;
+            }
+        });
+
+        // Check LLM Gateway features
+        llmFeatures.forEach((el, index) => {
+            const rect = el.getBoundingClientRect();
+            if (rect.top < windowHeight / 2 && rect.bottom > navbarHeight + 50) {
+                activeSection = 'llm-gateway';
+                activeFeatureIndex = index;
+            }
+        });
+
+        // Check Agent Gateway features
+        agentFeatures.forEach((el, index) => {
+            const rect = el.getBoundingClientRect();
+            if (rect.top < windowHeight / 2 && rect.bottom > navbarHeight + 50) {
+                activeSection = 'agent-gateway';
+                activeFeatureIndex = index;
+            }
+        });
+
+        // Fallback to main sections
+        if (!activeSection) {
+            if (sdkSection) {
+                const rect = sdkSection.getBoundingClientRect();
+                if (rect.top < windowHeight / 2 && rect.bottom > 0) {
+                    activeSection = 'sdk';
+                }
+            }
+            if (llmSection) {
+                const rect = llmSection.getBoundingClientRect();
+                if (rect.top < windowHeight / 2 && rect.bottom > 0) {
+                    activeSection = 'llm-gateway';
+                }
+            }
+            if (agentSection) {
+                const rect = agentSection.getBoundingClientRect();
+                if (rect.top < windowHeight / 2 && rect.bottom > 0) {
+                    activeSection = 'agent-gateway';
+                }
+            }
+        }
+
+        // Update indicator if section changed
+        if (activeSection && (activeSection !== currentSection || activeFeatureIndex !== currentFeatureIndex)) {
+            currentSection = activeSection;
+            currentFeatureIndex = activeFeatureIndex;
+
+            // Remove old classes
+            indicator.classList.remove('sdk', 'llm-gateway', 'agent-gateway');
+            indicator.classList.add(activeSection);
+
+            const data = featureData[activeSection];
+            badge.textContent = data.badge;
+            title.textContent = data.title;
+            
+            if (activeFeatureIndex >= 0 && data.features[activeFeatureIndex]) {
+                feature.textContent = data.features[activeFeatureIndex];
+                feature.style.display = '';
+            } else {
+                feature.style.display = 'none';
+            }
+        }
+
+        ticking = false;
+    }
+
+    window.addEventListener('scroll', () => {
+        if (!ticking) {
+            requestAnimationFrame(updateIndicator);
+            ticking = true;
+        }
+    });
+
+    // Initial update
+    updateIndicator();
+}
