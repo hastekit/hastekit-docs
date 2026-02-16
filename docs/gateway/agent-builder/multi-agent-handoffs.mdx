@@ -1,0 +1,49 @@
+---
+title: Multi-Agent Handoffs
+description: Configure an agent to hand off conversations to other agents
+---
+
+Handoffs enable an agent to transfer control of a conversation to another agent. Unlike [Agent as a Tool](/gateway/agent-builder/agent-tool) where the parent agent calls sub-agents and continues processing, handoffs transfer control entirely to the target agent, which then responds directly to the user.
+
+## Overview
+
+The **Handoffs** feature lets you:
+
+- Configure agents that can receive handoffs from the current agent
+- Build router patterns where a central agent delegates to specialists
+- Share conversation context when handing off
+- Pin each handoff target to a specific version or use **$LATEST**
+- Add descriptions to help the model decide when to hand off
+
+Only agents in the same project are listed. The current agent is excluded so you cannot add an agent as a handoff target to itself.
+
+## Handoffs vs Agent as a Tool
+
+| Feature | Handoffs | Agent as a Tool |
+| :--- | :--- | :--- |
+| **Control flow** | Transfers control entirely to target agent | Parent agent continues after sub-agent returns |
+| **Response** | Target agent responds directly to user | Sub-agent result returned to parent agent |
+| **Conversation history** | Shared with target agent | Sub-agent runs without history |
+| **Use case** | Router patterns, specialist delegation | Tool-like sub-tasks, parallel processing |
+
+## Runtime Behavior
+
+When an agent hands off to another agent:
+
+- **Shared history** – The target agent receives the conversation history, providing continuity for the user.
+- **Direct response** – The target agent's response goes directly to the user; the original agent does not process it further.
+- **Full transfer** – Control is transferred to the handoff target; the original agent's run ends.
+
+## Configuring Handoffs
+
+1. Open your agent in the Agent Builder and go to the **Handoffs** tab.
+2. Click **Add Handoff** to add a new handoff target.
+3. For each handoff entry:
+   - **Agent** – Select the target agent from the dropdown (other agents in the project; current agent is excluded).
+   - **Version** – Choose **$LATEST** (always use the latest version) or a specific version.
+   - **Description** – Optional but recommended. Describe when this handoff should be used; this helps the model decide when to hand off.
+4. Add more handoffs by clicking **Add Handoff** again.
+5. Remove a handoff with the delete (trash) icon on its row.
+6. Save your agent configuration.
+
+You can add multiple handoff targets. The model will choose the appropriate target based on the descriptions you provide.

@@ -106,6 +106,13 @@
                       "hastekit-sdk/agents/durable/restate",
                       "hastekit-sdk/agents/durable/temporal"
                     ]
+                  },
+                  {
+                    "group": "Multi Agents",
+                    "expanded": true,
+                    "pages": [
+                      "hastekit-sdk/agents/multi-agents/handoff"
+                    ]
                   }
                 ]
               }
@@ -149,7 +156,9 @@
                       "gateway/agent-builder/agent-runtime",
                       "gateway/agent-builder/model-configuration",
                       "gateway/agent-builder/system-prompt",
+                      "gateway/agent-builder/conversation-history",
                       {
+                        "icon": "tools",
                         "group": "Tools",
                         "pages": [
                           "gateway/agent-builder/provider-tools",
@@ -158,10 +167,10 @@
                         ],
                         "expanded": true
                       },
-                      "gateway/agent-builder/skills",
                       "gateway/agent-builder/mcp-server",
+                      "gateway/agent-builder/skills",
+                      "gateway/agent-builder/multi-agent-handoffs",
                       "gateway/agent-builder/structured-output",
-                      "gateway/agent-builder/conversation-history",
                       "gateway/agent-builder/versioning",
                       "gateway/agent-builder/alias",
                       "gateway/agent-builder/conversing-with-the-agent"

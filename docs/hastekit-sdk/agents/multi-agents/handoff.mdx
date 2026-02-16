@@ -1,0 +1,145 @@
+---
+title: Agent Handoff
+---
+
+Agent handoff enables a one agent to delegate tasks to others agents based on the user's request. This pattern is useful for building multi-agent systems where different agents have specific capabilities, and a central agent routes requests to the appropriate specialist.
+
+## Overview
+
+Handoffs allow you to:
+- **Route requests**: A router agent analyzes user input and delegates to the right specialist
+- **Specialize agents**: Create focused agents for specific tasks (jokes, facts, code, etc.)
+- **Share conversation context**: Handoff agents can share conversation history for continuity
+- **Build hierarchical systems**: Combine multiple specialists under one entry point
+
+Unlike [Agent as a Tool](/hastekit-sdk/agents/tools/agent-as-a-tool) where the parent agent calls sub-agents as tools and continues processing, handoffs transfer control entirely to the target agent, which then responds directly to the user.
+
+## Creating a Handoff
+
+To create a handoff, use `agents.NewHandoff()` with the target agent:
+
+```go
+import (
+    "github.com/hastekit/hastekit-sdk-go/pkg/agents"
+)
+
+// Create a specialized agent
+jokeAgent := client.NewAgent(&hastekit.AgentOptions{
+    Name:        "JokeAgent",
+    Instruction: client.Prompt("You are a joke teller"),
+    LLM:         model,
+    History:     client.NewConversationManager(),
+})
+
+// Create a handoff to this agent
+handoff := agents.NewHandoff(
+    jokeAgent.Name,                           // Name (used for routing)
+    "Use this agent to generate jokes",       // Description (helps router decide)
+    jokeAgent,                                // Target agent
+)
+```
+
+### NewHandoff Parameters
+
+| Parameter | Type | Description |
+| :--- | :--- | :--- |
+| **name** | `string` | Name of the handoff (typically matches the agent name) |
+| **desc** | `string` | Description that helps the router agent decide when to use this handoff |
+| **agent** | `*Agent` | The target agent that will handle the request |
+
+## Using Handoffs with a Router Agent
+
+Handoffs are configured on the router agent using the `Handoffs` field in `AgentOptions`:
+
+```go
+routerAgent := client.NewAgent(&hastekit.AgentOptions{
+    Name:        "RouterAgent",
+    Instruction: client.Prompt("You are a router agent. You must not respond directly. Your role is only to delegate to other agents"),
+    LLM:         model,
+    Handoffs: []*agents.Handoff{
+        agents.NewHandoff(jokeAgent.Name, "Use this agent to generate jokes", jokeAgent),
+        agents.NewHandoff(factAgent.Name, "Use this agent to generate facts", factAgent),
+    },
+    History: client.NewConversationManager(),
+})
+```
+
+The router agent uses the handoff descriptions to determine which agent should handle each request. Write clear, specific descriptions to help the router make accurate routing decisions.
+
+## Complete Example
+
+Here's a complete example demonstrating a router agent that delegates to specialized joke and fact agents:
+
+```go
+package main
+
+import (
+    "log"
+    "net/http"
+    "os"
+
+    hastekit "github.com/hastekit/hastekit-sdk-go"
+    "github.com/hastekit/hastekit-sdk-go/pkg/agents"
+    "github.com/hastekit/hastekit-sdk-go/pkg/gateway"
+    "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
+)
+
+func main() {
+    // Initialize SDK client with required services
+    client, err := hastekit.New(&hastekit.ClientOptions{
+        ProviderConfigs: []gateway.ProviderConfig{
+            {
+                ProviderName: llm.ProviderNameOpenAI,
+                ApiKeys: []*gateway.APIKeyConfig{
+                    {
+                        Name:   "Key 1",
+                        APIKey: os.Getenv("OPENAI_API_KEY"),
+                    },
+                },
+            },
+        },
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Create LLM model
+    model := client.NewLLM(hastekit.LLMOptions{
+        Provider: llm.ProviderNameOpenAI,
+        Model:    "gpt-4.1-mini",
+    })
+
+    // Create specialized agents
+    jokeAgent := client.NewAgent(&hastekit.AgentOptions{
+        Name:        "JokeAgent",
+        Instruction: client.Prompt("You are a joke teller"),
+        LLM:         model,
+        History:     client.NewConversationManager(),
+    })
+
+    factAgent := client.NewAgent(&hastekit.AgentOptions{
+        Name:        "FactAgent",
+        Instruction: client.Prompt("You are a fact teller"),
+        LLM:         model,
+        History:     client.NewConversationManager(),
+    })
+
+    // Create router agent with handoffs
+    _ = client.NewAgent(&hastekit.AgentOptions{
+        Name:        "RouterAgent",
+        Instruction: client.Prompt("You are a router agent. You must not respond directly. Your role is only to delegate to other agents"),
+        LLM:         model,
+        Handoffs: []*agents.Handoff{
+            agents.NewHandoff(jokeAgent.Name, "Use this agent to generate jokes", jokeAgent),
+            agents.NewHandoff(factAgent.Name, "Use this agent to generate facts", factAgent),
+        },
+        History: client.NewConversationManager(),
+    })
+
+    // Serve the agents
+    err = http.ListenAndServe(":8070", client)
+    if err != nil {
+        log.Fatal(err)
+    }
+}
+```

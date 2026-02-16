@@ -6,7 +6,7 @@ require (
 	github.com/bytedance/sonic v1.15.0
 	github.com/curaious/uno v0.2.0
 	github.com/google/uuid v1.6.0
-	github.com/hastekit/hastekit-sdk-go v0.0.0-20260212210810-930b50f6e3af
+	github.com/hastekit/hastekit-sdk-go v0.0.0-20260216183610-5634e0a5cbc8
 )
 
 require (
@@ -37,7 +37,7 @@ require (
 	github.com/mr-tron/base58 v1.2.0 // indirect
 	github.com/nexus-rpc/sdk-go v0.5.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/redis/go-redis/v9 v9.17.3 // indirect
+	github.com/redis/go-redis/v9 v9.18.0 // indirect
 	github.com/restatedev/sdk-go v0.23.0 // indirect
 	github.com/robfig/cron v1.2.0 // indirect
 	github.com/spf13/cast v1.7.1 // indirect
@@ -52,8 +52,10 @@ require (
 	go.opentelemetry.io/otel v1.40.0 // indirect
 	go.opentelemetry.io/otel/metric v1.40.0 // indirect
 	go.opentelemetry.io/otel/trace v1.40.0 // indirect
-	go.temporal.io/api v1.62.1 // indirect
+	go.temporal.io/api v1.62.2 // indirect
 	go.temporal.io/sdk v1.40.0 // indirect
+	go.temporal.io/sdk/contrib/opentelemetry v0.7.0 // indirect
+	go.uber.org/atomic v1.11.0 // indirect
 	golang.org/x/arch v0.24.0 // indirect
 	golang.org/x/net v0.50.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
@@ -62,7 +64,7 @@ require (
 	golang.org/x/time v0.14.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260209200024-4cfbd4190f57 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260209200024-4cfbd4190f57 // indirect
-	google.golang.org/grpc v1.79.0 // indirect
+	google.golang.org/grpc v1.79.1 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

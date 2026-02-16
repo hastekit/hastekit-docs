@@ -218,12 +218,13 @@ resp, _ := client.NewResponses(ctx, &responses.Request{
             <div class="feature-detail-content reverse">
                 <div class="feature-detail-text">
                     <span class="feature-number">02</span>
-                    <h3>MCP, Tools & Agent as Tool</h3>
+                    <h3>MCP, Tools & Sub-Agents</h3>
                     <p>Equip your agents with powerful capabilities. Connect to MCP servers, define custom function tools, or compose agents together by using one agent as a tool for another.</p>
                     <ul class="feature-highlights">
                         <li>Model Context Protocol (MCP) server integration</li>
                         <li>Type-safe function tool definitions</li>
                         <li>Agent-as-tool for hierarchical workflows</li>
+                        <li>Agent handoffs for transferring control to specialised agents</li>
                     </ul>
                     <a href="https://hastekit.ai/docs/hastekit-sdk/agents/tools/function-tools" target="_blank" class="feature-doc-link">
                         <span>View Documentation</span>
@@ -731,12 +732,67 @@ response = client.responses.create(
         </div>
     </section>
 
-    <!-- Agent Gateway Feature: Sandbox Environment -->
+    <!-- Agent Gateway Feature: Multi-Agent Patterns -->
     <section class="feature-detail agent-gateway-feature">
         <div class="container">
             <div class="feature-detail-content">
                 <div class="feature-detail-text">
                     <span class="feature-number">03</span>
+                    <h3>Multi-Agent Patterns</h3>
+                    <p>Build sophisticated multi-agent systems with two powerful patterns. Use <strong>Agent as a Tool</strong> to call sub-agents as tools that return results, or <strong>Handoffs</strong> to transfer control entirely to specialist agents.</p>
+                    <ul class="feature-highlights">
+                        <li>Agent as a Tool: Call sub-agents and continue processing</li>
+                        <li>Handoffs: Transfer control to specialist agents</li>
+                        <li>Router patterns for intelligent request delegation</li>
+                    </ul>
+                    <a href="https://hastekit.ai/docs/gateway/agent-builder/multi-agent-handoffs" target="_blank" class="feature-doc-link">
+                        <span>View Documentation</span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7M17 7H7M17 7V17"/></svg>
+                    </a>
+                </div>
+                <div class="feature-detail-visual">
+                    <div class="info-card purple">
+                        <div class="info-card-header">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4"/><path d="M12 18v4"/><path d="M4.93 4.93l2.83 2.83"/><path d="M16.24 16.24l2.83 2.83"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="M4.93 19.07l2.83-2.83"/><path d="M16.24 7.76l2.83-2.83"/></svg>
+                            <span>Multi-Agent Architecture</span>
+                        </div>
+                        <div class="info-card-content">
+                            <div class="multi-agent-visual">
+                                <div class="agent-node router">
+                                    <span class="node-label">Router Agent</span>
+                                </div>
+                                <div class="agent-connections">
+                                    <div class="connection-line left"></div>
+                                    <div class="connection-line right"></div>
+                                </div>
+                                <div class="agent-children">
+                                    <div class="agent-node specialist">
+                                        <span class="node-type">Handoff</span>
+                                        <span class="node-label">Sales Agent</span>
+                                    </div>
+                                    <div class="agent-node specialist">
+                                        <span class="node-type">Tool</span>
+                                        <span class="node-label">Research Agent</span>
+                                    </div>
+                                    <div class="agent-node specialist">
+                                        <span class="node-type">Handoff</span>
+                                        <span class="node-label">Support Agent</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Agent Gateway Feature: Sandbox Environment -->
+    <section class="feature-detail agent-gateway-feature alt">
+        <div class="container">
+            <div class="feature-detail-content reverse">
+                <div class="feature-detail-text">
+                    <span class="feature-number">04</span>
                     <h3>Sandbox Environment</h3>
                     <p>Execute agent code in isolated, secure Kubernetes sandboxes. Each execution runs in its own container with configurable resource limits, network policies, and filesystem isolation.</p>
                     <ul class="feature-highlights">
@@ -779,11 +835,11 @@ response = client.responses.create(
     </section>
 
     <!-- Agent Gateway Feature: Durable Agent Runtime -->
-    <section class="feature-detail agent-gateway-feature alt">
+    <section class="feature-detail agent-gateway-feature">
         <div class="container">
-            <div class="feature-detail-content reverse">
+            <div class="feature-detail-content">
                 <div class="feature-detail-text">
-                    <span class="feature-number">04</span>
+                    <span class="feature-number">05</span>
                     <h3>Durable Agent Runtime</h3>
                     <p>Run agents that survive infrastructure failures. Built on durable execution primitives, agents automatically checkpoint state and resume from failures without losing progress.</p>
                     <ul class="feature-highlights">
@@ -832,11 +888,11 @@ response = client.responses.create(
     </section>
 
     <!-- Agent Gateway Feature: Observability -->
-    <section class="feature-detail agent-gateway-feature">
+    <section class="feature-detail agent-gateway-feature alt">
         <div class="container">
-            <div class="feature-detail-content">
+            <div class="feature-detail-content reverse">
                 <div class="feature-detail-text">
-                    <span class="feature-number">05</span>
+                    <span class="feature-number">06</span>
                     <h3>Agent Observability</h3>
                     <p>Deep visibility into agent execution. Trace every step, tool call, and decision. Debug complex multi-step workflows with detailed execution traces and performance metrics.</p>
                     <ul class="feature-highlights">
