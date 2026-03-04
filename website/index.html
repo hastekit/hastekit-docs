@@ -272,12 +272,61 @@
         </div>
     </section>
 
-    <!-- Agent Gateway Feature: Multi-Agent Patterns -->
+    <!-- Agent Gateway Feature: Knowledge Bases -->
     <section class="feature-detail agent-gateway-feature">
         <div class="container">
             <div class="feature-detail-content">
                 <div class="feature-detail-text">
                     <span class="feature-number">03</span>
+                    <h3>Knowledge Bases</h3>
+                    <p>Add documentation and reference materials to your agents through vector-indexed knowledge bases. Upload markdown files, PDFs, and text documents, then search them using semantic similarity for context-aware responses.</p>
+                    <ul class="feature-highlights">
+                        <li>Fixed-length, semantic, and recursive chunking strategies</li>
+                        <li>Configurable chunk size, overlap, and similarity thresholds</li>
+                        <li>Vector similarity search with multiple embedding providers</li>
+                        <li>Incremental indexing with change detection</li>
+                    </ul>
+                    <a href="https://hastekit.ai/docs/gateway/agent-builder/knowledge-bases" target="_blank" class="feature-doc-link">
+                        <span>View Documentation</span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7M17 7H7M17 7V17"/></svg>
+                    </a>
+                </div>
+                <div class="feature-detail-visual">
+                    <div class="info-card purple">
+                        <div class="info-card-header">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                            <span>Knowledge Bases</span>
+                        </div>
+                        <div class="info-card-content skills-grid">
+                            <div class="skill-item">
+                                <span class="skill-icon"></span>
+                                <span class="skill-name">Chunking Strategies</span>
+                            </div>
+                            <div class="skill-item">
+                                <span class="skill-icon"></span>
+                                <span class="skill-name">Embedding Models</span>
+                            </div>
+                            <div class="skill-item">
+                                <span class="skill-icon"></span>
+                                <span class="skill-name">Vector Stores</span>
+                            </div>
+                            <div class="skill-item">
+                                <span class="skill-icon"></span>
+                                <span class="skill-name">Knowledge Tools</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Agent Gateway Feature: Multi-Agent Patterns -->
+    <section class="feature-detail agent-gateway-feature alt">
+        <div class="container">
+            <div class="feature-detail-content reverse">
+                <div class="feature-detail-text">
+                    <span class="feature-number">04</span>
                     <h3>Multi-Agent Patterns</h3>
                     <p>Build sophisticated multi-agent systems with two powerful patterns. Use <strong>Sub Agents</strong> to offload context heavy tasks, or <strong>Handoffs</strong> to transfer control entirely to specialist agents.</p>
                     <ul class="feature-highlights">
@@ -328,11 +377,11 @@
     </section>
 
     <!-- Agent Gateway Feature: Sandbox Environment -->
-    <section class="feature-detail agent-gateway-feature alt">
+    <section class="feature-detail agent-gateway-feature">
         <div class="container">
-            <div class="feature-detail-content reverse">
+            <div class="feature-detail-content">
                 <div class="feature-detail-text">
-                    <span class="feature-number">04</span>
+                    <span class="feature-number">05</span>
                     <h3>Sandbox Environment</h3>
                     <p>Execute agent code in isolated, secure containerized sandboxes. Each execution runs in its own container with configurable resource limits, network policies, and filesystem isolation.</p>
                     <ul class="feature-highlights">
@@ -374,12 +423,60 @@
         </div>
     </section>
 
+    <!-- Agent Gateway Feature: Triggers -->
+    <section class="feature-detail agent-gateway-feature alt">
+        <div class="container">
+            <div class="feature-detail-content reverse">
+                <div class="feature-detail-text">
+                    <span class="feature-number">06</span>
+                    <h3>Slack, Telegram & Scheduled Triggers</h3>
+                    <p>Connect your agents to messaging platforms and automate with scheduled triggers. Interact with agents through Slack and Telegram, or set up cron jobs to run agents on a schedule with optional notifications.</p>
+                    <ul class="feature-highlights">
+                        <li>Agent interaction through Slack and Telegram</li>
+                        <li>Cron jobs to trigger agents with custom messages</li>
+                        <li>Optional Slack / Telegram notifications on completion</li>
+                    </ul>
+                    <!-- <a href="https://hastekit.ai/docs/gateway/agent-builder/triggers" target="_blank" class="feature-doc-link">
+                        <span>View Documentation</span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7M17 7H7M17 7V17"/></svg>
+                    </a> -->
+                </div>
+                <div class="feature-detail-visual">
+                    <div class="info-card purple">
+                        <div class="info-card-header">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                            <span>Agent Triggers</span>
+                        </div>
+                        <div class="info-card-content skills-grid">
+                            <div class="skill-item">
+                                <span class="skill-icon"></span>
+                                <span class="skill-name">Scheduled Triggers</span>
+                            </div>
+                            <div class="skill-item">
+                                <span class="skill-icon"></span>
+                                <span class="skill-name">Slack</span>
+                            </div>
+                            <div class="skill-item">
+                                <span class="skill-icon"></span>
+                                <span class="skill-name">Telegram</span>
+                            </div>
+                            <div class="skill-item">
+                                <span class="skill-icon"></span>
+                                <span class="skill-name">Isolated Context</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- Agent Gateway Feature: Durable Agent Runtime -->
     <section class="feature-detail agent-gateway-feature">
         <div class="container">
             <div class="feature-detail-content">
                 <div class="feature-detail-text">
-                    <span class="feature-number">05</span>
+                    <span class="feature-number">07</span>
                     <h3>Durable Agent Runtime</h3>
                     <p>Run agents that survive infrastructure failures. Built on durable execution primitives, agents automatically checkpoint state and resume from failures without losing progress. Supports: Temporal & Restate.</p>
                     <ul class="feature-highlights">
@@ -432,7 +529,7 @@
         <div class="container">
             <div class="feature-detail-content reverse">
                 <div class="feature-detail-text">
-                    <span class="feature-number">06</span>
+                    <span class="feature-number">08</span>
                     <h3>Agent Observability</h3>
                     <p>Deep visibility into agent execution. Trace every step, tool call, and decision. Debug complex multi-step workflows with detailed execution traces and performance metrics.</p>
                     <ul class="feature-highlights">

@@ -626,7 +626,10 @@ function initProductNav() {
             features: [
                 'Visual Agent Builder',
                 'Agent Skills',
+                'Knowledge Bases',
+                'Multi-Agent Patterns',
                 'Sandbox Environment',
+                'Slack, Telegram & Scheduled Triggers',
                 'Durable Agent Runtime',
                 'Agent Observability'
             ]
@@ -656,13 +659,15 @@ function initProductNav() {
         const windowHeight = window.innerHeight;
         const navbarHeight = 72;
 
-        // Determine visibility range
-        const sdkTop = sdkSection ? sdkSection.offsetTop : 0;
-        const firstSdkFeature = sdkFeatures[0];
-        const startTop = firstSdkFeature ? firstSdkFeature.offsetTop - navbarHeight - 100 : sdkTop;
+        // First product section on the page (Agent Gateway) - indicator shows from here
+        const agentTop = agentSection ? agentSection.offsetTop : Infinity;
+        const llmTop = llmSection ? llmSection.offsetTop : Infinity;
+        const sdkTop = sdkSection ? sdkSection.offsetTop : Infinity;
+        const firstProductTop = Math.min(agentTop, llmTop, sdkTop);
+        const startTop = firstProductTop - navbarHeight - 100;
         const endTop = comparisonSection ? comparisonSection.offsetTop - windowHeight / 2 : document.body.scrollHeight;
 
-        // Show/hide indicator
+        // Show/hide indicator when in any product section
         if (scrollTop > startTop && scrollTop < endTop) {
             indicator.classList.add('visible');
         } else {
