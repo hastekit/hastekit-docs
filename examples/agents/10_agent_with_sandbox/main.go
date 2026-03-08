@@ -7,10 +7,9 @@ import (
 	"os"
 
 	"github.com/bytedance/sonic"
-	"github.com/hastekit/hastekit-ai-gateway/pkg/agent-gateway/sandbox/docker_sandbox"
-	sandbox_tool "github.com/hastekit/hastekit-ai-gateway/pkg/agent-gateway/sandbox/sandbox-tool"
 	hastekit "github.com/hastekit/hastekit-sdk-go"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
+	"github.com/hastekit/hastekit-sdk-go/pkg/agents/tools"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
@@ -48,9 +47,7 @@ func main() {
 		LLM:         model,
 		History:     history,
 		Tools: []agents.Tool{
-			sandbox_tool.NewSandboxTool(docker_sandbox.NewManager(docker_sandbox.Config{
-				AgentDataPath: "/Users/praveen/amagi/uno/temp",
-			}), "hastekit-ai-sandbox:latest"),
+			tools.NewSandboxTool(client.NewSandboxManager(), "praveenraj9495/hastekit-ai-sandbox:latest", map[string]string{}),
 		},
 	})
 
