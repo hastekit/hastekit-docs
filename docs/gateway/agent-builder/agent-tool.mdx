@@ -12,6 +12,7 @@ The **Agent as a Tool** feature lets you:
 - Choose one or more agents from the same project to act as tools
 - Pin each tool to a specific version or use **$LATEST**
 - Optionally add a description so the model knows when to use the tool
+- Optionally have isolated context between main agent and the sub-agent
 
 Only agents in the same project are listed. The current agent is excluded so you cannot add an agent as a tool to itself.
 
@@ -30,6 +31,7 @@ When the main agent calls an agent tool:
    - **Agent** – Select the agent from the dropdown (other agents in the project; current agent is excluded).
    - **Version** – Choose **$LATEST** (always use the latest version) or a specific version.
    - **Description** – Optional. Describe what this agent tool does; this is shown to the model when the tool is available and can help it decide when to call the tool.
+   - **Context Mode** - Optional. Choose whether agent tool should have context of previous invocations or not. `None` - no context, `Isolated` - has context of previous invocations.
 4. Add more tools by clicking **Add Agent Tool** again.
 5. Remove a tool with the delete (trash) icon on its row.
 6. Save your agent configuration.
