@@ -42,13 +42,16 @@ func NewCustomTool() *CustomTool {
 	}
 }
 
-func (t *CustomTool) Execute(ctx context.Context, params *agents.ToolCall) (*responses.FunctionCallOutputMessage, error) {
-	return &responses.FunctionCallOutputMessage{
-		ID:     params.ID,
-		CallID: params.CallID,
-		Output: responses.FunctionCallOutputContentUnion{
-			OfString: utils.Ptr("Bob"),
+func (t *CustomTool) Execute(ctx context.Context, params *agents.ToolCall) (*agents.ToolCallResponse, error) {
+	return &agents.ToolCallResponse{
+		FunctionCallOutputMessage: &responses.FunctionCallOutputMessage{
+			ID:     params.ID,
+			CallID: params.CallID,
+			Output: responses.FunctionCallOutputContentUnion{
+				OfString: utils.Ptr("Bob"),
+			},
 		},
+		SubAgentContext: nil,
 	}, nil
 }
 
@@ -93,6 +96,7 @@ func main() {
 			responses.UserMessage("Hello! Can you get my name for user_id '123'?"),
 		},
 		Namespace:         "default",
+		ThreadID:          "",
 		PreviousMessageID: "",
 	})
 	if err != nil {

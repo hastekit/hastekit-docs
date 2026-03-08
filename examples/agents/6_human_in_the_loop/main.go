@@ -44,12 +44,14 @@ func NewGetUserTool() *GetUserTool {
 	}
 }
 
-func (t *GetUserTool) Execute(ctx context.Context, params *agents.ToolCall) (*responses.FunctionCallOutputMessage, error) {
-	return &responses.FunctionCallOutputMessage{
-		ID:     params.ID,
-		CallID: params.CallID,
-		Output: responses.FunctionCallOutputContentUnion{
-			OfString: utils.Ptr(`{"name": "John Doe", "email": "john@example.com"}`),
+func (t *GetUserTool) Execute(ctx context.Context, params *agents.ToolCall) (*agents.ToolCallResponse, error) {
+	return &agents.ToolCallResponse{
+		FunctionCallOutputMessage: &responses.FunctionCallOutputMessage{
+			ID:     params.ID,
+			CallID: params.CallID,
+			Output: responses.FunctionCallOutputContentUnion{
+				OfString: utils.Ptr(`{"name": "John Doe", "email": "john@example.com"}`),
+			},
 		},
 	}, nil
 }
@@ -80,16 +82,19 @@ func NewDeleteUserTool() *DeleteUserTool {
 	}
 }
 
-func (t *DeleteUserTool) Execute(ctx context.Context, params *agents.ToolCall) (*responses.FunctionCallOutputMessage, error) {
+func (t *DeleteUserTool) Execute(ctx context.Context, params *agents.ToolCall) (*agents.ToolCallResponse, error) {
 	args := map[string]any{}
 	json.Unmarshal([]byte(params.Arguments), &args)
 
-	return &responses.FunctionCallOutputMessage{
-		ID:     params.ID,
-		CallID: params.CallID,
-		Output: responses.FunctionCallOutputContentUnion{
-			OfString: utils.Ptr(fmt.Sprintf("User %s has been deleted", args["user_id"])),
+	return &agents.ToolCallResponse{
+		FunctionCallOutputMessage: &responses.FunctionCallOutputMessage{
+			ID:     params.ID,
+			CallID: params.CallID,
+			Output: responses.FunctionCallOutputContentUnion{
+				OfString: utils.Ptr(fmt.Sprintf("User %s has been deleted", args["user_id"])),
+			},
 		},
+		SubAgentContext: nil,
 	}, nil
 }
 

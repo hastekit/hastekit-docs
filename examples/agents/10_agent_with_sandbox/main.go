@@ -50,7 +50,7 @@ func main() {
 		Tools: []agents.Tool{
 			sandbox_tool.NewSandboxTool(docker_sandbox.NewManager(docker_sandbox.Config{
 				AgentDataPath: "/Users/praveen/amagi/uno/temp",
-			}), "uno-sandbox:v7"),
+			}), "hastekit-ai-sandbox:latest"),
 		},
 	})
 
@@ -59,6 +59,7 @@ func main() {
 			responses.UserMessage("What is the current time?"),
 		},
 		Namespace:         "default",
+		ThreadID:          "",
 		PreviousMessageID: "",
 	})
 	if err != nil {

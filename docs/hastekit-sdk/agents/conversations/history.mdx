@@ -32,12 +32,23 @@ out, err := agent.Execute(context.Background(), &agents.AgentInput{
 
 ## Continuing the conversation
 
-To continue the conversation, pass the run ID obtained from the last invocation while invoking the agent again.
+To continue the conversation, pass same thread ID while invoking the agent again.
 
 ```go
+// First invocation
+threadID := uuid.NewString()
 out, err = agent.Execute(context.Background(), &agents.AgentInput{
     Namespace:         "default",
-    PreviousMessageID: out.RunID, // obtained from the previous invocation
+    ThreadID:          threadID,
+    Messages: []responses.InputMessageUnion{
+        responses.UserMessage("Hello! My name is Alice"),
+    },
+})
+
+// Second invocation
+out, err = agent.Execute(context.Background(), &agents.AgentInput{
+    Namespace:         "default",
+    ThreadID:          threadID, // Pass the same thread ID to continue the conversation
     Messages: []responses.InputMessageUnion{
         responses.UserMessage("What's my name?"),
     },
@@ -64,8 +75,8 @@ To implement custom persistence, implement the `ConversationPersistenceManager` 
 
 ```go
 type ConversationPersistenceManager interface {
-	LoadMessages(ctx context.Context, namespace string, previousMessageID string) ([]conversation.ConversationMessage, error)
-	SaveMessages(ctx context.Context, namespace, msgId, previousMsgId, conversationId string, messages []responses.InputMessageUnion, meta map[string]any) error
+	LoadMessages(ctx context.Context, namespace string, threadID string, previousMessageID string) ([]conversation.ConversationMessage, error)
+	SaveMessages(ctx context.Context, namespace, msgId, previousMsgId, threadID string, conversationId string, messages []responses.InputMessageUnion, meta map[string]any) error
 	SaveSummary(ctx context.Context, namespace string, summary conversation.Summary) error
 }
 ```
@@ -130,8 +141,11 @@ func main() {
 		History:     history,
 	})
 
+    threadID := uuid.NewString()
+
 	out, err := agent.Execute(context.Background(), &agents.AgentInput{
 		Namespace: "default",
+		ThreadID:  threadID,
 		Messages: []responses.InputMessageUnion{
 			responses.UserMessage("Hello! My name is Alice"),
 		},
@@ -143,7 +157,7 @@ func main() {
 	b, _ := sonic.Marshal(out)
 	fmt.Println(string(b))
 
-	// Agent itself is stateless - you can either re-create another agent or reuse the same agent instance, but ensure to pass the correct `PreviousMessageID`
+	// Agent itself is stateless - you can either re-create another agent or reuse the same agent instance, but ensure to pass the correct `ThreadID`
 	agent2 := client.NewAgent(&hastekit.AgentOptions{
 		Name:        "Hello world agent",
 		Instruction: client.Prompt("You are helpful assistant."),
@@ -152,9 +166,9 @@ func main() {
 	})
 
 	out, err = agent2.Execute(context.Background(), &agents.AgentInput{
-		Namespace:         "default",
-		PreviousMessageID: out.RunID,
-		Messages: []responses.InputMessageUnion{
+		Namespace: "default",
+		ThreadID:  threadID,
+		Messages:  []responses.InputMessageUnion{
 			responses.UserMessage("What's my name?"),
 		},
 	})

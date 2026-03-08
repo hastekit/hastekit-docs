@@ -56,8 +56,8 @@ func main() {
 		RunContext: map[string]any{
 			"name": "Bob",
 		},
-		Namespace:         "default",
-		PreviousMessageID: "",
+		Namespace: "default",
+		ThreadID:  "",
 	})
 	if err != nil {
 		log.Fatal(err)

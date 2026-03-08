@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/bytedance/sonic"
+	"github.com/google/uuid"
 	hastekit "github.com/hastekit/hastekit-sdk-go"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
@@ -47,8 +48,11 @@ func main() {
 		History:     history,
 	})
 
+	threadID := uuid.New().String()
+
 	out, err := agent.Execute(context.Background(), &agents.AgentInput{
 		Namespace: "default",
+		ThreadID:  threadID,
 		Messages: []responses.InputMessageUnion{
 			responses.UserMessage("Hello! My name is Alice"),
 		},
@@ -69,8 +73,8 @@ func main() {
 	})
 
 	out, err = agent2.Execute(context.Background(), &agents.AgentInput{
-		Namespace:         "default",
-		PreviousMessageID: out.RunID,
+		Namespace: "default",
+		ThreadID:  threadID,
 		Messages: []responses.InputMessageUnion{
 			responses.UserMessage("What's my name?"),
 		},
