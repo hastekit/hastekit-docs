@@ -42,13 +42,16 @@ agentTool := tools.NewAgentTool(&responses.ToolUnion{
             "required": []string{"user_id"},
         },
     },
-}, subAgent)
+}, subAgent, tools.SubAgentContextModeNone)
 ```
 
 ### Parameters
 
 - **`toolUnion`**: A `*responses.ToolUnion` that defines the tool's interface (name, description, parameters)
 - **`agent`**: The agent instance that will be executed when the tool is called
+- **`contextMode`**: Context mode for the agent tool.
+    - `SubAgentContextModeNone` - Each invocation of the agent tool starts with an empty context.
+    - `SubAgentContextModeIsolated` - Each invocation of the agent tool starts with context of all the previous invocation.
 
 When the tool is called, the agent receives the tool's arguments as input and returns its output as the tool's result.
 
@@ -138,7 +141,7 @@ func main() {
 				"required": []string{"user_id"},
 			},
 		},
-	}, subAgent)
+	}, subAgent, tools.SubAgentContextModeNone)
 
 	// Create the main agent that uses the agent tool
 	agent := client.NewAgent(&hastekit.AgentOptions{
