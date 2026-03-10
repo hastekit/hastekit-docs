@@ -30,7 +30,7 @@ if err != nil {
 You can also configure the MCP Client to send custom HTTP headers while interacting with the MCP server.
 
 ```go
-mcpClient, err := mcpclient.NewSSEClient(context.Background(), "http://localhost:9001/sse",
+mcpClient, err := mcpclient.NewClient(context.Background(), "http://localhost:9001/sse",
 	mcpclient.WithHeaders(map[string]string{
         "token": "your-token",
     }),
@@ -43,8 +43,18 @@ You can optionally filter which tools to use by passing tool names to `GetTools(
 
 ```go
 // Only use specific tools
-mcpClient, err := mcpclient.NewSSEClient(context.Background(), "http://localhost:9001/sse",
+mcpClient, err := mcpclient.NewClient(context.Background(), "http://localhost:9001/sse",
 		mcpclient.WithToolFilter("list_users"),
+	)
+```
+
+### Transport
+
+You can set the transport to be used for the connection. Supported transports are `SSE` and `Streamable HTTP`. If not specified it defaults to `SSE`
+
+```go
+mcpClient, err := mcpclient.NewClient(context.Background(), "http://localhost:9001/sse",
+		mcpclient.WithTransport("streamable-http"), // or "sse"
 	)
 ```
 
@@ -100,7 +110,7 @@ func main() {
     history := client.NewConversationManager("default", uuid.NewString(), "")
 
     // Connect to MCP server
-    mcpClient, err := mcpclient.NewSSEClient(context.Background(), "http://localhost:9001/sse",
+    mcpClient, err := mcpclient.NewClient(context.Background(), "http://localhost:9001/sse",
 		mcpclient.WithHeaders(map[string]string{
 			"token": "your-token",
 		}),

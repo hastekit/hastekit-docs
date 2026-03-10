@@ -9,9 +9,14 @@ Connect Model Context Protocol (MCP) servers to provide tools and resources to y
 1. Click **Add MCP Server**
 2. Configure the MCP server connection details:
    - **Endpoint** - The MCP server endpoint URL
+   - **Transport** - The transport to be used for the communicating with MCP servers.
    - **Headers** - Optional custom HTTP headers for authentication
    - **Tool Filter** - Optional list of tool names to include (empty means all tools are available)
    - **Tools Requiring Human Approval** - Optional list of tool names that require human approval before execution
+
+## Transport
+
+Set the transport to be used for the MCP server communication. Supports "SSE" and "Streamable HTTP".
 
 ## Tool Filter
 

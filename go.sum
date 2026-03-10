@@ -1,5 +1,7 @@
 github.com/a2aproject/a2a-go v0.3.7 h1:yw3wqvIoafE5KBh66qYdc0Na1y87H2zEX0R1hHFTcww=
 github.com/a2aproject/a2a-go v0.3.7/go.mod h1:I7Cm+a1oL+UT6zMoP+roaRE5vdfUa1iQGVN8aSOuZ0I=
+github.com/a2aproject/a2a-go v0.3.8 h1:chS3LPLmxYIbl6afdlHmg/3yA23SfaQcKaWy3SU19fM=
+github.com/a2aproject/a2a-go v0.3.8/go.mod h1:I7Cm+a1oL+UT6zMoP+roaRE5vdfUa1iQGVN8aSOuZ0I=
 github.com/bahlo/generic-list-go v0.2.0 h1:5sz/EEAK+ls5wF+NeqDpk5+iNdMDXrh3z3nPnH1Wvgk=
 github.com/bahlo/generic-list-go v0.2.0/go.mod h1:2KvAjgMlE5NNynlg/5iLrrCCZ2+5xWbdbCW3pNTGyYg=
 github.com/bsm/ginkgo/v2 v2.12.0 h1:Ny8MWAHyOepLGlLKYmXG4IEkioBysk6GpaRTLC8zwWs=
@@ -55,6 +57,8 @@ github.com/hastekit/hastekit-sdk-go v0.0.0-20260308163412-2313891bbc5b h1:jkp/yt
 github.com/hastekit/hastekit-sdk-go v0.0.0-20260308163412-2313891bbc5b/go.mod h1:ruQbPT7K7nc4mjdzMzm5ZzbZwnNSw/gYGpwDE0foDM8=
 github.com/hastekit/hastekit-sdk-go v0.0.0-20260308182017-c8c84410989d h1:I0U6OmrJp8hjfGUGxQaByQDDSqAz8P8wS6qL58qeCjs=
 github.com/hastekit/hastekit-sdk-go v0.0.0-20260308182017-c8c84410989d/go.mod h1:ruQbPT7K7nc4mjdzMzm5ZzbZwnNSw/gYGpwDE0foDM8=
+github.com/hastekit/hastekit-sdk-go v0.0.0-20260310055246-0a9c7cb099f9 h1:ijI4PF/Xo5jJKsNSdb0OE1kFaFGWN889Zm/Bx3mv4fY=
+github.com/hastekit/hastekit-sdk-go v0.0.0-20260310055246-0a9c7cb099f9/go.mod h1:ruQbPT7K7nc4mjdzMzm5ZzbZwnNSw/gYGpwDE0foDM8=
 github.com/invopop/jsonschema v0.13.0 h1:KvpoAJWEjR3uD9Kbm2HWJmqsEaHt8lBUpd0qHcIi21E=
 github.com/invopop/jsonschema v0.13.0/go.mod h1:ffZ5Km5SWWRAIN6wbDXItl95euhFz2uON45H2qjYt+0=
 github.com/kisielk/errcheck v1.5.0/go.mod h1:pFxgyoBC7bSaBwPgfKdkLd5X25qrDl4LWUI2bnpBCr8=

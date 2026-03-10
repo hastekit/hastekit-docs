@@ -5,11 +5,11 @@ go 1.25.3
 require (
 	github.com/bytedance/sonic v1.15.0
 	github.com/google/uuid v1.6.0
-	github.com/hastekit/hastekit-sdk-go v0.0.0-20260308182017-c8c84410989d
+	github.com/hastekit/hastekit-sdk-go v0.0.0-20260310055246-0a9c7cb099f9
 )
 
 require (
-	github.com/a2aproject/a2a-go v0.3.7 // indirect
+	github.com/a2aproject/a2a-go v0.3.8 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/bytedance/gopkg v0.1.3 // indirect
