@@ -53,28 +53,32 @@ func main() {
 		LLM:         model,
 		History:     history,
 		Tools: []agents.Tool{
-			tools.NewAgentTool(&responses.ToolUnion{
-				OfFunction: &responses.FunctionTool{
-					Name:        "joke-generator-agent",
-					Description: utils.Ptr("Use to generate jokes"),
-					Parameters: map[string]any{
-						"type":     "object",
-						"required": []string{"message"},
-						"properties": map[string]any{
-							"message": map[string]any{
-								"type":        "string",
-								"description": "Message for the agent",
+			tools.NewAgentTool(
+				&responses.ToolUnion{
+					OfFunction: &responses.FunctionTool{
+						Name:        "joke-generator-agent",
+						Description: utils.Ptr("Use to generate jokes"),
+						Parameters: map[string]any{
+							"type":     "object",
+							"required": []string{"message"},
+							"properties": map[string]any{
+								"message": map[string]any{
+									"type":        "string",
+									"description": "Message for the agent",
+								},
 							},
+							"additionalProperties": false,
 						},
-						"additionalProperties": false,
 					},
 				},
-			}, client.NewTemporalAgent(&hastekit.AgentOptions{
-				Name:        "joke-generator",
-				Instruction: client.Prompt("You are helpful assistant."),
-				LLM:         model,
-				History:     client.NewConversationManager(),
-			})),
+				client.NewTemporalAgent(&hastekit.AgentOptions{
+					Name:        "joke-generator",
+					Instruction: client.Prompt("You are helpful assistant."),
+					LLM:         model,
+					History:     client.NewConversationManager(),
+				}),
+				tools.SubAgentContextModeNone,
+			),
 		},
 	})
 
