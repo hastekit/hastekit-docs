@@ -70,7 +70,8 @@
                     ]
                   },
                   "hastekit-sdk/embeddings/embeddings",
-                  "hastekit-sdk/speech/speech"
+                  "hastekit-sdk/speech/speech",
+                  "hastekit-sdk/speech/transcription"
                 ]
               },
               {
@@ -80,22 +81,29 @@
                   "hastekit-sdk/agents/simple-agent",
                   "hastekit-sdk/agents/system-instruction",
                   {
-                    "group": "Tools",
-                    "expanded": true,
-                    "pages": [
-                      "hastekit-sdk/agents/tools/function-tools",
-                      "hastekit-sdk/agents/tools/mcp-tools",
-                      "hastekit-sdk/agents/tools/agent-as-a-tool",
-                      "hastekit-sdk/agents/tools/sandbox-tool",
-                      "hastekit-sdk/agents/tools/human-in-the-loop"
-                    ]
-                  },
-                  {
                     "group": "Conversations",
                     "expanded": true,
                     "pages": [
                       "hastekit-sdk/agents/conversations/history",
                       "hastekit-sdk/agents/conversations/summarization"
+                    ]
+                  },
+                  {
+                    "group": "Tools",
+                    "expanded": true,
+                    "pages": [
+                      "hastekit-sdk/agents/tools/function-tools",
+                      "hastekit-sdk/agents/tools/mcp-tools",
+                      "hastekit-sdk/agents/tools/sandbox-tool",
+                      "hastekit-sdk/agents/tools/human-in-the-loop"
+                    ]
+                  },
+                  {
+                    "group": "Multi Agents",
+                    "expanded": true,
+                    "pages": [
+                      "hastekit-sdk/agents/tools/agent-as-a-tool",
+                      "hastekit-sdk/agents/multi-agents/handoff"
                     ]
                   },
                   "hastekit-sdk/agents/serving-agents/serving-agents-http",
@@ -105,13 +113,6 @@
                     "pages": [
                       "hastekit-sdk/agents/durable/restate",
                       "hastekit-sdk/agents/durable/temporal"
-                    ]
-                  },
-                  {
-                    "group": "Multi Agents",
-                    "expanded": true,
-                    "pages": [
-                      "hastekit-sdk/agents/multi-agents/handoff"
                     ]
                   }
                 ]

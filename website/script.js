@@ -617,7 +617,7 @@ function initProductNav() {
             features: [
                 'Virtual Keys',
                 'API Key Balancing',
-                'Observability'
+                'Usage Analytics & Observability'
             ]
         },
         'agent-gateway': {
@@ -629,7 +629,8 @@ function initProductNav() {
                 'Knowledge Bases',
                 'Multi-Agent Patterns',
                 'Sandbox Environment',
-                'Slack, Telegram & Scheduled Triggers',
+                'Slack, Telegram, GitHub & Scheduled Triggers',
+                'Codebases',
                 'Durable Agent Runtime',
                 'Agent Observability'
             ]

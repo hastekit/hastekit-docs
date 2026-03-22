@@ -351,7 +351,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .hero-container {
     text-align: center;
-    max-width: 900px;
+    max-width: 1060px;
 }
 
 .hero-badge {
@@ -404,6 +404,164 @@ h1, h2, h3, h4, h5, h6 {
     gap: 16px;
     flex-wrap: wrap;
     margin-bottom: 64px;
+}
+
+/* Hero Product Cards */
+.hero-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    margin: 0 auto 64px;
+    max-width: 960px;
+    text-align: left;
+}
+
+.hero-card {
+    display: flex;
+    flex-direction: column;
+    padding: 28px 24px;
+    border-radius: 16px;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    transition: all var(--transition-base);
+    text-align: left;
+    position: relative;
+    overflow: hidden;
+}
+
+.hero-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    border-radius: 16px 16px 0 0;
+    opacity: 0.8;
+    transition: opacity var(--transition-base);
+}
+
+.hero-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--color-border-light);
+    box-shadow: var(--shadow-lg);
+}
+
+.hero-card:hover::before {
+    opacity: 1;
+}
+
+/* Card color variants */
+.hero-card-purple::before {
+    background: linear-gradient(90deg, #a78bfa, #8b5cf6);
+}
+.hero-card-purple:hover {
+    border-color: rgba(167, 139, 250, 0.3);
+    box-shadow: 0 8px 30px rgba(167, 139, 250, 0.15);
+}
+
+.hero-card-blue::before {
+    background: linear-gradient(90deg, #38bdf8, #0ea5e9);
+}
+.hero-card-blue:hover {
+    border-color: rgba(56, 189, 248, 0.3);
+    box-shadow: 0 8px 30px rgba(56, 189, 248, 0.15);
+}
+
+.hero-card-green::before {
+    background: linear-gradient(90deg, #4ade80, #22c55e);
+}
+.hero-card-green:hover {
+    border-color: rgba(74, 222, 128, 0.3);
+    box-shadow: 0 8px 30px rgba(74, 222, 128, 0.15);
+}
+
+.hero-card-icon {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+    max-width: 40px;
+    max-height: 40px;
+    margin-bottom: 16px;
+    color: var(--color-text-muted);
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.hero-card-purple .hero-card-icon { color: #a78bfa; }
+.hero-card-blue .hero-card-icon { color: #38bdf8; }
+.hero-card-green .hero-card-icon { color: #4ade80; }
+
+.hero-card-icon svg {
+    width: 40px;
+    height: 40px;
+    max-width: 40px;
+    max-height: 40px;
+    display: block;
+}
+
+.hero-card-title {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    color: var(--color-text);
+}
+
+.hero-card-desc {
+    font-size: 14px;
+    color: var(--color-text-dim);
+    margin-bottom: 16px;
+    line-height: 1.4;
+}
+
+.hero-card-features {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 20px;
+    flex: 1;
+}
+
+.hero-card-features li {
+    font-size: 13px;
+    color: var(--color-text-muted);
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    line-height: 1.4;
+}
+
+.hero-card-features li:last-child {
+    border-bottom: none;
+}
+
+.hero-card-features li::before {
+    content: '→';
+    margin-right: 8px;
+    opacity: 0.4;
+}
+
+.hero-card-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    margin-top: auto;
+    transition: gap var(--transition-base);
+}
+
+.hero-card-purple .hero-card-link { color: #a78bfa; }
+.hero-card-blue .hero-card-link { color: #38bdf8; }
+.hero-card-green .hero-card-link { color: #4ade80; }
+
+.hero-card-link svg {
+    width: 16px;
+    height: 16px;
+    transition: transform var(--transition-base);
+}
+
+.hero-card:hover .hero-card-link svg {
+    transform: translateX(4px);
 }
 
 .hero-stats {
@@ -2386,16 +2544,21 @@ section {
         display: flex;
     }
     
+    .hero-cards {
+        grid-template-columns: 1fr;
+        max-width: 400px;
+    }
+
     .hero-stats {
         flex-direction: column;
         gap: 24px;
     }
-    
+
     .stat-divider {
         width: 60px;
         height: 1px;
     }
-    
+
     .features-grid,
     .sdk-features {
         grid-template-columns: 1fr;

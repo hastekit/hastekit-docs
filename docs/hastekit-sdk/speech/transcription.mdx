@@ -1,0 +1,249 @@
+---
+title: Transcription
+---
+
+HasteKit SDK supports speech-to-text transcription with various LLM providers like OpenAI, Gemini, and ElevenLabs.
+
+## Transcribe audio
+
+Transcribe audio from a file. The audio data is sent as raw bytes along with the filename for MIME type detection.
+
+```go
+import (
+    "context"
+    "fmt"
+    "log"
+    "os"
+    "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/transcription"
+)
+
+// Read audio file
+audio, err := os.ReadFile("recording.mp3")
+if err != nil {
+    log.Fatal(err)
+}
+
+resp, err := client.NewTranscription(context.Background(), &transcription.Request{
+    Model:         "OpenAI/whisper-1",
+    Audio:         audio,
+    AudioFilename: "recording.mp3",
+})
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Println("Transcription:", resp.Text)
+```
+
+## Response
+
+The response contains the transcribed text along with optional metadata like language, duration, word-level timestamps, and segments.
+
+```go
+// Access transcribed text
+fmt.Println("Text:", resp.Text)
+
+// Access detected language
+if resp.Language != nil {
+    fmt.Println("Language:", *resp.Language)
+}
+
+// Access audio duration
+if resp.Duration != nil {
+    fmt.Printf("Duration: %.2f seconds\n", *resp.Duration)
+}
+
+// Access usage statistics
+if resp.Usage != nil {
+    fmt.Printf("Tokens used: %d\n", resp.Usage.TotalTokens)
+}
+```
+
+---
+
+## Word-level timestamps
+
+Request word-level timestamps for precise timing information.
+
+```go
+resp, err := client.NewTranscription(context.Background(), &transcription.Request{
+    Model:                  "OpenAI/whisper-1",
+    Audio:                  audio,
+    AudioFilename:          "recording.mp3",
+    ResponseFormat:         utils.Ptr("verbose_json"),
+    TimestampGranularities: []string{"word"},
+})
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, word := range resp.Words {
+    fmt.Printf("[%.2fs - %.2fs] %s\n", word.Start, word.End, word.Word)
+}
+```
+
+## Segment-level timestamps
+
+Request segment-level timestamps for paragraph or sentence-level timing.
+
+```go
+resp, err := client.NewTranscription(context.Background(), &transcription.Request{
+    Model:                  "OpenAI/whisper-1",
+    Audio:                  audio,
+    AudioFilename:          "recording.mp3",
+    ResponseFormat:         utils.Ptr("verbose_json"),
+    TimestampGranularities: []string{"segment"},
+})
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, seg := range resp.Segments {
+    fmt.Printf("[%.2fs - %.2fs] %s\n", seg.Start, seg.End, seg.Text)
+}
+```
+
+## Request Configuration
+
+| Parameter | Type | Description |
+| :--- | :--- | :--- |
+| **Audio** | `[]byte` | Raw audio data to transcribe. |
+| **AudioFilename** | `string` | Filename for the audio file (e.g., `"audio.mp3"`). Used for MIME type detection. |
+| **Model** | `string` | The model to use for transcription (e.g., `"OpenAI/whisper-1"`). |
+| **Language** | `*string` | Optional. Language of the input audio in ISO-639-1 format (e.g., `"en"`, `"es"`). |
+| **Prompt** | `*string` | Optional. Text to guide the model's style or continue a previous audio segment. |
+| **ResponseFormat** | `*string` | Optional. Output format: `"json"`, `"text"`, `"srt"`, `"verbose_json"`, or `"vtt"`. |
+| **Temperature** | `*float64` | Optional. Sampling temperature between 0 and 1. Lower values are more deterministic. |
+| **TimestampGranularities** | `[]string` | Optional. Timestamp granularities: `"word"`, `"segment"`. Requires `verbose_json` format. |
+
+## Response Structure
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| **Text** | `string` | The transcribed text. |
+| **Language** | `*string` | Detected language of the audio. |
+| **Duration** | `*float64` | Duration of the audio in seconds. |
+| **Words** | `[]Word` | Word-level timestamps (when requested). |
+| **Segments** | `[]Segment` | Segment-level timestamps (when requested). |
+| **Usage** | `*Usage` | Token usage statistics. |
+
+### Word
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| **Word** | `string` | The transcribed word. |
+| **Start** | `float64` | Start time in seconds. |
+| **End** | `float64` | End time in seconds. |
+
+### Segment
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| **ID** | `int` | Segment index. |
+| **Seek** | `int` | Seek offset of the segment. |
+| **Start** | `float64` | Start time in seconds. |
+| **End** | `float64` | End time in seconds. |
+| **Text** | `string` | Transcribed text of the segment. |
+| **Temperature** | `float64` | Temperature used for this segment. |
+| **AvgLogprob** | `float64` | Average log probability of the segment. |
+| **CompressionRatio** | `float64` | Compression ratio of the segment. |
+| **NoSpeechProb** | `float64` | Probability that the segment contains no speech. |
+
+### Usage
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| **PromptTokens** | `int` | Number of input tokens processed. |
+| **CompletionTokens** | `int` | Number of output tokens generated. |
+| **TotalTokens** | `int` | Total tokens used. |
+
+## Example: Complete Transcription
+
+```go
+package main
+
+import (
+    "context"
+    "log"
+    "os"
+
+    "github.com/hastekit/hastekit-sdk-go/pkg/utils"
+    "github.com/hastekit/hastekit-sdk-go/pkg/gateway"
+    "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
+    "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/transcription"
+    hastekit "github.com/hastekit/hastekit-sdk-go"
+)
+
+func main() {
+    // Initialize SDK client
+    client, err := hastekit.New(&hastekit.ClientOptions{
+        ProviderConfigs: []gateway.ProviderConfig{
+            {
+                ProviderName:  llm.ProviderNameOpenAI,
+                BaseURL:       "",
+                CustomHeaders: nil,
+                ApiKeys: []*gateway.APIKeyConfig{
+                    {
+                        Name:   "Key 1",
+                        APIKey: os.Getenv("OPENAI_API_KEY"),
+                    },
+                },
+            },
+        },
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Read audio file
+    audio, err := os.ReadFile("meeting.mp3")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Transcribe with word-level timestamps
+    resp, err := client.NewTranscription(context.Background(), &transcription.Request{
+        Model:                  "OpenAI/whisper-1",
+        Audio:                  audio,
+        AudioFilename:          "meeting.mp3",
+        Language:               utils.Ptr("en"),
+        ResponseFormat:         utils.Ptr("verbose_json"),
+        TimestampGranularities: []string{"word", "segment"},
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    log.Printf("Transcription: %s\n", resp.Text)
+    if resp.Duration != nil {
+        log.Printf("Duration: %.2f seconds\n", *resp.Duration)
+    }
+    if resp.Language != nil {
+        log.Printf("Language: %s\n", *resp.Language)
+    }
+}
+```
+
+## Supported Audio Formats
+
+The SDK automatically detects the MIME type from the `AudioFilename`. Supported formats include:
+
+| Format | Extension | MIME Type |
+| :--- | :--- | :--- |
+| MP3 | `.mp3` | `audio/mpeg` |
+| WAV | `.wav` | `audio/wav` |
+| FLAC | `.flac` | `audio/flac` |
+| OGG | `.ogg` | `audio/ogg` |
+| M4A | `.m4a` | `audio/mp4` |
+| AAC | `.aac` | `audio/aac` |
+| WebM | `.webm` | `audio/webm` |
+| PCM | `.pcm` | `audio/L16` |
+
+## Supported Providers
+
+| Provider | Transcription |
+| :--- | :---: |
+| **OpenAI** | ✅ |
+| **Gemini** | ✅ |
+| **ElevenLabs** | ✅ |
+| **Anthropic** | ❌ |
