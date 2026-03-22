@@ -855,7 +855,8 @@ section {
     box-shadow: var(--shadow-lg), 0 0 60px rgba(99, 102, 241, 0.1);
 }
 
-.product-screenshot img {
+.product-screenshot img,
+.product-screenshot video {
     display: block;
     width: 100%;
     height: auto;
