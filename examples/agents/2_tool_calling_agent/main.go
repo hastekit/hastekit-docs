@@ -51,7 +51,7 @@ func (t *CustomTool) Execute(ctx context.Context, params *agents.ToolCall) (*age
 				OfString: utils.Ptr("Bob"),
 			},
 		},
-		SubAgentContext: nil,
+		StateUpdates: map[string]string{},
 	}, nil
 }
 

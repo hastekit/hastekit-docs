@@ -94,7 +94,7 @@ func (t *DeleteUserTool) Execute(ctx context.Context, params *agents.ToolCall) (
 				OfString: utils.Ptr(fmt.Sprintf("User %s has been deleted", args["user_id"])),
 			},
 		},
-		SubAgentContext: nil,
+		StateUpdates: nil,
 	}, nil
 }
 
@@ -134,9 +134,12 @@ func main() {
 		History: client.NewConversationManager(),
 	})
 
+	threadID := uuid.New().String()
+
 	// First execution - agent may request to delete a user
 	result, err := agent.Execute(ctx, &agents.AgentInput{
 		Namespace: "default",
+		ThreadID:  threadID,
 		Messages: []responses.InputMessageUnion{
 			responses.UserMessage("Delete user 123"),
 		},
@@ -160,9 +163,9 @@ func main() {
 
 		// Resume with approval
 		result, err = agent.Execute(ctx, &agents.AgentInput{
-			Namespace:         "default",
-			PreviousMessageID: result.RunID,
-			Messages:          []responses.InputMessageUnion{approvalResponse},
+			Namespace: "default",
+			ThreadID:  threadID,
+			Messages:  []responses.InputMessageUnion{approvalResponse},
 		})
 	}
 

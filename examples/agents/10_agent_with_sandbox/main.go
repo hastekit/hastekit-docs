@@ -30,6 +30,12 @@ func main() {
 				},
 			},
 		},
+		ServerConfig: hastekit.ServerConfig{
+			Endpoint:    "https://app.hastekit.ai",
+			VirtualKey:  "",
+			OrgID:       "",
+			ProjectName: "",
+		},
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -47,7 +53,7 @@ func main() {
 		LLM:         model,
 		History:     history,
 		Tools: []agents.Tool{
-			tools.NewSandboxTool(client.NewSandboxManager(), "praveenraj9495/hastekit-ai-sandbox:latest", map[string]string{}),
+			tools.NewBashTool(client.NewSandboxManager(), "praveenraj9495/hastekit-ai-sandbox:latest", map[string]string{}),
 		},
 	})
 
