@@ -105,7 +105,7 @@ type RunState struct {
 
 ### Resuming Execution
 
-To resume execution after user review, send a `FunctionCallApprovalResponseMessage`:
+To resume execution after user review, send a `FunctionCallApprovalResponseMessage` on the same thread. `Execute()` returns an `*AgentHandle`; the simplest way to wait for the resumed run is `handle.Result()`:
 
 ```go
 // User approved the tool call
@@ -117,12 +117,15 @@ approvalResponse := responses.InputMessageUnion{
     },
 }
 
-// Resume execution with the approval response
-result, err := agent.Execute(ctx, &agents.AgentInput{
+handle, err := agent.Execute(ctx, &agents.AgentInput{
     Messages: []responses.InputMessageUnion{
         approvalResponse,
     },
 })
+if err != nil {
+    log.Fatal(err)
+}
+result, err := handle.Result()
 ```
 
 ### Handling Rejections
@@ -279,12 +282,16 @@ func main() {
 	})
 
 	// First execution - agent may request to delete a user
-	result, err := agent.Execute(ctx, &agents.AgentInput{
+	handle, err := agent.Execute(ctx, &agents.AgentInput{
 		Namespace: "default",
 		Messages: []responses.InputMessageUnion{
 			responses.UserMessage("Delete user 123"),
 		},
 	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	result, err := handle.Result()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -303,15 +310,18 @@ func main() {
 		}
 
 		// Resume with approval
-		result, err = agent.Execute(ctx, &agents.AgentInput{
+		handle, err = agent.Execute(ctx, &agents.AgentInput{
 			Namespace:         "default",
 			PreviousMessageID: result.RunID,
 			Messages:          []responses.InputMessageUnion{approvalResponse},
 		})
-	}
-
-	if err != nil {
-		log.Fatal(err)
+		if err != nil {
+			log.Fatal(err)
+		}
+		result, err = handle.Result()
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	buf, _ := sonic.Marshal(result.Output)

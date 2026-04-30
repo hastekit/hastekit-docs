@@ -73,11 +73,15 @@ func main() {
 		Tools:       []agents.Tool{agentTool},
 	})
 
-	out, err := agent.Execute(context.Background(), &agents.AgentInput{
+	handle, err := agent.Execute(context.Background(), &agents.AgentInput{
 		Messages: []responses.InputMessageUnion{
-			responses.UserMessage("Hello!"),
+			responses.UserMessage("what is the username of user_id '123'?"),
 		},
 	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	out, err := handle.Result()
 	if err != nil {
 		log.Fatal(err)
 	}

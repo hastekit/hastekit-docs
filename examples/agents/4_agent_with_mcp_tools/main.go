@@ -59,11 +59,15 @@ func main() {
 		McpServers:  []agents.MCPToolset{mcpClient},
 	})
 
-	out, err := agent.Execute(context.Background(), &agents.AgentInput{
+	handle, err := agent.Execute(context.Background(), &agents.AgentInput{
 		Messages: []responses.InputMessageUnion{
 			responses.UserMessage("Hello!"),
 		},
 	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	out, err := handle.Result()
 	if err != nil {
 		log.Fatal(err)
 	}

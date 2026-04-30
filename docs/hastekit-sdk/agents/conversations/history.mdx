@@ -22,12 +22,13 @@ agent := agents.NewAgent(&agents.AgentOptions{
     History:     cm,
 })
 
-out, err := agent.Execute(context.Background(), &agents.AgentInput{
+handle, err := agent.Execute(context.Background(), &agents.AgentInput{
     Namespace: "default",
     Messages: []responses.InputMessageUnion{
         responses.UserMessage("Hello! My name is Alice"),
     },
 })
+out, err := handle.Result()
 ```
 
 ## Continuing the conversation
@@ -37,22 +38,24 @@ To continue the conversation, pass same thread ID while invoking the agent again
 ```go
 // First invocation
 threadID := uuid.NewString()
-out, err = agent.Execute(context.Background(), &agents.AgentInput{
-    Namespace:         "default",
-    ThreadID:          threadID,
+handle, err := agent.Execute(context.Background(), &agents.AgentInput{
+    Namespace: "default",
+    ThreadID:  threadID,
     Messages: []responses.InputMessageUnion{
         responses.UserMessage("Hello! My name is Alice"),
     },
 })
+out, err := handle.Result()
 
 // Second invocation
-out, err = agent.Execute(context.Background(), &agents.AgentInput{
-    Namespace:         "default",
-    ThreadID:          threadID, // Pass the same thread ID to continue the conversation
+handle, err = agent.Execute(context.Background(), &agents.AgentInput{
+    Namespace: "default",
+    ThreadID:  threadID, // Pass the same thread ID to continue the conversation
     Messages: []responses.InputMessageUnion{
         responses.UserMessage("What's my name?"),
     },
 })
+out, err = handle.Result()
 ```
 
 ---
@@ -143,13 +146,17 @@ func main() {
 
     threadID := uuid.NewString()
 
-	out, err := agent.Execute(context.Background(), &agents.AgentInput{
+	handle, err := agent.Execute(context.Background(), &agents.AgentInput{
 		Namespace: "default",
 		ThreadID:  threadID,
 		Messages: []responses.InputMessageUnion{
 			responses.UserMessage("Hello! My name is Alice"),
 		},
 	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	out, err := handle.Result()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -165,13 +172,17 @@ func main() {
 		History:     history,
 	})
 
-	out, err = agent2.Execute(context.Background(), &agents.AgentInput{
+	handle, err = agent2.Execute(context.Background(), &agents.AgentInput{
 		Namespace: "default",
 		ThreadID:  threadID,
-		Messages:  []responses.InputMessageUnion{
+		Messages: []responses.InputMessageUnion{
 			responses.UserMessage("What's my name?"),
 		},
 	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	out, err = handle.Result()
 	if err != nil {
 		log.Fatal(err)
 	}

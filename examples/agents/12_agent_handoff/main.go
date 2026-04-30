@@ -64,11 +64,15 @@ func main() {
 		History: client.NewConversationManager(),
 	})
 
-	out, err := routerAgent.Execute(context.Background(), &agents.AgentInput{
+	handle, err := routerAgent.Execute(context.Background(), &agents.AgentInput{
 		Messages: []responses.InputMessageUnion{
 			responses.UserMessage("Hello! Tell me a joke about universe"),
 		},
 	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	out, err := handle.Result()
 	if err != nil {
 		log.Fatal(err)
 	}

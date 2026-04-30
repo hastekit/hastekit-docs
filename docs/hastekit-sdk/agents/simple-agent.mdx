@@ -11,9 +11,10 @@ Simple agents provide:
 - **LLM integration**: Use any supported LLM provider (OpenAI, Anthropic, Gemini, etc.)
 - **Tool support**: Optional tools for function calling
 - **Conversation history**: Optional memory across interactions
-- **Streaming responses**: Real-time response chunks via callbacks
+- **Streaming responses**: A live channel of response chunks delivered through the run handle
+- **Stop signal**: Cancel an in-flight run cleanly via `handle.Stop`
 
-Unlike durable agents, simple agents execute synchronously and don't persist state between runs. They're ideal for stateless applications, quick prototypes, and scenarios where you don't need crash recovery.
+Unlike durable agents, simple agents execute in-process and don't persist state between runs across restarts. They're ideal for stateless applications, quick prototypes, and scenarios where you don't need crash recovery.
 
 ## Creating a Simple Agent
 
@@ -82,10 +83,15 @@ agent := client.NewAgent(&hastekit.AgentOptions{
 
 ## Executing an Agent
 
-Execute an agent using the `Execute()` method with `AgentInput`:
+`Execute()` is non-blocking — it generates a stream id, subscribes to the broker, and returns an `*AgentHandle`. There are two valid ways to consume the handle:
+
+- **`handle.Result()`** — drains the chunk channel internally and returns the aggregated `AgentOutput`. Use this when you only care about the final output.
+- **`for chunk := range handle.Chunks` + `handle.Wait()`** — observe chunks as they arrive (e.g. to forward to a UI or SSE stream), then collect the aggregated output.
+
+Call `handle.Stop(ctx)` at any point to ask the agent to stop at the next iteration boundary.
 
 ```go
-out, err := agent.Execute(context.Background(), &agents.AgentInput{
+handle, err := agent.Execute(context.Background(), &agents.AgentInput{
     Messages: []responses.InputMessageUnion{
         responses.UserMessage("Hello!"),
     },
@@ -94,8 +100,21 @@ if err != nil {
     log.Fatal(err)
 }
 
-// Access the response
+// One-shot: drain + aggregate.
+out, err := handle.Result()
+if err != nil {
+    log.Fatal(err)
+}
 fmt.Println(out.Output[0].OfOutputMessage.Content[0].OfOutputText.Text)
+```
+
+Or if you want to consume chunks live:
+
+```go
+for chunk := range handle.Chunks {
+    // forward chunk to your UI / SSE / log
+}
+out, err := handle.Wait()
 ```
 
 ### AgentInput Fields
@@ -106,17 +125,38 @@ fmt.Println(out.Output[0].OfOutputMessage.Content[0].OfOutputText.Text)
 | **Namespace** | `string` | Optional namespace for conversation isolation |
 | **PreviousMessageID** | `string` | Optional ID of previous message for conversation continuity |
 | **RunContext** | `map[string]any` | Optional context data for template variable resolution |
-| **Callback** | `func(chunk *responses.ResponseChunk)` | Optional callback for streaming responses |
+| **StreamID** | `string` | Optional broker channel id. `Execute()` generates one if empty; supply your own to resume an existing stream or coordinate a stop signal. |
+
+### AgentHandle
+
+`Execute()` returns a handle:
+
+```go
+type AgentHandle struct {
+    StreamID string                          // Broker channel id for this run
+    Chunks   <-chan *responses.ResponseChunk // Live stream of chunks; closed on completion
+}
+
+func (h *AgentHandle) Stop(ctx context.Context) error
+func (h *AgentHandle) Wait() (*AgentOutput, error)
+func (h *AgentHandle) Result() (*AgentOutput, error)
+```
+
+- **`Stop`** records a stop request on the broker; the agent loop polls it at iteration boundaries and transitions to `completed`.
+- **`Wait`** blocks until the run finishes and returns the aggregated output. Safe to call only after `Chunks` has been drained.
+- **`Result`** drains `Chunks` internally and returns the aggregated output — equivalent to `for range Chunks {}; Wait()`.
+
+<Warning>Calling `Wait` without draining `Chunks` will deadlock once the broker's per-subscriber buffer fills, because the agent's publisher back-pressures. Use `Result` if you don't intend to consume chunks yourself.</Warning>
 
 ### AgentOutput Structure
 
-The `Execute()` method returns an `AgentOutput`:
+`handle.Wait()` returns the aggregated `AgentOutput`:
 
 ```go
 type AgentOutput struct {
-    RunID            string                        // Unique run identifier
-    Status           core.RunStatus                // Execution status
-    Output           []responses.InputMessageUnion  // Agent's response messages
+    RunID            string                          // Unique run identifier
+    Status           agentstate.RunStatus            // Execution status
+    Output           []responses.InputMessageUnion   // Agent's response messages
     PendingApprovals []responses.FunctionCallMessage // Tool calls requiring approval
 }
 ```
@@ -172,11 +212,15 @@ func main() {
 	})
 
 	// Execute agent
-	out, err := agent.Execute(context.Background(), &agents.AgentInput{
+	handle, err := agent.Execute(context.Background(), &agents.AgentInput{
 		Messages: []responses.InputMessageUnion{
 			responses.UserMessage("Hello!"),
 		},
 	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	out, err := handle.Result()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -188,29 +232,48 @@ func main() {
 
 ## Streaming Responses
 
-To receive streaming responses, provide a `Callback` function in `AgentInput`:
+Streaming is built into the handle — every run delivers chunks on `handle.Chunks` as they arrive:
 
 ```go
-out, err := agent.Execute(context.Background(), &agents.AgentInput{
+handle, err := agent.Execute(context.Background(), &agents.AgentInput{
     Messages: []responses.InputMessageUnion{
         responses.UserMessage("Tell me a story"),
     },
-    Callback: func(chunk *responses.ResponseChunk) {
-        // Handle different chunk types
-        switch chunk.ChunkType() {
-        case "response.output_text.delta":
-            // Print text deltas as they arrive
-            if chunk.OfOutputTextDelta != nil {
-                fmt.Print(chunk.OfOutputTextDelta.Delta)
-            }
-        case "response.output_text.done":
-            // Text generation complete
-            if chunk.OfOutputTextDone != nil && chunk.OfOutputTextDone.Text != nil {
-                fmt.Printf("\n\nComplete text: %s\n", *chunk.OfOutputTextDone.Text)
-            }
-        }
-    },
 })
+if err != nil {
+    log.Fatal(err)
+}
+
+for chunk := range handle.Chunks {
+    switch chunk.ChunkType() {
+    case "response.output_text.delta":
+        if chunk.OfOutputTextDelta != nil {
+            fmt.Print(chunk.OfOutputTextDelta.Delta)
+        }
+    case "response.output_text.done":
+        if chunk.OfOutputTextDone != nil && chunk.OfOutputTextDone.Text != nil {
+            fmt.Printf("\n\nComplete text: %s\n", *chunk.OfOutputTextDone.Text)
+        }
+    }
+}
+
+out, _ := handle.Wait()
+_ = out
+```
+
+## Stopping an In-Flight Run
+
+`handle.Stop(ctx)` records a stop request on the broker. The agent's loop checks this at every iteration boundary (between LLM calls / tool executions) and transitions cleanly to `completed`. The chunk stream stays open while the agent winds down — you'll still see the final `run.completed` chunk before the channel closes.
+
+```go
+go func() {
+    time.Sleep(2 * time.Second)
+    _ = handle.Stop(context.Background())
+}()
+
+for chunk := range handle.Chunks {
+    _ = chunk
+}
 ```
 
 ## Helper Functions

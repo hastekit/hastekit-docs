@@ -66,17 +66,21 @@ The request body follows the `agents.AgentInput` structure:
 ```go
 type AgentInput struct {
     Namespace         string
+    ThreadID          string
     PreviousMessageID string
     Messages          []responses.InputMessageUnion
     RunContext        map[string]any
-    Callback          func(chunk *responses.ResponseChunk)
+    StreamID          string
+    SessionID         string
 }
 ```
 
 - `Namespace` - Optional. Namespace for conversation isolation
+- `ThreadID` - Optional. Thread to continue (or empty to start a new one)
 - `PreviousMessageID` - Optional. Previous message ID for conversation history
 - `Messages` - Required. Array of input messages
 - `RunContext` - Optional. Additional context for the execution
+- `StreamID` - Optional. Broker channel id; the server generates one if empty. The HTTP handler streams chunks back as Server-Sent Events as the run progresses.
 
 ## Complete Example
 

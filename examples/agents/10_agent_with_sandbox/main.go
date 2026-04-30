@@ -57,7 +57,7 @@ func main() {
 		},
 	})
 
-	out, err := agent.Execute(context.Background(), &agents.AgentInput{
+	handle, err := agent.Execute(context.Background(), &agents.AgentInput{
 		Messages: []responses.InputMessageUnion{
 			responses.UserMessage("What is the current time?"),
 		},
@@ -65,6 +65,10 @@ func main() {
 		ThreadID:          "",
 		PreviousMessageID: "",
 	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	out, err := handle.Result()
 	if err != nil {
 		log.Fatal(err)
 	}

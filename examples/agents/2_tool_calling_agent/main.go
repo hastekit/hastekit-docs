@@ -81,7 +81,7 @@ func main() {
 	})
 
 	history := client.NewConversationManager()
-	agent := agents.NewAgent(&agents.AgentOptions{
+	agent := client.NewAgent(&hastekit.AgentOptions{
 		Name:        "Hello world agent",
 		Instruction: client.Prompt("You are a helpful assistant. Use the get_user_name tool to get the user's name and greet them."),
 		LLM:         model,
@@ -91,7 +91,7 @@ func main() {
 		},
 	})
 
-	out, err := agent.Execute(context.Background(), &agents.AgentInput{
+	handle, err := agent.Execute(context.Background(), &agents.AgentInput{
 		Messages: []responses.InputMessageUnion{
 			responses.UserMessage("Hello! Can you get my name for user_id '123'?"),
 		},
@@ -99,6 +99,11 @@ func main() {
 		ThreadID:          "",
 		PreviousMessageID: "",
 	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	
+	out, err := handle.Result()
 	if err != nil {
 		log.Fatal(err)
 	}

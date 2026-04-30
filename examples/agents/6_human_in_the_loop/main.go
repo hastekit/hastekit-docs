@@ -136,8 +136,8 @@ func main() {
 
 	threadID := uuid.New().String()
 
-	// First execution - agent may request to delete a user
-	result, err := agent.Execute(ctx, &agents.AgentInput{
+	// First execution - agent may request to delete a user.
+	handle, err := agent.Execute(ctx, &agents.AgentInput{
 		Namespace: "default",
 		ThreadID:  threadID,
 		Messages: []responses.InputMessageUnion{
@@ -147,12 +147,16 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	result, err := handle.Result()
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	// Check if approval is needed
+	// If a tool needs human approval the run pauses. Resume by sending
+	// a FunctionCallApprovalResponseMessage on the same thread.
 	if result.Status == agentstate.RunStatusPaused {
 		fmt.Println("Approval required for:", result.PendingApprovals)
 
-		// Simulate user approval
 		approvalResponse := responses.InputMessageUnion{
 			OfFunctionCallApprovalResponse: &responses.FunctionCallApprovalResponseMessage{
 				ID:              uuid.NewString(),
@@ -161,16 +165,18 @@ func main() {
 			},
 		}
 
-		// Resume with approval
-		result, err = agent.Execute(ctx, &agents.AgentInput{
+		handle, err = agent.Execute(ctx, &agents.AgentInput{
 			Namespace: "default",
 			ThreadID:  threadID,
 			Messages:  []responses.InputMessageUnion{approvalResponse},
 		})
-	}
-
-	if err != nil {
-		log.Fatal(err)
+		if err != nil {
+			log.Fatal(err)
+		}
+		result, err = handle.Result()
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	buf, _ := sonic.Marshal(result.Output)

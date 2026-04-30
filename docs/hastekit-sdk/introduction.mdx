@@ -53,11 +53,12 @@ agent := client.NewAgent(&hastekit.AgentOptions{
     }),
 })
 
-out, _ := agent.Execute(ctx, &agents.AgentInput{
+handle, _ := agent.Execute(ctx, &agents.AgentInput{
     Messages: []responses.InputMessageUnion{
         responses.UserMessage("Hello!"),
     },
 })
+out, _ := handle.Result()
 ```
   </Tab>
 </Tabs>

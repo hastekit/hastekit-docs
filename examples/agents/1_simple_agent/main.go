@@ -9,6 +9,7 @@ import (
 	"github.com/bytedance/sonic"
 	hastekit "github.com/hastekit/hastekit-sdk-go"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
+	"github.com/hastekit/hastekit-sdk-go/pkg/agents/streambroker"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
@@ -40,6 +41,8 @@ func main() {
 		Model:    "gpt-4.1-mini",
 	})
 
+	sb := streambroker.NewMemoryStreamBroker()
+
 	agent := client.NewAgent(&hastekit.AgentOptions{
 		Name:        "Hello world agent",
 		Instruction: client.Prompt("You are helpful assistant. You are interacting with the user named {{name}}"),
@@ -47,9 +50,10 @@ func main() {
 		Parameters: responses.Parameters{
 			Temperature: utils.Ptr(0.2),
 		},
+		StreamBroker: sb,
 	})
 
-	out, err := agent.Execute(context.Background(), &agents.AgentInput{
+	handle, err := agent.Execute(context.Background(), &agents.AgentInput{
 		Messages: []responses.InputMessageUnion{
 			responses.UserMessage("Hello!"),
 		},
@@ -57,12 +61,14 @@ func main() {
 			"name": "Bob",
 		},
 		Namespace: "default",
-		ThreadID:  "",
+		ThreadID:  "test123",
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	b, _ := sonic.Marshal(out)
-	fmt.Println(string(b))
+	for chunk := range handle.Chunks {
+		b, _ := sonic.Marshal(chunk)
+		fmt.Println(string(b))
+	}
 }

@@ -50,7 +50,7 @@ func main() {
 
 	threadID := uuid.New().String()
 
-	out, err := agent.Execute(context.Background(), &agents.AgentInput{
+	handle, err := agent.Execute(context.Background(), &agents.AgentInput{
 		Namespace: "default",
 		ThreadID:  threadID,
 		Messages: []responses.InputMessageUnion{
@@ -60,11 +60,15 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	out, err := handle.Result()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	b, _ := sonic.Marshal(out)
 	fmt.Println(string(b))
 
-	// Agent itself is stateless - you can either re-create another agent or reuse the same agent instance, but ensure to pass the correct `PreviousMessageID`
+	// Agent itself is stateless - you can either re-create another agent or reuse the same agent instance, but ensure to pass the correct `ThreadID`
 	agent2 := client.NewAgent(&hastekit.AgentOptions{
 		Name:        "Hello world agent",
 		Instruction: client.Prompt("You are helpful assistant."),
@@ -72,13 +76,17 @@ func main() {
 		History:     history,
 	})
 
-	out, err = agent2.Execute(context.Background(), &agents.AgentInput{
+	handle, err = agent2.Execute(context.Background(), &agents.AgentInput{
 		Namespace: "default",
 		ThreadID:  threadID,
 		Messages: []responses.InputMessageUnion{
 			responses.UserMessage("What's my name?"),
 		},
 	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	out, err = handle.Result()
 	if err != nil {
 		log.Fatal(err)
 	}

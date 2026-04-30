@@ -50,11 +50,15 @@ func main() {
 		Tools:       []agents.Tool{tools.NewBashTool(client.NewSandboxManager(), "hastekit-ai-sandbox:v1", nil)},
 	})
 
-	out, err := agent.Execute(context.Background(), &agents.AgentInput{
+	handle, err := agent.Execute(context.Background(), &agents.AgentInput{
 		Messages: []responses.InputMessageUnion{
 			responses.UserMessage("what is the current time? use bash tool"),
 		},
 	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	out, err := handle.Result()
 	if err != nil {
 		log.Fatal(err)
 	}

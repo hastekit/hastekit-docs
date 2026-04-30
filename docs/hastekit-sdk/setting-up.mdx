@@ -87,13 +87,21 @@ agent := client.NewAgent(&hastekit.AgentOptions{
 })
 ```
 
-Execute the agent with user messages:
+Execute the agent with user messages. `Execute()` returns an `*AgentHandle`; the simplest way to get the aggregated `AgentOutput` is `handle.Result()`, which drains the chunk stream internally. To render chunks live (e.g. forward to a UI), range over `handle.Chunks` yourself and then call `handle.Wait()`.
 ```go
-out, err := agent.Execute(ctx, &agents.AgentInput{
+handle, err := agent.Execute(ctx, &agents.AgentInput{
     Messages: []responses.InputMessageUnion{
         responses.UserMessage("Hello!"),
     },
 })
+if err != nil {
+    log.Fatal(err)
+}
+
+out, err := handle.Result()
+if err != nil {
+    log.Fatal(err)
+}
 ```
 
 Extract the agent's response:
