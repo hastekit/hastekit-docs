@@ -42,6 +42,14 @@ func main() {
 			Input: responses.InputUnion{
 				OfString: utils.Ptr("Hello!"),
 			},
+			Parameters: responses.Parameters{
+				Temperature: utils.Ptr(0.2),
+				ExtraFields: map[string]any{
+					"additional_headers": map[string]string{
+						"X-Custom-Header": "Custom Header Value",
+					},
+				},
+			},
 		},
 	)
 	if err != nil {
