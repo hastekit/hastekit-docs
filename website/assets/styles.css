@@ -1224,6 +1224,12 @@ html {
   }
   .fx-text   { flex: 1 1 100%; }
   .fx-canvas { flex: 1 1 100%; display: flex; justify-content: center; }
+  /* In the stacked layout the desktop "alternate sides" ordering becomes
+     visual noise — half the sections put the canvas on top, half on the
+     bottom, so the reader sees the canvas slip "between" text blocks as
+     they scroll. Reset the order so every section reads text → canvas. */
+  .fx-section[data-side="left"] .fx-text   { order: 0; }
+  .fx-section[data-side="left"] .fx-canvas { order: 0; }
   .fx-hero, .fx-outro { padding-left: 48px; padding-right: 48px; }
 }
 
