@@ -1,0 +1,136 @@
+---
+title: Workflows
+description: Build deterministic DAGs of triggers, connector actions, code, and agents — and call them as tools from an agent
+---
+
+Workflows are deterministic, versioned DAGs you build on a visual canvas. Drop in a trigger, chain connector actions, branch on conditions, run code, and (if you want) call an [AI Agent](/gateway/agent-builder) as a node. Save it and the workflow can be invoked by another agent as a tool — composable automation without leaving the platform.
+
+## Anatomy
+
+A workflow has four tabs at the top: **General**, **Canvas**, **Versions**, and **Alias** — mirroring the surfaces you already know from agents.
+
+### General
+
+| Field | Description |
+|-------|-------------|
+| **Workflow Name** | Required. Used as the tool name when the workflow is invoked from an agent. |
+| **Description** | Surfaced as the tool description; also shown in lists. |
+| **Runtime** | **Local** runs the workflow in-process (fast, non-durable). **Temporal** runs each node as a durable activity — replay-safe, retries on failure, recovers after restarts. Pick Local for development, Temporal for production. |
+
+### Canvas
+
+The visual DAG editor. The right rail holds the node palette, grouped into three sections:
+
+#### Triggers
+
+Define how the workflow is started.
+
+| Trigger | Fires when |
+|---------|------------|
+| **Cron** | A configured cron schedule elapses. |
+| **Invoked by Agent** | An AI Agent calls this workflow as a tool. The agent's arguments are the workflow inputs. |
+| **GitHub** | A GitHub webhook event arrives (e.g. PR opened, issue commented). Multiple GitHub event types are supported. |
+
+Each workflow has exactly one trigger.
+
+#### Nodes
+
+The building blocks of the DAG.
+
+| Node | Purpose |
+|------|---------|
+| **HTTP Request** | Make an HTTP request — free-form or driven by a JSON schema. |
+| **Code** | Run a snippet of JavaScript. Reads upstream outputs via `{{node_id.field}}`. |
+| **AI Agent** | Run an existing agent from your Agent Builder as a node. Inputs become the agent's user message; outputs include the final response. |
+| **Gmail** | Send, reply, list, draft messages. |
+| **Jira** | JQL search, create issue, comment, transition, assign. |
+| **Google Calendar** | List events, create events, send invites. |
+| **GitHub** | List PRs, review, merge, comment. |
+| **Slack** | Post messages, react, DM. |
+| **Telegram** | Send messages to a Telegram chat. |
+
+The connector nodes (Gmail / Jira / Calendar / GitHub / Slack / Telegram) come from [connectors](/gateway/agent-builder/connectors) — each connector action surfaces as a typed node with typed inputs and outputs.
+
+#### Control
+
+Flow-control primitives.
+
+| Node | Behaviour |
+|------|-----------|
+| **If** | Conditional branching. Routes to one of two downstream paths based on a boolean expression. |
+| **Switch** | Multi-way branching. Routes to one of N paths based on the value of an expression. |
+| **Delay** | Wait for a specified duration before continuing. Durable on the Temporal runtime — the workflow sleeps without holding compute. |
+| **End** | Terminate the workflow and return its output. |
+
+### Building the graph
+
+- **Add a node**: drag from the palette onto the canvas, or click. Connect the source node's output handle to the next node's input handle.
+- **Configure a node**: double-click it. The right panel opens with the node's editable fields:
+  - **ID** — used in references (e.g. `{{node_4.field}}`).
+  - **Label** — display name on the canvas.
+  - **Connection** — for connector nodes, which OAuth connection to act through.
+  - **Inputs** — action-specific parameters. String fields support templating with `{{node_id.field}}` references to upstream outputs.
+  - **Outputs** — the typed return shape, with copy-to-clipboard buttons for each field reference (e.g. `{{node_4.next_page_token}}`).
+- **Delete a node**: select it and press <kbd>Delete</kbd>, or use **Delete Node** at the bottom of the config panel.
+- **Save** the canvas to persist your changes. **Export JSON** dumps the workflow definition.
+
+Outputs from any node are referenced downstream as `{{node_id.field}}`. The ID is editable, so you can rename `node_4` to `list_messages` for readability.
+
+### Versions
+
+Workflows are versioned with the same model as agents:
+
+- **\$LATEST** is version 0 — the mutable working copy. Every save on the Canvas tab updates `\$LATEST`.
+- **Create New Version** freezes the current `\$LATEST` into a numbered immutable snapshot (1, 2, 3, …). Future canvas edits go to `\$LATEST` again; numbered versions never change.
+- The **Versions** tab lists every snapshot with its creation/update timestamp. Click **View** to open a version read-only in the Canvas tab.
+
+### Alias
+
+Aliases pin a named label (e.g. `production`, `canary`) to one or two versions:
+
+- **\$LATEST** is a built-in alias that always points at version 0.
+- **Custom aliases** can point at a single version, or split traffic across two versions with a weight (for canary or A/B rollouts).
+- Agents that invoke this workflow can reference it by alias (e.g. `pr_triage@production`) instead of a numeric version, so you can roll forward without touching the agent.
+
+## Invoking a workflow from an agent
+
+When the **Invoked by Agent** trigger is used, the workflow registers itself as a tool with the same name as the workflow. To make the agent able to call it:
+
+1. Open the agent in **Agent Builder**.
+2. Go to the **Tools** tab.
+3. Enable **Workflows** and select this workflow (and the version or alias you want to pin).
+4. Save.
+
+The agent now sees the workflow as a tool. It calls the tool with arguments matching the trigger's input schema; the workflow runs to completion (durably on Temporal, in-process on Local) and the agent receives the output back as the tool result.
+
+This is the **workflow-as-tool** composition pattern: build complex multi-step automation deterministically as a DAG, then let an agent orchestrate it like any other tool.
+
+## Local vs Temporal runtime — when to use which
+
+| Aspect | Local | Temporal |
+|--------|-------|----------|
+| Where it runs | In-process with the request handler | Temporal worker(s); each node is an activity |
+| Durability | Non-durable; a crash loses the run | Durable; survives crashes, restarts, transient failures |
+| Retries | None automatic | Per-activity retry policy |
+| Replay safety | N/A | Deterministic replay from history |
+| Latency | Lowest (no broker hop) | Slightly higher (broker hop per activity) |
+| Best for | Development, fast paths, short workflows | Long-running, multi-step, production workflows |
+
+You can change the runtime at any time from the **General** tab; existing version definitions stay the same.
+
+## Observability
+
+Every workflow run produces an OpenTelemetry trace covering:
+
+- The trigger event.
+- Each node executed, with inputs, outputs, status, and duration.
+- Tool calls made by any AI Agent nodes inside the workflow.
+- Re-tries and replays (Temporal).
+
+See [Tracing](/gateway/llm/tracing) for how to filter and inspect runs.
+
+## Relation to other features
+
+- [Connectors](/gateway/agent-builder/connectors) — provide the typed connector nodes (Gmail, Slack, Jira, …) on the workflow palette.
+- [Agent Tool](/gateway/agent-builder/agent-tool) — agents call workflows just like any other tool, with arguments derived from the trigger's schema.
+- [Agent Runtime](/gateway/agent-builder/agent-runtime) — workflows mirror the runtime choice agents have: in-process for speed, Temporal for durability.

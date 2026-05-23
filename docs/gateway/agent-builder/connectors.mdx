@@ -1,0 +1,81 @@
+---
+title: Connectors
+description: Per-user OAuth connections to third-party apps like Gmail, Slack, Jira, GitHub, and Google Calendar
+---
+
+Connectors let your agents (and [workflows](/gateway/agent-builder/workflows)) act inside the third-party tools your users already live in. Each connector registers a third-party OAuth app once; each end user then connects their own account, and every action runs against that user's authorization — your agent never sees a long-lived token.
+
+## Supported connectors
+
+| Connector | Type | Typical actions |
+|-----------|------|-----------------|
+| **Gmail** | OAuth | Send, list, reply, draft messages |
+| **Google Calendar** | OAuth | List events, create, invite attendees |
+| **Slack** | OAuth | Post to channel, react, DM |
+| **Jira** | OAuth | JQL search, create issue, comment, transition |
+| **GitHub** | OAuth | List PRs, review, merge |
+
+The connector palette in the **Add Connector** dialog reflects what's currently available; expect this list to grow.
+
+## Two-layer model
+
+Connectors have two layers:
+
+1. **Connector** — the registered third-party OAuth app. Holds the app's `client_id`/`client_secret` (referenced via a stored [credential](/agent-framework/credentials)) and a redirect/callback URL. One per third-party service per project.
+2. **Connection** — a single user's authorization of that connector. Each connection stores that user's OAuth tokens (access + refresh). One connector typically has many connections — one per end user.
+
+A workflow node like `Slack: Post Message` runs against a specific **connection**, not the connector. The agent picks the right connection based on who's chatting.
+
+## Registering a connector
+
+1. Open **Agent Framework → Connectors**.
+2. Click **Add Connector**.
+3. Pick the **Connector Type** (Gmail, Slack, Jira, etc.).
+4. Copy the **Redirect / Callback URL** shown in the dialog (e.g. `https://app.hastekit.ai/api/agent-server/connections/oauth/callback`). You will need this in the next step.
+5. In the third-party app (e.g. the Slack app dashboard or a GitHub OAuth app), create an OAuth app and add the redirect URL as an authorized redirect URI. Copy the resulting **client_id** and **client_secret**.
+6. Back in HasteKit, open **Agent Framework → Credentials** and store the `client_id` and `client_secret` as a credential (or use an existing one with those keys).
+7. Return to the **Add Connector** dialog. Give the connector a **Name** (e.g. `Production Slack App`) and pick the **Credential** you just created.
+8. Click **Create**.
+
+The connector now appears in the list with a count of attached connections (initially `0 connections`).
+
+## Connecting an account
+
+Once the connector is registered, end users (or you, as a developer for testing) can authorize their own account:
+
+1. On the **Connectors** list, click **Connect Account** next to the connector.
+2. The standard OAuth consent screen for the third-party service opens.
+3. Sign in and approve the requested scopes.
+4. You're redirected back; a new connection appears under the connector marked **Active** with a creation timestamp.
+
+Each connection lives under its connector. Expand a row to see them. Connections support:
+
+- **Refresh** — manually refresh OAuth tokens that are about to expire (the server also refreshes automatically when an action returns an expiration error).
+- **Disable** — temporarily prevent the connection from being used without deleting its tokens.
+- **Delete** — revoke and forget the connection. Tokens are removed; the user must re-connect to use the connector again.
+
+## Using connectors in workflows
+
+In the **Canvas** tab of a [workflow](/gateway/agent-builder/workflows), the node palette groups actions by connector. Each connector contributes a set of typed nodes (e.g. **Gmail → List Messages**, **Send Message**, **Reply**, **Draft**). When you drop one onto the canvas and double-click to configure, you'll see:
+
+- **Connection** — pick which user account to act on. This can be hard-coded for system actions, or templated like `{{trigger.user_connection}}` so each invocation runs against the calling user's connection.
+- **Inputs** — action-specific parameters (e.g. `q` for Gmail search syntax, `label_ids` to filter, `max_results` to cap).
+- **Outputs** — typed return values you can reference downstream as `{{node_id.field}}` (e.g. `{{node_4.messages}}`, `{{node_4.next_page_token}}`).
+
+## Using connectors directly from an agent
+
+Connectors are also surfaced as tools to an agent without a workflow. In the **Agent Builder → Tools** tab, enable the connector and pick which actions are exposed. The agent receives those actions as ordinary tools and calls them through the configured connection.
+
+For sensitive actions (e.g. `send`, `delete`, `transition`), mark them as **requires-approval** to gate them behind a human-in-the-loop step.
+
+## Security model
+
+- Your agent never sees a user's OAuth tokens; HasteKit performs the request on the agent's behalf and returns only the response data.
+- `client_id`/`client_secret` are stored as encrypted credentials and never returned in API responses.
+- Disabling a connection blocks all future actions through it; deleting it revokes locally and forces a re-auth.
+- Every connector call appears as a span in the [trace](/gateway/llm/tracing) with the connector, action, arguments, status, and latency.
+
+## Relation to other features
+
+- [MCP Servers](/gateway/agent-builder/mcp-server) — MCP brings tools from any MCP-speaking server (often a power-user's local MCP). Connectors are HasteKit-managed first-class integrations with curated actions and per-user OAuth.
+- [Channels](/gateway/agent-builder/conversing-with-the-agent) — Channels deliver messages **to** the user (Slack, Telegram). Connectors let agents act **on behalf of** the user.
