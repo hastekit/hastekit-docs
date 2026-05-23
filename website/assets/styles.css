@@ -1506,10 +1506,19 @@ html {
 
 /* ── Chrome responsive ────────────────────────────────────── */
 @media (max-width: 720px) {
-  .nav-inner { gap: 16px; }
+  /* On mobile, --pad-x is 72px which would consume ~144px of the
+     viewport and bunch the header content into the centre. Drop the
+     horizontal padding to the same 16px used by .fx-hero / .fx-section
+     so the brand sits flush left and the CTAs sit flush right. */
+  .nav-inner {
+    gap: 16px;
+    padding-left: 16px;
+    padding-right: 16px;
+    justify-content: space-between;
+  }
   .footer-top { grid-template-columns: 1fr; gap: 48px; }
   .footer-cols { grid-template-columns: repeat(2, 1fr); gap: 32px; }
-  .footer-inner { padding: 56px var(--pad-x) 24px; }
+  .footer-inner { padding: 56px 16px 24px; }
   .footer-bottom { flex-direction: column; gap: 10px; align-items: flex-start; }
   .fx-hero-cta { flex-direction: column; align-items: stretch; width: 100%; }
   .fx-hero-cta .btn { justify-content: center; }
