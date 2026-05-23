@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Privacy Policy — HasteKit</title>
+  <meta name="description" content="HasteKit's privacy policy: what we collect, how we use it, and how we handle data from Google APIs and other connected services.">
+  <link rel="canonical" href="https://hastekit.ai/privacy.html">
+  <link rel="icon" type="image/x-icon" href="assets/hastekit-favicon.ico">
+  <link rel="icon" type="image/svg+xml" href="assets/hastekit-logo.svg">
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+  <div class="fx-page legal-page">
+    <header class="site-nav">
+      <div class="nav-inner">
+        <a href="/" class="nav-brand" aria-label="HasteKit">
+          <img class="nav-brand-mark" src="assets/hastekit-logo.svg" alt="" aria-hidden="true">
+          <span class="nav-brand-text">HasteKit</span>
+        </a>
+        <div class="nav-cta">
+          <a class="btn btn-ghost nav-cta-github" href="https://github.com/hastekit/hastekit-sdk-go" target="_blank" rel="noopener" aria-label="GitHub">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.11.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.34-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.2 1.77 1.2 1.03 1.77 2.71 1.26 3.37.96.1-.75.4-1.26.73-1.55-2.55-.29-5.23-1.28-5.23-5.7 0-1.26.45-2.28 1.18-3.09-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.78 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.58.24 2.75.12 3.04.74.81 1.18 1.83 1.18 3.09 0 4.43-2.69 5.4-5.25 5.69.41.36.78 1.06.78 2.14v3.17c0 .31.21.68.8.56A11.5 11.5 0 0 0 12 .5Z"/></svg>
+          </a>
+          <a class="btn btn-accent" href="https://app.hastekit.ai/" target="_blank" rel="noopener">Try HasteKit</a>
+        </div>
+      </div>
+    </header>
+
+    <article class="legal-article">
+      <header class="legal-header">
+        <span class="kicker">Legal</span>
+        <h1 class="display-l">Privacy Policy</h1>
+        <p class="legal-meta">Effective date: <strong>May 23, 2026</strong> · Last updated: May 23, 2026</p>
+      </header>
+
+      <section class="legal-content">
+        <p>
+          HasteKit ("HasteKit", "we", "us", or "our") provides an AI agent platform that lets users
+          build, run, and observe AI agents and connect those agents to third-party services such as
+          Google Workspace, Slack, Jira, and GitHub. This Privacy Policy explains what information we
+          collect when you use the HasteKit website at <a href="https://hastekit.ai">hastekit.ai</a>,
+          the HasteKit application at <a href="https://app.hastekit.ai">app.hastekit.ai</a>, and our
+          APIs and SDKs (collectively, the "Services"), how we use that information, and the choices
+          you have.
+        </p>
+
+        <h2>1. Information We Collect</h2>
+
+        <h3>1.1 Information you give us</h3>
+        <ul>
+          <li><strong>Account information.</strong> Name, email address, organization name, and any
+            credentials you provide when signing up or signing in (e.g. via Google Sign-In).</li>
+          <li><strong>Configuration data.</strong> Agent configurations, prompts, knowledge-base
+            documents, skills, workflow definitions, scheduled triggers, connector setups, and other
+            content you upload or create on the Services.</li>
+          <li><strong>Provider credentials.</strong> API keys for third-party LLM providers (OpenAI,
+            Anthropic, Gemini, xAI, Bedrock, etc.) and OAuth tokens for connected accounts. These are
+            stored encrypted at rest.</li>
+          <li><strong>Communications.</strong> Messages you send our support team, feedback, and
+            anything you choose to share with us.</li>
+        </ul>
+
+        <h3>1.2 Information from connected services (including Google)</h3>
+        <p>
+          When you connect a third-party account (such as Gmail, Google Calendar, Slack, Jira, or
+          GitHub) through our Connectors feature, we receive data from that service only to perform
+          the action your agent requests. The specific data depends on the connector and the scopes
+          you grant. For example:
+        </p>
+        <ul>
+          <li><strong>Gmail</strong> — message metadata, headers, bodies, attachments, and labels for
+            messages your agent reads, sends, or modifies on your behalf.</li>
+          <li><strong>Google Calendar</strong> — calendar lists, events, attendees, and free/busy
+            information when your agent reads or modifies events on your behalf.</li>
+          <li><strong>Slack, Jira, GitHub, and other connectors</strong> — equivalent
+            workspace/issue/repository data scoped to the actions you authorize.</li>
+        </ul>
+        <p>
+          We do <strong>not</strong> collect data from connected services beyond what is necessary to
+          execute the actions you or your agent request.
+        </p>
+
+        <h3>1.3 Information collected automatically</h3>
+        <ul>
+          <li><strong>Usage data.</strong> IP address, browser type, device information, pages
+            visited, referrer URLs, and timestamps.</li>
+          <li><strong>Telemetry.</strong> OpenTelemetry spans we generate for every gateway call,
+            agent run, tool invocation, and workflow node — including model, provider, latency, token
+            counts, cost, and trace identifiers. Telemetry powers the observability features visible
+            in your dashboard.</li>
+          <li><strong>Cookies.</strong> Session cookies for authentication and a small number of
+            functional cookies. We do not use advertising or cross-site tracking cookies.</li>
+        </ul>
+
+        <h2>2. How We Use Information</h2>
+        <p>We use the information we collect to:</p>
+        <ul>
+          <li>provide, operate, and maintain the Services;</li>
+          <li>execute the actions your agents perform on connected services on your behalf;</li>
+          <li>generate observability traces, cost reports, and dashboards for your own use;</li>
+          <li>communicate with you about your account, billing, security, and product updates;</li>
+          <li>monitor and protect the Services against fraud, abuse, and security threats;</li>
+          <li>comply with applicable legal obligations.</li>
+        </ul>
+
+        <h2>3. Google API Services User Data — Limited Use</h2>
+        <p>
+          HasteKit's use and transfer to any other app of information received from Google APIs will
+          adhere to the
+          <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google
+          API Services User Data Policy</a>, including the Limited Use requirements.
+        </p>
+        <p>Specifically, data obtained through Google APIs is:</p>
+        <ul>
+          <li><strong>Used only</strong> to provide or improve user-facing features that are
+            prominent in the requesting app's user interface;</li>
+          <li><strong>Not used</strong> for serving advertisements;</li>
+          <li><strong>Not sold</strong> to third parties;</li>
+          <li><strong>Not transferred</strong> to others except as necessary to provide or improve
+            user-facing features, comply with applicable law, or as part of a merger, acquisition,
+            or sale of assets (in which case the receiving party must agree to honor this policy);</li>
+          <li><strong>Not used or transferred</strong> to determine credit-worthiness or for lending
+            purposes;</li>
+          <li><strong>Not read by humans</strong> unless we have your explicit consent to read
+            specific messages, we do so for security purposes such as investigating abuse, to comply
+            with applicable law, or for internal operations (and even then only when the data has
+            been aggregated and anonymized);</li>
+          <li><strong>Not used to develop, improve, or train generalized AI and/or machine learning
+            models.</strong> Your Google user data is sent to the third-party LLM provider you have
+            chosen (e.g. OpenAI, Anthropic) only to fulfill your agent's task in real time; we do not
+            retain or use it to train HasteKit's own models, and we do not provide it to LLM
+            providers in any form that permits them to train on your data, where the provider offers
+            such a setting.</li>
+        </ul>
+
+        <h2>4. How We Share Information</h2>
+        <p>We share information only as follows:</p>
+        <ul>
+          <li><strong>LLM providers.</strong> When you or your agent invoke an LLM via the HasteKit
+            Gateway, the prompt (including any context such as Google API content) is sent to the
+            provider you selected, solely for the purpose of generating that response.</li>
+          <li><strong>Connected services.</strong> When your agent performs an action on a connected
+            service (e.g. send a Gmail message), we transmit the necessary payload to that service
+            via its API.</li>
+          <li><strong>Service providers.</strong> Cloud hosting, database, observability, and
+            payment processors that we use to operate the Services. Each is bound by a written
+            agreement requiring confidentiality and use limited to providing services to us.</li>
+          <li><strong>Legal.</strong> When required by law, court order, or to protect rights,
+            property, or safety.</li>
+          <li><strong>Business transfers.</strong> In connection with a merger, acquisition, or sale
+            of assets, subject to the surviving entity continuing to honor this policy.</li>
+        </ul>
+        <p>We do not sell personal information or data obtained from Google APIs.</p>
+
+        <h2>5. Data Retention</h2>
+        <p>
+          We retain your data for as long as your account is active or as needed to provide the
+          Services. Specifically:
+        </p>
+        <ul>
+          <li>Account and configuration data are retained for the life of your account.</li>
+          <li>Trace and telemetry data are retained for a rolling window (typically 30–90 days)
+            unless you configure a longer retention period.</li>
+          <li>Connector tokens are retained until you revoke them or delete the connection. We
+            refresh OAuth tokens automatically as needed to keep connections live.</li>
+          <li>When you delete your account or a specific resource, we delete the corresponding data
+            from our active systems within 30 days. Backups containing the data are overwritten on
+            our standard backup rotation.</li>
+        </ul>
+
+        <h2>6. Your Choices and Rights</h2>
+        <p>You can, at any time:</p>
+        <ul>
+          <li>access, correct, or export your account and configuration data from within the
+            HasteKit application;</li>
+          <li>disconnect or delete a connector connection, which revokes the corresponding OAuth
+            tokens we hold;</li>
+          <li>delete individual resources (agents, knowledge bases, workflows, traces) from the
+            application;</li>
+          <li>delete your entire account by contacting us at the address below.</li>
+        </ul>
+        <p>
+          Depending on your jurisdiction (e.g. India, EEA, UK, California), you may have additional
+          rights including access, correction, deletion, restriction, portability, and the right to
+          lodge a complaint with a supervisory authority. Indian users (Data Principals under the
+          Digital Personal Data Protection Act, 2023) may exercise the rights granted by that Act,
+          including the right to access, correction, erasure, grievance redressal, and the right to
+          nominate another person to exercise these rights in the event of death or incapacity. To
+          exercise any of these rights, contact us.
+        </p>
+
+        <h2>7. Security</h2>
+        <p>
+          We use industry-standard administrative, technical, and physical safeguards to protect
+          your data, including TLS in transit, encryption at rest for credentials and connector
+          tokens, scoped access controls, and ongoing security monitoring. No method of transmission
+          or storage is 100% secure; we cannot guarantee absolute security.
+        </p>
+
+        <h2>8. International Data Transfers</h2>
+        <p>
+          HasteKit operates from India. If you access the Services from outside India, your
+          information will be transferred to, stored, and processed in India and in other countries
+          where we or our service providers operate. Where personal data of users in the European
+          Economic Area, the United Kingdom, or other jurisdictions with cross-border transfer
+          restrictions is transferred to India, we rely on appropriate safeguards (such as the
+          European Commission's Standard Contractual Clauses) as required by applicable law.
+        </p>
+
+        <h2>9. Children's Privacy</h2>
+        <p>
+          The Services are not directed to children under 13 (or the equivalent minimum age in your
+          jurisdiction), and we do not knowingly collect personal information from them. If you
+          believe we have, please contact us so we can delete it.
+        </p>
+
+        <h2>10. Changes to This Policy</h2>
+        <p>
+          We may update this Privacy Policy from time to time. If we make material changes, we will
+          notify you (e.g. by email or an in-app notice) and update the effective date above. Your
+          continued use of the Services after the change becomes effective constitutes acceptance of
+          the updated policy.
+        </p>
+
+        <h2>11. Contact</h2>
+        <p>
+          Questions, requests, or complaints about this Privacy Policy or our data practices:
+          <br>
+          Email: <a href="mailto:privacy@hastekit.ai">privacy@hastekit.ai</a>
+        </p>
+      </section>
+    </article>
+
+    <footer class="site-footer">
+      <div class="footer-inner">
+        <div class="footer-top">
+          <div class="footer-brand">
+            <a href="/" class="nav-brand" aria-label="HasteKit">
+              <img class="nav-brand-mark" src="assets/hastekit-logo.svg" alt="" aria-hidden="true">
+              <span class="footer-brand-name">HasteKit</span>
+            </a>
+            <p class="footer-tagline">The production agent platform. One platform, one SDK, one bill.</p>
+            <div class="footer-kicker"><span class="footer-kicker-rule"></span>v1.0 · 2026</div>
+          </div>
+          <div class="footer-cols">
+            <div class="footer-col">
+              <h4 class="footer-col-title">Product</h4>
+              <a href="/#features">LLM Gateway</a>
+              <a href="/#features">Agents</a>
+              <a href="/#features">Workflows</a>
+              <a href="/#features">Connectors</a>
+              <a href="/#features">Observability</a>
+            </div>
+            <div class="footer-col">
+              <h4 class="footer-col-title">Resources</h4>
+              <a href="https://hastekit.ai/docs" target="_blank" rel="noopener">Documentation</a>
+              <a href="https://github.com/hastekit/hastekit-sdk-go" target="_blank" rel="noopener">Go SDK</a>
+              <a href="https://github.com/hastekit/hastekit-sdk-go/issues" target="_blank" rel="noopener">Issue tracker</a>
+              <a href="https://github.com/hastekit/hastekit-sdk-go/discussions" target="_blank" rel="noopener">Discussions</a>
+            </div>
+            <div class="footer-col">
+              <h4 class="footer-col-title">Company</h4>
+              <a href="/">Home</a>
+              <a href="/privacy.html">Privacy</a>
+              <a href="/terms.html">Terms</a>
+              <a href="mailto:hi@hastekit.ai">Contact</a>
+            </div>
+          </div>
+        </div>
+        <div class="footer-bottom">
+          <span>© 2026 HasteKit</span>
+          <span class="footer-meta">
+            <a href="#">Status</a>
+            <span class="footer-meta-dot">·</span>
+            <a href="#">Changelog</a>
+            <span class="footer-meta-dot">·</span>
+            <a href="#">Security</a>
+          </span>
+        </div>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>
