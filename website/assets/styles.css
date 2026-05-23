@@ -753,6 +753,7 @@ code {
   font-size: 14px;
   font-weight: 500;
   letter-spacing: -0.005em;
+  text-decoration: none;
   transition: transform 0.15s, background 0.15s, border-color 0.15s;
   white-space: nowrap;
 }
@@ -1318,16 +1319,20 @@ html {
   font-size: 17px;
   letter-spacing: -0.01em;
 }
+/* Brand mark — the HasteKit SVG logo. Sized large enough that the
+   internal detail (two pillars + lightning bolt) reads as a logo and
+   not a single colored blob. The SVG's intrinsic colors render
+   identically on the paper header and the dark footer, so no per-
+   context override is needed. */
 .nav-brand-mark {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: inset 0 0 0 2px var(--paper), 0 0 0 1px var(--rule-2);
+  width: 32px;
+  height: 32px;
   flex: 0 0 auto;
-}
-.nav-brand-mark.on-dark {
-  box-shadow: inset 0 0 0 2px var(--dark), 0 0 0 1px rgba(235, 228, 212, 0.25);
+  display: block;
+  background: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
 }
 .nav-cta {
   display: flex;
