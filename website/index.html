@@ -66,6 +66,16 @@
   <!-- Page wiring: boots the canvas drivers, sets up scroll/section
        observers. Must run after the anim-*.js modules have registered. -->
   <script defer src="assets/js/features-page.js"></script>
+
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-VMGGRQQQV8"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-VMGGRQQQV8');
+  </script>
 </head>
 <body>
   <div id="root">
