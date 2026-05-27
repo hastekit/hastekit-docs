@@ -1,0 +1,62 @@
+---
+title: Memories
+description: Long-term per-user memory — extract facts and events from conversations, recall them across sessions
+---
+
+Memories give an agent recall *across conversations*. After each conversation, a memory service extracts important facts ("user prefers concise answers", "their account ID is X") and stores them. On future runs the agent retrieves the relevant ones and folds them into the prompt — so the user doesn't have to repeat themselves and the agent feels like it remembers them.
+
+<Frame>
+    <img src="/images/agent-builder/memories.png" alt="Memories library" />
+</Frame>
+
+## Two memory types
+
+| Type | Stores | Example |
+|------|--------|---------|
+| **Semantic** | Discrete facts, preferences, definitions. | "Alex is a vegetarian." "We deploy on AWS us-east-1." |
+| **Episodic** | Events over time, with timestamps. | "On 2026-04-12 Alex asked about migrating to Postgres." |
+
+You can attach a service of either (or both) type to an agent.
+
+## Creating a memory service
+
+1. Open **Agent Framework → Memories**.
+2. Click **Create Memory Service**.
+3. Configure:
+
+| Field | Description |
+|-------|-------------|
+| **Name** | Human-readable identifier. |
+| **Type** | `Semantic` or `Episodic`. |
+| **Model** | Provider + model used to extract and recall memories. A small fast model is usually fine. |
+| **Extraction Prompt** | Instructions for what to extract from a conversation. Tune for your domain (e.g. "Capture user preferences, named entities, and any stated goals"). |
+| **Extraction Cadence** | How often extraction runs — e.g. "after every N runs" or "at end of conversation." |
+| **Reasoning Effort / Budget** | For reasoning models, how hard to think during extraction and recall. |
+
+Save the service. It now lives at the project level and can be attached to any agent.
+
+## Attaching to an agent
+
+1. Open the agent → **Memory** tab.
+2. Select a memory service.
+3. Save.
+
+When attached, the agent automatically gets two tools:
+
+- **`memory_search`** — retrieve relevant memories for the current turn.
+- **`memory_add`** — explicitly write a new memory mid-conversation (in addition to automatic extraction).
+
+Both tools can be marked **Requires Approval** if you want a human review step before any memory is written.
+
+## How memory is keyed
+
+Memories are scoped by namespace — typically by user. The namespace is read from the request context (or HTTP headers) and isolates one user's memories from another's. This means a single shared agent can serve many users without their memories bleeding across sessions.
+
+## When to use memories vs alternatives
+
+| Need | Use |
+|------|-----|
+| Remember the same user across conversations | **Memories** |
+| Remember things *within* one conversation | [Conversation History](/gateway/agent-builder/conversation-history) |
+| Ground in a shared document corpus | [Knowledge Bases](/gateway/agent-builder/knowledge-base) |
+| Read curated capability bundles | [Skills](/gateway/agent-builder/skills) |

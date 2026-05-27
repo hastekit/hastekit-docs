@@ -1,0 +1,188 @@
+---
+title: "Introduction"
+description: "HasteKit — The end-to-end platform for building, deploying, and observing AI agents"
+---
+
+**HasteKit** brings everything you need to ship production-grade AI agents into a single, cohesive platform — from model configuration and tool orchestration to durable workflows, multi-channel deployment, and OpenTelemetry observability. No more stitching together LangSmith, n8n, Temporal, and a half-dozen SaaS dashboards.
+
+This guide walks through the platform in the order you'll naturally consume it: configure a model, build an agent, give it tools and memory, test it, deploy it, and observe it in production.
+
+---
+
+## 1. Start with the Agent Builder
+
+The Agent Builder is the heart of HasteKit. Every agent is configured through a dashboard — no code required — across a set of focused tabs covering the model, prompt, tools, memory, and output contract.
+
+<CardGroup cols={2}>
+    <Card title="Model & Parameters" icon="microchip">
+        Pick from 8 providers (OpenAI, Anthropic, Gemini, xAI, Bedrock, OpenRouter, Ollama, ElevenLabs) and tune temperature, top_p, reasoning effort, parallel tool calls, max output tokens, and provider-specific extras like Anthropic `cache_control` and `thinking`.
+    </Card>
+    <Card title="System Prompt" icon="message-pen">
+        Write a prompt inline, or reference a **versioned prompt template** with `{{variable}}` interpolation that's reusable across agents.
+    </Card>
+    <Card title="Structured Output" icon="brackets-curly">
+        Enforce a JSON schema on agent responses with a schema builder UI (or raw JSON) so downstream code consumes agent output without ad-hoc parsing.
+    </Card>
+    <Card title="Conversation History" icon="comments">
+        Built-in thread management with configurable summarization strategies to keep context windows — and cost — under control.
+    </Card>
+</CardGroup>
+
+---
+
+## 2. Give Your Agent Tools
+
+Tools are how agents take action. Every tool — built-in, MCP, OpenAPI, connector, sub-agent, or workflow — has independent **Enabled**, **Requires Approval**, and **Deferred** switches.
+
+### Built-in tools
+
+<CardGroup cols={2}>
+    <Card title="Image, Speech & Transcription" icon="wand-magic-sparkles">
+        Generate images (xAI grok-imagine, OpenAI gpt-image-1), synthesize speech (ElevenLabs Flash v2.5), and transcribe audio (ElevenLabs scribe_v2) with configurable provider, model, voice, and language.
+    </Card>
+    <Card title="Web Search & Code Execution" icon="globe">
+        First-class web search and Python/JS code execution — useful tools available out of the box without wiring up MCP servers.
+    </Card>
+    <Card title="Sandbox" icon="box">
+        A Docker-backed bash sandbox with configurable image and environment variables for safe, isolated shell execution.
+    </Card>
+    <Card title="Todo & Schedule" icon="list-check">
+        A built-in todo list for progress tracking on long tasks, and a schedule tool that lets agents schedule themselves via cron or one-off triggers.
+    </Card>
+</CardGroup>
+
+### Bring your own tools
+
+<CardGroup cols={2}>
+    <Card title="MCP Servers" icon="plug">
+        Attach Streamable HTTP or SSE MCP servers with custom headers, tool filters, approval requirements, and deferred loading.
+    </Card>
+    <Card title="OpenAPI → Tools" icon="file-code">
+        Import any OpenAPI 3.x spec — each operation becomes an agent tool, with HTTP requests handled automatically.
+    </Card>
+    <Card title="Connector Actions" icon="link">
+        Expose individual actions from GitHub, Gmail, Google Calendar, Jira, Slack, and Telegram as tools your agent can call directly.
+    </Card>
+    <Card title="Function Tools & Code" icon="code">
+        Define custom tools as code when you need full control over execution.
+    </Card>
+</CardGroup>
+
+---
+
+## 3. Add Memory, Knowledge & Skills
+
+Tools handle *doing*. The next layer is what your agent *knows*.
+
+<CardGroup cols={2}>
+    <Card title="Knowledge Bases (RAG)" icon="book">
+        Create local knowledge bases with configurable chunking (size, overlap, separators) and embedding provider/model/dimension. Attach any number to an agent for retrieval-augmented answers with citations.
+    </Card>
+    <Card title="Skills" icon="screwdriver-wrench">
+        Author reusable `SKILL.md` packages of prompts, scripts, and docs in the editor or upload a zip. Pinned skills are mounted at `/skills/<name>/` inside the agent's sandbox.
+    </Card>
+    <Card title="Long-term Memory" icon="brain">
+        Attach a memory service with **Semantic** (facts) and **Episodic** (events over time) memory types. Each service has its own model, prompt, and extraction cadence. The `memory_search` and `memory_add` tools are auto-exposed to the agent.
+    </Card>
+    <Card title="Codebases" icon="code-branch">
+        Connect GitHub repositories via the GitHub connector. They're auto-synced and attachable to agents for code-aware reasoning.
+    </Card>
+</CardGroup>
+
+---
+
+## 4. Compose Multi-Agent Systems
+
+Skip the monolithic prompt. Decompose your agent into focused specialists and have them collaborate.
+
+<CardGroup cols={2}>
+    <Card title="Agent as a Tool" icon="people-group">
+        Invoke a sub-agent as a tool with **Isolated** or **Shared** context modes. The parent agent stays in control and aggregates results.
+    </Card>
+    <Card title="Handoffs" icon="people-arrows">
+        Hand off the conversation mid-flight to a specialist agent. The user keeps chatting; the right agent answers.
+    </Card>
+    <Card title="Human-in-the-Loop" icon="user-check">
+        Flag any tool (built-in, MCP, connector, sub-agent, workflow) as **Requires Approval**. Sensitive actions wait for a human decision before executing.
+    </Card>
+    <Card title="Deferred Tools" icon="layer-group">
+        Load tools on demand instead of all at once. Keep context windows small even with hundreds of tools available.
+    </Card>
+</CardGroup>
+
+---
+
+## 5. Orchestrate with DAG Workflows
+
+When logic gets complex enough that you want deterministic control flow — not LLM judgment — build a workflow on the visual canvas and expose it to your agent as a tool.
+
+- **Trigger types** — invoked by an agent, cron schedule, or GitHub events (PR opened/updated/closed, issue opened, issue comment, push).
+- **Node types** — HTTP Request, AI Agent, Code (JS), and connector actions for GitHub, Gmail, Google Calendar, Jira, Slack, and Telegram.
+- **Control flow** — `If`, `Switch`, `Delay`, and `End` nodes for branching, waiting, and returning structured output.
+- **Runtime** — run **Local** for low latency, or back the workflow with **Temporal** so every node runs as a durable activity with automatic checkpointing and retries.
+
+Any saved workflow can be called as a tool from any agent — combining the determinism of a DAG with the flexibility of an LLM.
+
+---
+
+## 6. Test in the Built-in Chat
+
+Iterate without leaving the dashboard. The chat UI supports per-message agent and version selection, file/image/audio attachments, inline tool-call visualizations, editable context JSON, custom request headers, and one-click jumps to the underlying trace. Debug, iterate, and ship without a separate client.
+
+---
+
+## 7. Deploy to Your Users
+
+Once your agent works in the chat, put it in front of users.
+
+<CardGroup cols={2}>
+    <Card title="Channels" icon="comment-dots">
+        Bind any agent to a **Telegram** or **Slack** channel. Each channel gets a unique webhook URL — paste it into Slack Event Subscriptions or your Telegram bot config and you're live.
+    </Card>
+    <Card title="Triggers" icon="bolt">
+        Auto-invoke agents (or workflows) on a **cron** schedule, a **one-off future time**, or a **connector event** like a new GitHub PR. Status, edit, and delete controls are all visible from the dashboard.
+    </Card>
+    <Card title="HTTP API" icon="cloud">
+        Every agent is also callable via HTTP using a virtual key — drop it into your existing application with a single request.
+    </Card>
+    <Card title="Versions & Aliases" icon="code-fork">
+        Every save creates an immutable version. Point a `production` alias at any version — or **split traffic between two versions** for canary releases — and roll back instantly when needed.
+    </Card>
+</CardGroup>
+
+---
+
+## 8. Observe Everything
+
+Every agent run, tool call, and LLM request emits **OpenTelemetry traces** — complete with token usage, latency, and cost attribution.
+
+Drill into a hierarchical span tree: `AgentTrigger.HTTP → LoadMessages → GetPrompt → VirtualKeyMiddleware → LLM.StreamingResponses → SaveMessages`. Each span shows duration, status, attributes (`agent_name`, `project_id`, `user_id`, `org_id`), and parent/child links. Aggregate dashboards roll up spans, error rate, average duration, and active services across any time range.
+
+---
+
+## 9. Secure & Govern
+
+<CardGroup cols={2}>
+    <Card title="Virtual Keys" icon="key">
+        Issue `sk-uno-...` virtual keys scoped to specific providers, models, and rate limits. Hand out one credential and centrally control access.
+    </Card>
+    <Card title="Secret Manager & Credentials" icon="shield-halved">
+        Encrypted per-project vault for OAuth client IDs/secrets, bot tokens, and webhooks. Credentials are masked once saved.
+    </Card>
+    <Card title="Organisation & Roles" icon="users">
+        Owner and Collaborator roles at the org level, with project-scoped resources for clean separation of work.
+    </Card>
+    <Card title="Project Export" icon="box-archive">
+        Export an entire project as a ZIP for portability, backup, or environment promotion.
+    </Card>
+</CardGroup>
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Build an Agent" icon="robot" href="/gateway/agent-builder/agent-runtime">
+    Configure your first agent with tools, skills, and structured output.
+  </Card>
+</CardGroup>

@@ -1,26 +1,53 @@
 ---
 title: Model Configuration
+description: Pick a provider, pick a model, and tune sampling and reasoning parameters
 ---
 
-Configure the LLM provider and model parameters for your agent.
+Every agent starts with a model. HasteKit talks to eight providers out of the box and gives you full control over the generation parameters each one accepts — including the reasoning controls on the newer reasoning-capable models.
 
-## Required Fields
+<Frame>
+    <img src="/images/agent-builder/model-configuration.png" alt="Model tab in Agent Builder" />
+</Frame>
 
-**Provider Type** - Select the LLM provider (e.g., OpenAI, Anthropic, etc.)
+## Supported providers
 
-**Model ID** - Select the specific model from the chosen provider
+| Provider | Notes |
+|----------|-------|
+| **OpenAI** | GPT-5, GPT-4.1, o-series, image and audio models |
+| **Anthropic** | Claude Opus, Sonnet, Haiku (including 1M-context variants) |
+| **Gemini** | Gemini 2.5 Pro / Flash family |
+| **xAI** | Grok models including `grok-imagine` for image generation |
+| **AWS Bedrock** | Bedrock-hosted Claude, Llama, Titan, and others |
+| **OpenRouter** | Aggregator endpoint to 100+ models |
+| **Ollama** | Local models served over an Ollama-compatible endpoint |
+| **ElevenLabs** | Speech synthesis and transcription models |
 
-## Model Parameters (Optional)
+Providers and their models are configured under **LLM Gateway → Providers**. Once a model is registered there, it shows up in the **Model ID** dropdown here.
 
-Configure model behavior parameters. Leave fields empty to use default values.
+## Required fields
 
-### Generation Parameters
+- **Provider Type** — which provider account to call.
+- **Model ID** — the specific model from that provider.
 
-- **Temperature** (0.0-2.0) - Controls randomness in output. Higher values increase creativity.
-- **Top P** (0.0-1.0) - Nucleus sampling parameter. Controls diversity via nucleus sampling.
-- **Max Output Token** - Maximum tokens in the response
-- **Max Tool Call** - Maximum tool calls per response
-- **Top Logprob** - Number of most likely tokens to return
-- **Parallel Tool Call** - Enable parallel tool call execution (toggle switch)
-- **Reasoning Effort** - Level of reasoning effort (Default, Low, Medium, High)
-- **Reasoning Budget (Tokens)** - Maximum tokens for reasoning (optional)
+## Generation parameters
+
+All parameters are optional. Leaving a field empty uses the provider's default.
+
+| Parameter | Range | Effect |
+|-----------|-------|--------|
+| **Temperature** | 0.0 – 2.0 | Randomness. Higher = more creative, lower = more deterministic. |
+| **Top P** | 0.0 – 1.0 | Nucleus sampling. Lower values restrict the token distribution. |
+| **Max Output Tokens** | integer | Hard cap on the response length. |
+| **Max Tool Calls** | integer | Cap on tool calls per single LLM response. |
+| **Top Logprobs** | integer | Return the top-K most likely tokens with their log probabilities. |
+| **Parallel Tool Calls** | toggle | Allow the model to emit several tool calls in one turn. |
+| **Reasoning Effort** | Default / Low / Medium / High | For reasoning models — how hard to think before answering. |
+| **Reasoning Budget (Tokens)** | integer | For reasoning models — max tokens spent on internal reasoning. |
+
+## Provider-specific extras
+
+Some providers accept extra fields that don't fit the common set above — e.g. Anthropic's `cache_control` for [prompt caching](/gateway/llm/sdk-integrations/anthropic) or `thinking` for extended-thinking. The Model tab exposes a JSON extras field where you can drop these in verbatim; they're passed through unchanged.
+
+## Iteration cap
+
+The **Agent Info** tab also exposes **Max Iteration** — the maximum number of agent loop turns (LLM call → tool calls → LLM call → ...) before the run is force-terminated. Leave empty to run without a limit. Use this as a safety net for agents that might otherwise loop indefinitely.

@@ -1,48 +1,60 @@
 ---
 title: Conversation History
+description: Enable multi-turn memory and control how long conversations are summarized to fit the context window
 ---
 
-Configure whether the agent maintains conversation history across interactions and how to manage long conversations.
+By default, each call to an agent is a one-shot interaction — the model sees the user's message and nothing else. Turning on **Conversation History** persists messages and replays them on every subsequent call so the agent remembers what happened across turns.
 
-## Configuration
+<Frame>
+    <img src="/images/agent-builder/history.png" alt="History tab" />
+</Frame>
 
-**Enable Conversation History** - Toggle switch to enable or disable conversation history.
+## Toggle
 
-When enabled, the agent will:
-- Store conversation messages
-- Use previous context in subsequent interactions
-- Maintain state across multiple conversation turns
+- **Enable Conversation History** — switch it on to store and replay messages.
 
-When disabled, each interaction is treated as a new conversation without context from previous messages.
+When **on**, every user message, assistant response, tool call, and tool result is appended to the conversation. The agent sees the full history on each subsequent turn (subject to the summarization strategy below).
 
-## Summarization
+When **off**, each request is treated as a fresh conversation. The chat UI's "thread" is still tracked, but the model itself only ever sees the current user message.
 
-When conversation history is enabled, you can configure summarization to manage long conversations and reduce token usage.
+## Why summarize?
 
-### LLM-Based Summarization
+Conversations grow without bound, and the LLM's context window doesn't. Beyond a few thousand tokens of history, every call gets more expensive and slower — and eventually the request hits the context limit and fails. The two summarization strategies below trade off cost, latency, and fidelity differently.
 
-Uses an LLM to intelligently summarize older conversation history while preserving important context.
+## LLM-based summarization
 
-**Configuration:**
-- **Summarizer Model** - LLM provider and model for summarization
-- **Summarizer Prompt** - Instructions for how to summarize conversations
-- **Token Threshold** - Summarization triggers when total tokens exceed this value
-- **Keep Recent Count** - Number of recent conversation runs to keep unsummarized
+Use an LLM to compress older history into a single system message while preserving important context.
 
-**How it works:**
-- Monitors total token count in conversation history
-- When threshold is exceeded, keeps the most recent N runs intact
-- Summarizes older runs into a single system message
-- Preserves important context while reducing token usage
+| Setting | What it controls |
+|---------|------------------|
+| **Summarizer Model** | Provider + model used to generate the summary. Pick a cheap, fast model — you only need decent compression, not deep reasoning. |
+| **Summarizer Prompt** | Instructions for *how* to summarize. Tune for your domain (e.g. "Preserve customer name, account ID, and any quoted figures verbatim"). |
+| **Token Threshold** | Total history tokens above which summarization kicks in. |
+| **Keep Recent Count** | How many recent runs to leave untouched. Older runs get summarized; recent ones stay verbatim. |
 
-### Sliding Window Summarization
+Behavior:
 
-Keeps only the most recent N conversation runs and discards older ones. This is a simple, cost-effective approach that doesn't require an LLM.
+1. Before each LLM call, total history tokens are counted.
+2. If they exceed **Token Threshold**, the oldest runs (everything older than the **Keep Recent Count** most recent runs) are summarized into one system message.
+3. The agent then sees: `[summary of old history]` + `[N most recent runs verbatim]` + `[new user message]`.
 
-**Configuration:**
-- **Keep Count** - Number of recent conversation runs to retain
+Best when: long, context-rich conversations where details from earlier matter (support, planning, multi-step research).
 
-**How it works:**
-- Messages are grouped by conversation run ID
-- Only the most recent N runs are kept
-- Older runs are discarded without summarization
+## Sliding window summarization
+
+A no-LLM strategy: keep only the most recent N runs and discard everything older.
+
+| Setting | What it controls |
+|---------|------------------|
+| **Keep Count** | Number of recent runs to retain. |
+
+Best when: each conversation is mostly independent of the deep past (e.g. a customer asking unrelated questions across a session), and you want zero extra LLM cost.
+
+## What counts as a "run"?
+
+One run = one user message and everything the agent did to respond to it (LLM calls, tool calls, the final answer). Summarization always operates on whole runs, never partial ones — so the assistant's response to a question is never separated from the question itself.
+
+## Relation to other features
+
+- [Memories](/gateway/agent-builder/memories) — persists *facts* about a user across **all** conversations, not just within one. Conversation History is per-thread; Memories are per-user (or per-namespace) and durable.
+- [Knowledge Bases](/gateway/agent-builder/knowledge-base) — shared, retrieval-based context grounded in documents. Use for "what's in our docs"; use Conversation History for "what did we just discuss."

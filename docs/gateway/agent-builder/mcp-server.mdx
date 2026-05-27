@@ -1,35 +1,53 @@
 ---
-title: Connecting MCP Servers
+title: MCP Servers
+description: Attach Model Context Protocol servers to give an agent external tools and resources
 ---
 
-Connect Model Context Protocol (MCP) servers to provide tools and resources to your agent.
+[Model Context Protocol](https://modelcontextprotocol.io) servers expose tools and resources over a standard wire format. Attach one (or several) to an agent and every tool the server exposes becomes callable by the agent — no custom code.
 
-## Adding MCP Servers
+<Frame>
+    <img src="/images/agent-builder/mcp-servers.png" alt="MCP Servers tab" />
+</Frame>
 
-1. Click **Add MCP Server**
-2. Configure the MCP server connection details:
-   - **Endpoint** - The MCP server endpoint URL
-   - **Transport** - The transport to be used for the communicating with MCP servers.
-   - **Headers** - Optional custom HTTP headers for authentication
-   - **Tool Filter** - Optional list of tool names to include (empty means all tools are available)
-   - **Tools Requiring Human Approval** - Optional list of tool names that require human approval before execution
+## Adding an MCP server
 
-## Transport
+1. Open your agent → **Tools** tab → **MCP Servers** section.
+2. Click **Add MCP Server**.
+3. Configure the connection:
 
-Set the transport to be used for the MCP server communication. Supports "SSE" and "Streamable HTTP".
+| Field | Description |
+|-------|-------------|
+| **Endpoint** | The MCP server URL. |
+| **Transport** | `Streamable HTTP` or `SSE`. Pick whichever your server speaks. |
+| **Headers** | Optional HTTP headers — typically used for auth (e.g. `Authorization: Bearer <token>`). |
+| **Tool Filter** | Optional. Comma-separated tool names to include. Empty = all tools exposed by the server are available. |
+| **Tools Requiring Approval** | Optional. Comma-separated tool names that must be confirmed by a human before execution. See [Human in the Loop](/gateway/agent-builder/human-in-the-loop). |
+| **Deferred Tools** | Optional. Comma-separated tool names whose definitions are loaded only when the agent explicitly asks for them. See [Deferred Tools](/gateway/agent-builder/deferred-tools). |
 
-## Tool Filter
+4. Save. The agent will now see those tools on its next run.
 
-Filter which tools from the MCP server are available to the agent. If left empty, all tools from the server are available. Specify tool names to restrict access to only selected tools.
+## Transports
 
-## Human in the Loop
+- **Streamable HTTP** — modern transport; supports streaming responses over a single HTTP connection. Use this if your server supports it.
+- **SSE** — Server-Sent Events. Fine for many existing servers, slightly older shape.
 
-Configure tools that require human approval before execution. When the agent attempts to use a tool marked for approval:
+## Tool filtering
 
-- Agent execution pauses
-- The tool call is queued for approval
-- Execution resumes after approval is granted or denied
+By default, every tool the MCP server advertises is exposed to the agent. For big servers (10+ tools), that can bloat the prompt and confuse the model. Two ways to trim:
 
-This provides safety controls for sensitive operations like data deletion or system modifications.
+- **Tool Filter** — explicit allowlist. Only the named tools are exposed.
+- **Deferred Tools** — keeps definitions out of the system prompt until the agent calls `load_tool(name)`. Lets you attach huge tool catalogs without paying for them in every turn. See [Deferred Tools](/gateway/agent-builder/deferred-tools).
 
-MCP servers extend agent capabilities by providing external tools, data sources, and integrations. You can add multiple MCP servers to a single agent.
+## Approval gating
+
+Mark any sensitive tool (delete, send, transfer, …) as **Requires Approval**. When the agent tries to call it, the run pauses and the tool call is queued for human review. See [Human in the Loop](/gateway/agent-builder/human-in-the-loop) for the full workflow.
+
+## Multiple servers
+
+You can attach as many MCP servers as you need — internal corporate MCPs, third-party developer MCPs, single-purpose helpers. Each is configured independently and contributes its filtered tool set to the agent's combined tool catalog.
+
+## Relation to other tool types
+
+- [Connectors](/gateway/agent-builder/connectors) — HasteKit-managed, first-class OAuth integrations (Gmail, Slack, Jira, …) with per-user authorization. Use these when you'd rather not run an MCP server.
+- [API Servers](/gateway/agent-builder/api-servers) — point at an OpenAPI 3.x spec and every operation becomes a tool. Use these when you control an HTTP API but don't want to wrap it in MCP.
+- [Provider Tools](/gateway/agent-builder/provider-tools) — built-in tools (image, speech, web search, etc.).

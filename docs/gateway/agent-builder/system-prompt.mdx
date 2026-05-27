@@ -1,27 +1,41 @@
 ---
 title: System Prompt
+description: Define your agent's behavior — inline or by reference to a versioned prompt template
 ---
 
-Configure the system prompt that defines your agent's behavior and instructions.
+The system prompt is what tells the model *what kind of agent it is*. HasteKit lets you write it inline on the agent, or reference an immutable version of a [prompt template](/gateway/agent-builder/prompts) from your project's prompt library so the same prompt can power many agents.
 
-## Prompt Options
+<Frame>
+    <img src="/images/agent-builder/system-prompt.png" alt="System Prompt tab" />
+</Frame>
 
-You can configure the system prompt in two ways:
+## Two ways to configure
 
-### Use Prompt Reference
+### Use raw prompt text
 
-Reference a saved prompt from your prompt library:
+Write the prompt directly on the agent. The editor supports multi-line text and syntax highlighting.
 
-1. Click **Use Prompt Reference**
-2. Select a prompt from the **Select Prompt** dropdown
+Best when:
 
-**Important:** Each prompt version is immutable. When you reference a prompt, you're referencing a specific version that will not change, ensuring consistent agent behavior even if the prompt is updated later.
+- The prompt is unique to this agent.
+- You're iterating quickly and don't yet want to version it.
 
-### Use Raw Prompt Text
+### Use prompt reference
 
-Enter the prompt text directly:
+Reference a prompt from your project's [Prompts](/gateway/agent-builder/prompts) library.
 
-1. Click **Use Raw Prompt Text**
-2. Enter your system prompt in the text editor
+1. Select **Use Prompt Reference**.
+2. Pick a prompt from the **Select Prompt** dropdown.
+3. Optionally pin to a specific version (or leave on `$LATEST`).
 
-The editor supports multi-line text and provides syntax highlighting for better readability.
+Each prompt version is **immutable** — referencing version `3` of a prompt guarantees the exact same text forever, even if a teammate later publishes version `4`. This is the recommended path for production agents.
+
+Best when:
+
+- Multiple agents share a prompt.
+- You want to version the prompt independently of the agent.
+- You want a non-engineer to be able to edit the prompt without touching the agent config.
+
+## Variables
+
+Prompt templates can use `{{variable}}` interpolation. Variables are resolved from the agent's runtime context (passed via the [chat UI's Add Context dialog](/gateway/agent-builder/conversing-with-the-agent) or the HTTP request body). This lets one prompt template adapt to per-user or per-tenant data without spinning up a separate agent for each.

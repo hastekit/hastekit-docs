@@ -1,63 +1,58 @@
 ---
 title: Provider Tools
-description: Access tools provided by the model providers
+description: Built-in tools — image generation, speech, transcription, web search, code execution — wired straight into the agent
 ---
 
-Provider tools are capabilities provided directly by the model providers that can be enabled for your agents. These tools allow your agents to perform specialized tasks like generating images, searching the web, and executing code.
+Provider tools are first-class capabilities that ship with HasteKit. Toggle them on in the **Tools** tab and the agent gets a new tool — no MCP server, no OpenAPI spec, no custom code. Each tool has independent **Enabled**, **Requires Approval**, and **Deferred** switches.
 
-## Overview
+<Frame>
+    <img src="/images/agent-builder/tools.png" alt="Tools tab" />
+</Frame>
 
-The Agent Builder provides access to three tools that leverage the native capabilities of supported LLM providers:
+## Available tools
 
-- **Image Generation Tool** - Generate images from text descriptions
-- **Web Search Tool** - Search the web for real-time information
-- **Code Execution Tool** - Execute code in a sandboxed environment
+| Tool | What it does | Configurable |
+|------|--------------|--------------|
+| **Image Generation** | Generate images from text prompts. | Provider + model (e.g. `xAI grok-imagine`, `OpenAI gpt-image-1`). |
+| **Speech Generation (TTS)** | Synthesize speech from text. | Provider + model + voice + language (e.g. `ElevenLabs Flash v2.5`). |
+| **Transcript Generation (STT)** | Transcribe audio to text. | Provider + model (e.g. `ElevenLabs scribe_v2`). |
+| **Web Search** | Search the web for real-time information. | None — uses the provider's native search. |
+| **Code Execution** | Run code in the provider's sandboxed code interpreter. | None. |
+| **Todo Tool** | A built-in todo list the agent uses to plan and track multi-step tasks. | None. |
+| **Schedule Task Tool** | Lets the agent schedule itself for later — recurring (cron) or one-off — and amend existing schedules. | None. |
+| **Sandbox Tool** | Per-session Docker-backed bash sandbox with persistent workspace and file API. | Image, env vars. See [Sandbox Tool](/gateway/agent-builder/sandbox-tool). |
 
-These tools are automatically handled by the model providers when enabled, requiring no additional configuration or setup.
+## Enabling tools
 
-## Enabling Provider Tools
+1. Open your agent in the Agent Builder.
+2. Click the **Tools** tab.
+3. Toggle the tool on. Image / Speech / Transcript tools also let you pick the provider and model.
+4. Optionally flip the **Requires Approval** switch to gate each tool call behind [human-in-the-loop](/gateway/agent-builder/human-in-the-loop) confirmation.
+5. Optionally flip **Deferred** to keep the tool definition out of the prompt until the agent explicitly asks for it (useful for big tool catalogs).
+6. Save.
 
-To enable provider tools for your agent:
+## Image / Speech / Transcription
 
-1. Navigate to your agent in the Agent Builder
-2. Click on the **Tools** tab
-3. Toggle the switch next to each tool you want to enable
-4. Save your agent configuration
+These three are configured similarly: pick a provider, pick a model, and (for speech) a voice and language. The agent receives a single tool — e.g. `generate_image(prompt)`, `generate_speech(text)`, `transcribe(audio_url)` — and the runtime routes the call to the configured provider behind the scenes.
 
-Each tool can be enabled or disabled independently. When enabled, the agent will have access to that tool's capabilities during conversations.
+You can use any combination of providers for the three tools — e.g. xAI for images and ElevenLabs for speech.
 
-## Image Generation Tool
+## Web Search & Code Execution
 
-The Image Generation Tool allows your agent to create images based on text descriptions. This tool is useful for:
-
-- Creating visual content from descriptions
-- Generating illustrations or graphics
-- Producing images for presentations or documents
-
-## Web Search Tool
-
-The Web Search Tool enables your agent to search the internet for real-time information. This tool is useful for:
-
-- Finding current events and news
-- Looking up factual information
-- Getting up-to-date data and statistics
-- Researching topics that require recent information
-
-## Code Execution Tool
-
-The Code Execution Tool allows your agent to write and execute code in a sandboxed environment. This tool is useful for:
-
-- Performing mathematical calculations
-- Analyzing data
-- Running code snippets
-- Solving computational problems
-- Generating code examples
-
-## Provider Compatibility
+These map onto the LLM provider's native capabilities. Compatibility depends on the model you pick on the Model tab.
 
 | Tool | OpenAI | Anthropic | Gemini |
 |------|--------|-----------|--------|
-| Image Generation | ✅ | ❌ | ✅ |
-| Web Search | ✅ | ✅ | ❌ |
+| Web Search | ✅ | ✅ | — |
 | Code Execution | ✅ | ✅ | ✅ |
 
+For richer or stricter sandboxing — or to give the agent a persistent workspace — use the [Sandbox Tool](/gateway/agent-builder/sandbox-tool) instead of provider-level code execution.
+
+## Todo & Schedule
+
+Two utility tools designed for long-running, agentic workflows:
+
+- **Todo Tool** — gives the agent `add_todo`, `update_todo`, `list_todos`. Useful for keeping a complex plan organized when the agent is doing many things in a single run.
+- **Schedule Task Tool** — gives the agent `schedule_once(at, message)` and `schedule_recurring(cron, message)` so an agent can defer work, set reminders, or kick off recurring runs of itself.
+
+Both compose naturally with [Triggers](/gateway/agent-builder/triggers) — the agent can register a trigger and later be invoked by it.

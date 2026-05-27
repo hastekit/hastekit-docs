@@ -33,7 +33,7 @@ A workflow node like `Slack: Post Message` runs against a specific **connection*
 3. Pick the **Connector Type** (Gmail, Slack, Jira, etc.).
 4. Copy the **Redirect / Callback URL** shown in the dialog (e.g. `https://app.hastekit.ai/api/agent-server/connections/oauth/callback`). You will need this in the next step.
 5. In the third-party app (e.g. the Slack app dashboard or a GitHub OAuth app), create an OAuth app and add the redirect URL as an authorized redirect URI. Copy the resulting **client_id** and **client_secret**.
-6. Back in HasteKit, open **Agent Framework → Credentials** and store the `client_id` and `client_secret` as a credential (or use an existing one with those keys).
+6. Back in HasteKit, open **Agent Framework → [Credentials](/gateway/agent-builder/credentials)** and store the `client_id` and `client_secret` as a credential (or use an existing one with those keys).
 7. Return to the **Add Connector** dialog. Give the connector a **Name** (e.g. `Production Slack App`) and pick the **Credential** you just created.
 8. Click **Create**.
 
@@ -78,4 +78,4 @@ For sensitive actions (e.g. `send`, `delete`, `transition`), mark them as **requ
 ## Relation to other features
 
 - [MCP Servers](/gateway/agent-builder/mcp-server) — MCP brings tools from any MCP-speaking server (often a power-user's local MCP). Connectors are HasteKit-managed first-class integrations with curated actions and per-user OAuth.
-- [Channels](/gateway/agent-builder/conversing-with-the-agent) — Channels deliver messages **to** the user (Slack, Telegram). Connectors let agents act **on behalf of** the user.
+- [Channels](/gateway/agent-builder/channels) — Channels deliver messages **to** the user (Slack, Telegram). Connectors let agents act **on behalf of** the user.

@@ -1,0 +1,57 @@
+---
+title: Triggers
+description: Invoke an agent or workflow on a schedule, at a specific time, or from a connector event
+---
+
+Triggers are how agents and workflows get invoked without a user typing anything. Schedule a daily summary, fire an agent when a GitHub PR opens, kick off a workflow at a specific future time — each one is a trigger.
+
+<Frame>
+    <img src="/images/agent-builder/triggers.png" alt="Triggers" />
+</Frame>
+
+## Trigger types
+
+| Type | Fires when |
+|------|------------|
+| **Cron** | A configured cron expression elapses (recurring). |
+| **Schedule Once** | A specific future timestamp arrives (one-off). |
+| **Connector** | A connector emits a matching event (e.g. GitHub PR opened, issue commented). |
+
+## Creating a trigger
+
+1. Open **Agent Framework → Triggers**.
+2. Click **Add Trigger**.
+3. Choose:
+
+| Field | Description |
+|-------|-------------|
+| **Type** | `Cron`, `Schedule Once`, or `Connector`. |
+| **Target** | Agent or workflow to invoke. Pick by name and version/alias. |
+| **Schedule** | For Cron: a cron expression. For Schedule Once: an absolute timestamp. For Connector: the connector + event filter (e.g. "GitHub: PR opened in `acme/api`"). |
+| **Input** | JSON payload passed to the agent or workflow. Supports templating against the trigger event (e.g. `{{event.pull_request.url}}`). |
+| **Enabled** | On/off without deleting the trigger. |
+
+4. Save.
+
+The trigger appears in the list with its status (Active / Disabled / Last fired at …).
+
+## Connector triggers
+
+When you pick **Connector** as the type, you also pick which event from which connector you want to listen for. Currently supported:
+
+| Connector | Events |
+|-----------|--------|
+| **GitHub** | PR opened / updated / closed, issue opened, issue comment, push |
+
+The agent/workflow receives the full event payload as input, so it can read the PR number, the comment body, etc.
+
+## Agent-scheduled triggers
+
+Triggers can also be created by an agent at runtime, via the **Schedule Task tool** ([Provider Tools](/gateway/agent-builder/provider-tools)). This lets an agent set itself a reminder ("check in with the user tomorrow") or kick off recurring runs ("every Monday at 9am, summarize last week's tickets") without leaving the conversation.
+
+## Common patterns
+
+- **Daily standup** — Cron at 09:00 weekdays → agent that reads Jira and posts a summary to Slack.
+- **PR triage** — GitHub "PR opened" → workflow that runs an AI code-review agent and posts the review.
+- **Calendar follow-up** — Schedule Once 24h after a meeting → agent that drafts a follow-up email referencing the meeting transcript.
+- **Self-rescheduling agent** — agent uses the **Schedule Task tool** to set its own next run based on conversation outcome.

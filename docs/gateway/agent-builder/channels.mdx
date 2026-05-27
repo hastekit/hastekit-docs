@@ -1,0 +1,71 @@
+---
+title: Channels
+description: Deploy an agent to Telegram or Slack with a single webhook
+---
+
+A **channel** binds an agent to a messaging platform — Telegram or Slack — so end users can talk to it where they already are. Each channel gets a unique webhook URL; paste it into the platform's webhook configuration and you're live.
+
+<Frame>
+    <img src="/images/agent-builder/channels.png" alt="Channels" />
+</Frame>
+
+## Supported channels
+
+| Channel | Setup |
+|---------|-------|
+| **Telegram** | Create a bot via @BotFather, paste the bot token, paste the HasteKit webhook URL into the bot's webhook config. |
+| **Slack** | Create a Slack app, paste the HasteKit webhook URL into Event Subscriptions, install the app to your workspace. |
+
+## Creating a channel
+
+1. Open **Agent Framework → Channels**.
+2. Click **Add Channel**.
+3. Choose the platform.
+4. Select the **Agent** (and version or alias) the channel should route to. One agent per channel.
+5. Provide the platform credentials:
+   - **Telegram** — bot token from BotFather.
+   - **Slack** — signing secret and OAuth credentials from your Slack app config.
+6. Save. HasteKit shows you a **Webhook URL**.
+
+## Wiring the platform side
+
+### Telegram
+
+Set the bot's webhook to the HasteKit URL:
+
+```
+https://api.telegram.org/bot<TOKEN>/setWebhook?url=<HASTEKIT_WEBHOOK_URL>
+```
+
+Or use BotFather's webhook configuration UI. Once set, every message the bot receives is delivered to HasteKit, which forwards it to the configured agent.
+
+### Slack
+
+In your Slack app dashboard:
+
+1. **Event Subscriptions** → enable, paste the HasteKit URL as the Request URL.
+2. Subscribe to bot events (`message.channels`, `message.im`, etc.).
+3. **OAuth & Permissions** → grant `chat:write`, `im:history`, and any scopes you want the bot to use.
+4. **Install to Workspace**.
+
+Slack now routes events to HasteKit; the agent replies in the same channel/DM.
+
+## Per-user context
+
+Each incoming message is augmented with the platform's user identity (Telegram user ID, Slack user/team ID) in the agent's [request context](/gateway/agent-builder/conversing-with-the-agent). Use this to:
+
+- Scope [Memories](/gateway/agent-builder/memories) per user (so the agent remembers each person separately).
+- Look up the user's [connector connection](/gateway/agent-builder/connectors) so the agent can act in *their* Gmail/Calendar/Jira on request.
+- Substitute the user identity into the [system prompt](/gateway/agent-builder/system-prompt) via `{{user_id}}`.
+
+## Channels vs Connectors
+
+It's easy to confuse these — they're opposite ends of the same conversation.
+
+| | Channels | Connectors |
+|---|----------|------------|
+| Direction | The user → the agent | The agent → external services |
+| Examples | Telegram, Slack DMs | Gmail, Google Calendar, Jira, GitHub |
+| Auth | One bot/app per channel | One OAuth connection per end user |
+
+A typical "personal assistant" agent has one **channel** (Telegram, so the user can chat) and several **connectors** (Gmail and Calendar, so the agent can read their inbox and book meetings).

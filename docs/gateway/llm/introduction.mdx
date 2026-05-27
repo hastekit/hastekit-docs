@@ -5,25 +5,14 @@ description: "HasteKit — The end-to-end platform for building LLM-powered agen
 
 **HasteKit LLM Gateway** is a high-performance, open-source gateway written in Golang that provides a unified interface to interact with large language models from various providers. It sits between your application and LLM providers, offering access control via virtual keys, centralized configuration, and deep observability through OpenTelemetry traces.
 
-### Conversational UI
+## Why HasteKit
 
-Test prompts, debug tool calls, and iterate on your agents in real-time from a built-in chat interface—no separate client needed.
-
-<Frame>
-    <img src="/images/conversational-ui.png" alt="Conversational UI for Agents" />
-</Frame>
-
-### Durable Execution
-
-Run agents in-process for low-latency interactions, or back them with Temporal or Restate for long-running workflows where every step is checkpointed and every retry is automatic. Same agent definition, two execution modes.
-
-### Agent Traces
-
-Every agent invocation captures detailed traces across model calls, tool calls, and sub-agent handoffs. Debug multi-step workflows, monitor performance, and attribute cost—all from the dashboard.
-
-<Frame>
-    <img src="/images/traces.png" alt="Agent Traces and Observability" />
-</Frame>
+- **No-Code Agent Builder**: Compose agents with model parameters, system prompts, MCP tools, skills, and structured output schemas—without writing code
+- **Multi-Agent Orchestration**: Invoke sub-agents as tools or hand off conversations mid-flight to specialist agents instead of overloading a single monolithic prompt
+- **Durable Execution**: Run agents on Temporal or Restate where every step is checkpointed and every retry is automatic—or call them in-process for low-latency workloads
+- **Versioning & Aliases**: Ship immutable agent snapshots with production aliases so you can iterate safely and roll back instantly
+- **Unified LLM Gateway**: Drop-in replacement for OpenAI, Anthropic, and Gemini SDKs with virtual keys, rate limits, and full request/response logging
+- **Deep Observability**: Every agent run, tool call, and LLM request emits OpenTelemetry traces with token usage, latency, and cost attribution
 
 ## LLM Gateway
 
@@ -94,12 +83,6 @@ Support for additional providers is on the roadmap.
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="Quickstart" icon="rocket" href="/gateway/quickstart">
-    Get HasteKit running locally in less than 5 minutes.
-  </Card>
-  <Card title="Build an Agent" icon="robot" href="/gateway/agent-builder/agent-runtime">
-    Configure your first agent with tools, skills, and structured output.
-  </Card>
   <Card title="LLM Gateway" icon="route" href="/gateway/llm/providers">
     Connect providers, issue virtual keys, and route SDK calls through the gateway.
   </Card>

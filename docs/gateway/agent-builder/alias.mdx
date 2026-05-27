@@ -1,20 +1,44 @@
 ---
 title: Aliases
+description: Pin a stable name like `production` or `canary` to one or two agent versions
 ---
 
-Create aliases to map names to specific agent versions or version combinations.
+An **alias** is a named pointer to one or two agent [versions](/gateway/agent-builder/versioning). Clients invoke the agent by alias — `my_agent@production` — and the alias decides which version actually runs. Repoint the alias and every client picks up the change on the next call.
 
-## Alias Configuration
+<Frame>
+    <img src="/images/agent-builder/alias.png" alt="Alias tab" />
+</Frame>
 
-**Alias Name** - Unique name for the alias (required)
+## Configuration
 
-**Version 1** - Primary version to map (required). Select from available versions or $LATEST (version 0).
+| Field | Description |
+|-------|-------------|
+| **Alias Name** | Required, unique per agent. Example: `production`, `staging`, `canary`. |
+| **Version 1** | Required. The primary version this alias maps to. Pick any numbered version or `$LATEST` (version 0). |
+| **Version 2** | Optional. Add a second version to split traffic. |
+| **Weight** | Required when Version 2 is set. Percentage (0–100) of traffic routed to Version 2 — the rest goes to Version 1. |
 
-**Version 2** - Optional second version for A/B testing or gradual rollouts
+## Single-version alias
 
-**Weight** - Required when Version 2 is set. Percentage (0-100) indicating traffic distribution to Version 2. The remainder goes to Version 1.
+Map a name to one immutable version. The most common pattern:
 
-## Use Cases
+| Alias | Points at | Used for |
+|-------|-----------|----------|
+| `production` | `v7` | Whatever's serving real users right now |
+| `staging` | `v8` | The build under QA |
+| `$LATEST` (built-in) | `v0` | Bleeding edge |
 
-- **Single Version** - Map an alias to one version for stable references
-- **Dual Version** - Map to two versions with weighted distribution for gradual rollouts or A/B testing
+To ship a new version: build and test it as `v8`, then re-point `production` from `v7` to `v8`. To roll back: re-point `production` to `v7`. No client redeploy required.
+
+## Dual-version alias (canary / A-B)
+
+Setting both **Version 1** and **Version 2** with a **Weight** between them splits invocations between the two versions according to the weight. Useful for:
+
+- **Canary releases** — `production` = 95% old / 5% new, ramped up if the new version performs well.
+- **A/B experiments** — compare two prompt or model configurations on real traffic.
+
+Traces tag each run with which version actually executed, so you can compare success rate, latency, and cost between the two.
+
+## Same model for workflows
+
+[Workflows](/gateway/agent-builder/workflows) use the identical versioning + alias model — `pr_triage@production` works the same way.

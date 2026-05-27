@@ -1,0 +1,45 @@
+---
+title: Deferred Tools
+description: Load tool definitions on demand so big tool catalogs don't bloat the context window
+---
+
+Modern agents often have access to dozens or hundreds of tools — between MCP servers, OpenAPI specs, and connectors, the catalog grows fast. But every tool the agent *might* call eats prompt tokens, every turn, whether the agent uses it or not. **Deferred Tools** fix that: tool definitions stay out of the system prompt until the agent explicitly asks for them.
+
+<Frame>
+    <img src="/images/agent-builder/deferred-tools.png" alt="Deferred tool toggle" />
+</Frame>
+
+## How it works
+
+A deferred tool is registered with HasteKit but not exposed in the system prompt by default. Instead, the agent sees a single meta-tool — `tool_search` — that lets it discover and load tools on demand:
+
+1. The agent calls `tool_search("calendar")`.
+2. HasteKit returns a short list of matching tool names and one-line summaries.
+3. The agent calls `tool_load(["GoogleCalendar.CreateEvent"])`.
+4. The full schema of that tool is now in scope and the agent can call it.
+
+The discovery + load step costs one or two extra LLM turns up front, but means the agent isn't paying for tool definitions it never uses — and you can attach huge tool catalogs without context bloat.
+
+## Marking tools as deferred
+
+Available on every tool type that supports filtering:
+
+- [MCP Servers](/gateway/agent-builder/mcp-server) — **Deferred Tools** field (comma-separated tool names).
+- [API Servers](/gateway/agent-builder/api-servers) — flag specific operations.
+- [Connectors](/gateway/agent-builder/connectors) — flag specific actions.
+- [Provider Tools](/gateway/agent-builder/provider-tools) — toggle on a per-tool basis.
+
+## When to defer a tool
+
+- **Big catalogs** — anything past ~20 tools starts to crowd the prompt and degrade tool-call accuracy.
+- **Specialty tools** — tools the agent only needs in narrow cases (e.g. `Jira.TransitionIssue` is only relevant once the user mentions tickets).
+- **Heavy schemas** — tools whose input schemas are huge (deeply nested objects, long enums) cost more tokens to keep loaded.
+
+## When NOT to defer
+
+- **Always-needed tools** — if the agent is going to use the tool on most runs, deferring just costs an extra round-trip every time.
+- **Tools the agent should consider proactively** — discovery only happens when the agent thinks to search; if the right answer is "use tool X" and the agent doesn't know X exists, it won't find it.
+
+## Pair with approval
+
+Deferred and **Requires Approval** are independent. A tool can be deferred (not in the prompt), approval-gated (held for human review when called), both, or neither.

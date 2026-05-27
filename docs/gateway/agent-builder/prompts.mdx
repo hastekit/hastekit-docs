@@ -1,0 +1,62 @@
+---
+title: Prompts
+description: Versioned, reusable prompt templates with `{{variable}}` interpolation
+---
+
+The **Prompts** library is your project's source of truth for system prompts. Author a prompt once, version it like code, and reference specific versions from any number of agents — so changing a prompt doesn't require touching every agent that uses it.
+
+<Frame>
+    <img src="/images/agent-builder/prompts.png" alt="Prompts library" />
+</Frame>
+
+## Why prompts deserve their own library
+
+A prompt that lives inline on an agent is fine while you're iterating, but it has costs:
+
+- **Duplication** — every agent that needs similar instructions has its own copy that drifts.
+- **No version control** — there's no record of what the prompt said when an old run happened.
+- **Mixed ownership** — engineers edit agent configs, but prompt-writers want to edit prompts.
+
+A prompt in the library has:
+
+- **Immutable versions** — every saved version is frozen. Reference `my-prompt@3` and you'll get the exact same text forever.
+- **Shared use** — one prompt powers many agents.
+- **Variables** — `{{user_name}}`, `{{org_id}}`, anything from the request context interpolated at runtime.
+
+## Creating a prompt
+
+1. Open **Agent Framework → Prompts**.
+2. Click **Create Prompt**.
+3. Give it a **Name** (unique per project; used to reference the prompt from agents) and an optional **Description**.
+4. Write the prompt text. Use `{{variable}}` for any dynamic substitutions.
+5. Click **Save**. This creates version 1.
+
+## Versioning
+
+Each time you save edits to an existing prompt, a new immutable version is created. The Prompt detail page lists every version with its creation timestamp; you can view any historical version verbatim.
+
+A prompt-reference on an agent ([System Prompt tab](/gateway/agent-builder/system-prompt)) pins to a specific version. If you want an agent to always use the newest version, pin it to `$LATEST`; if you want stable behaviour, pin to an explicit number.
+
+## Variables
+
+A template body can reference `{{name}}` anywhere. At runtime, variables resolve from the request's **context** object — the same object you set in the [Chat UI's Add Context dialog](/gateway/agent-builder/conversing-with-the-agent) or pass in the HTTP request body.
+
+Example:
+
+```
+You are a support agent for {{company_name}}.
+The customer you're helping is {{customer_name}} ({{customer_tier}} tier).
+Always be polite and reference their tier when relevant.
+```
+
+If `{{customer_tier}}` isn't provided in context at runtime, it's left blank — variables are optional unless the prompt logic requires them.
+
+## When to reference a prompt vs write it inline
+
+- **Inline** — quick iteration on a single agent, throwaway experiments, prompt is hyper-specific to this one agent.
+- **Reference** — production, shared logic, anything you want to version independently of the agent definition.
+
+## Related
+
+- [System Prompt](/gateway/agent-builder/system-prompt) — the agent-side tab where you pick "raw text" or "prompt reference."
+- [Versioning](/gateway/agent-builder/versioning) — the same immutable-versions model applies to agents themselves.

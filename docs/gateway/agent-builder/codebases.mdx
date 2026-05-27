@@ -1,0 +1,51 @@
+---
+title: Codebases
+description: Attach GitHub repositories so an agent can read, search, and reason over code
+---
+
+Codebases bring source code into the agent. Connect a GitHub repository once, HasteKit keeps it synced, and any agent in the project can attach it to read files, search the tree, and answer code-aware questions.
+
+<Frame>
+    <img src="/images/agent-builder/codebases.png" alt="Codebases" />
+</Frame>
+
+## Adding a codebase
+
+1. First, register the **GitHub connector** under **Agent Framework → [Connectors](/gateway/agent-builder/connectors)**, and connect the account that has access to the repo.
+2. Open **Agent Framework → Codebases**.
+3. Click **Add Codebase**.
+4. Select:
+
+| Field | Description |
+|-------|-------------|
+| **GitHub Connection** | The OAuth connection to use for cloning and syncing. |
+| **Repository** | `owner/name` of the repository. |
+| **Branch** | Default branch (usually `main`). The codebase will track this branch. |
+| **Path filter** | Optional. Limit indexing to a subdirectory (e.g. `services/api`). |
+
+5. Save. HasteKit clones the repo and syncs it on a schedule (and on demand).
+
+## Attaching to an agent
+
+1. Open the agent → **Codebases** tab.
+2. Select one or more codebases.
+3. Save.
+
+The agent receives tools for navigating and reading the repo — `list_directory`, `read_file`, `search_code`, etc. — scoped to the attached codebases. Reading is read-only; agents can't push, branch, or modify the repo.
+
+## How sync works
+
+- Repositories are re-cloned on a schedule (typically every few minutes) and on demand when the agent needs a fresh read.
+- Only the configured branch is tracked. Switch branches by editing the codebase config.
+- Large repos are paginated and chunked; the agent doesn't have to load the whole tree into context.
+
+## Use cases
+
+- **Code review agents** — read a PR diff, the surrounding files, and project conventions, then leave a structured review.
+- **Documentation agents** — answer "where is X defined" or "what files use this function."
+- **Refactor planners** — produce a step-by-step plan grounded in the actual code rather than guessed structure.
+
+## Relation to other features
+
+- [Knowledge Bases](/gateway/agent-builder/knowledge-base) — for general docs, PDFs, markdown. Codebases are for repository-shaped data where path and structure matter.
+- [Workflows](/gateway/agent-builder/workflows) — GitHub trigger nodes can kick off a workflow on a PR event; the agent inside that workflow can read the same codebase.

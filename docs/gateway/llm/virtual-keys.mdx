@@ -5,7 +5,7 @@ description: Create and manage virtual keys for secure provider and model access
 
 Virtual Keys provide a secure way to control access to LLM providers and models without exposing your actual provider API keys. They act as an abstraction layer that allows you to manage access permissions, rate limits, and model restrictions for different applications or users.
 
-![Virtual Keys Overview](../../images/virtual-keys-overview.png)
+![Virtual Keys Overview](../../images/llm/virtual-keys.png)
 
 The Virtual Keys page displays all configured virtual keys in a table format, showing their names, secret keys, allowed providers, models, rate limits, and creation dates.
 
@@ -38,7 +38,7 @@ To create a new virtual key:
    - **Rate Limits** (Optional): Configure rate limits (see below)
 4. Click **Create**
 
-![Add Virtual Key Dialog](../../images/virtual-keys-add-dialog.png)
+![Add Virtual Key Dialog](../../images/llm/add-virtual-key.png)
 
 The virtual key will be automatically generated and displayed. Make sure to copy and save it securely, as it won't be shown again in full.
 
@@ -67,8 +67,6 @@ The **Models** field is optional. If left empty, the virtual key will have acces
 ### Configuring Rate Limits
 
 Rate limits allow you to control how many requests can be made with a virtual key within a specific time period. You can configure multiple rate limits for different time windows.
-
-![Rate Limit Configuration](../../images/virtual-keys-rate-limit.png)
 
 To add a rate limit:
 

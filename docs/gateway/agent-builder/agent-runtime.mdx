@@ -1,37 +1,43 @@
 ---
 title: Agent Runtime
+description: Pick where each agent executes — in-process for speed, or durable on Temporal / Restate for production reliability
 ---
 
-The Runtime setting determines how the agent executes and handles failures.
+The **Runtime** field on the Agent Info tab decides where the agent loop executes. The same agent definition can run on any of three runtimes; you change it from a dropdown.
 
-## Runtime Types
+<Frame>
+    <img src="/images/agent-builder/runtime.png" alt="Runtime selector on Agent Info" />
+</Frame>
 
-### Local
+## Local
 
-Runs everything in the same process as the request handler. This is the simplest runtime with no external dependencies.
+The agent loop runs in the same process as the request handler.
 
-**Characteristics:**
-- Fast execution with no network overhead
-- Crashes during the agent loop cannot recover
-- Suitable for development and low-risk scenarios
+- **Latency** — lowest (no broker hops).
+- **Durability** — none. If the process crashes mid-run, the run is lost.
+- **Concurrency** — limited by the process.
+- **Best for** — development, short interactive chats, low-risk operations.
 
-### Restate
+## Temporal
 
-Uses Restate server for durable execution. Each agent loop runs as a Restate workflow, and each IO operation is a Restate durable step.
+Each agent loop runs as a Temporal workflow; each IO operation (LLM call, tool call) is a Temporal **activity**.
 
-**Characteristics:**
-- Durable execution with automatic recovery
-- IO operation results are stored by Restate and reused upon recovery/replay instead of performing the operation again
-- Provides strong guarantees for long-running agent operations
-- Streaming is handled through sidecar Redis-based streaming
-- Suitable for production environments requiring reliability
+- **Durability** — workflows survive process restarts, replay deterministically from history.
+- **Retries** — per-activity retry policy with exponential backoff.
+- **Long-running** — workflows can run for hours or days; the agent can sleep on Delay nodes or wait for [approvals](/gateway/agent-builder/human-in-the-loop) without holding compute.
+- **Streaming** — handled via a sidecar Redis stream so the client still sees token-by-token output.
+- **Best for** — production agents, anything that calls expensive tools, anything you can't afford to lose.
 
-### Temporal
+## Restate
 
-Uses Temporal server for durable execution. Each agent loop runs as a Temporal workflow, and each IO operation is a Temporal activity.
+Each agent loop runs as a Restate workflow; each IO operation is a durable Restate step.
 
-**Characteristics:**
-- Durable execution with automatic recovery
-- IO operations are executed as Temporal activities, providing isolation and retry capabilities
-- Streaming is handled through sidecar Redis-based streaming
-- Suitable for production environments requiring workflow orchestration
+- **Durability** — IO results are memoized by Restate. On recovery the workflow replays the recorded results instead of re-issuing the calls.
+- **Streaming** — also Redis-sidecar based.
+- **Best for** — teams already running Restate, agents with idempotency requirements around external side effects.
+
+## Same agent, any runtime
+
+The agent definition (prompt, tools, schema, etc.) is identical across runtimes. You can develop on **Local**, switch to **Temporal** for production, and the agent's behavior is unchanged — only its durability characteristics differ.
+
+[Workflows](/gateway/agent-builder/workflows) have the same Local-vs-Temporal choice, with the same trade-offs.

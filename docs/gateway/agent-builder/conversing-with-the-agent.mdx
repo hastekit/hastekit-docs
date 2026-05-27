@@ -1,49 +1,67 @@
 ---
-title: Conversing with the Agent
+title: Chat
+description: Test your agent in a built-in chat UI — no separate client required
 ---
 
-The chat interface allows you to interact with your agents through a conversational interface.
+The Chat tab is the fastest path from "I saved this agent" to "I'm watching it answer." It supports every feature of the runtime — multi-turn history, tool calls, structured output, attachments, voice — in a UI you can use without writing any client code.
 
-## Interface Overview
+<Frame>
+    <img src="/images/agent-builder/chat.png" alt="Conversational UI for Agents" />
+</Frame>
 
-The chat interface consists of:
+## Layout
 
-- **Sidebar** - Lists all your conversations
-- **Main Chat Area** - Displays messages and agent responses
-- **Input Bar** - Agent selection, version selection, context configuration, and message input
+- **Sidebar** — past conversations grouped under "Chats." Click any one to resume; click **New Chat** to start fresh.
+- **Main chat area** — message history with inline rendering of tool calls (each shows its name, arguments, and result).
+- **Input bar** — the agent picker, version picker, context dialog, attachment buttons, and message input.
 
-## Selecting an Agent
+## Picking an agent and version
 
-Click the agent name button above the input field to open the agent selection menu. Choose the agent you want to converse with.
+- Click the **agent name** button above the input field to switch agents.
+- Click the **version** button (defaults to `Latest`) to pin the chat to a specific version. Version 0 (`$LATEST`) is always the current mutable working copy; numbered versions are immutable snapshots. See [Versioning](/gateway/agent-builder/versioning).
+- Picking an [alias](/gateway/agent-builder/alias) (e.g. `production`) routes each turn to whichever version the alias currently points at.
 
-## Selecting Agent Version
+## Adding context
 
-Click the **Latest** button to select a specific agent version. The menu shows all available versions for the selected agent. Version 0 represents the latest version.
+Click the **@** button to open the **Add Context** dialog:
 
-## Adding Context
+- **Context** — a JSON object passed alongside each message. Useful for templated [system prompts](/gateway/agent-builder/system-prompt) (`{{user_name}}`, `{{org_id}}`, …) or anything else your agent reads from the request body.
+- **Headers** — a JSON object of HTTP headers added to each request — auth tokens, user IDs, anything you'd want a real client to send.
 
-Click the **@** button to open the "Add Context" dialog. This allows you to provide additional context and headers that will be sent with each message.
+Both values persist for the rest of the conversation.
 
-### Context
+## Attachments
 
-JSON object containing additional context data to pass to the agent. This can include user information, session data, or any custom context your agent needs.
+- **Files** — paperclip icon. Attach PDFs, images, and other files inline with a message. The agent's model needs to support the file type natively (e.g. vision for images, document inputs for PDFs).
+- **Audio** — microphone icon. Record voice input directly. Useful for testing agents wired to the [Transcript Generation tool](/gateway/agent-builder/provider-tools).
 
-### Headers
+## Tool-call visualization
 
-JSON object containing HTTP headers to include with the request. Useful for authentication tokens, custom headers, or metadata.
+Every tool call the agent makes shows up inline in the chat as a labeled block:
 
-Both context and headers are edited in JSON format using the code editor. The values persist across messages in the same session.
+- Tool name and source (e.g. `Google Calendar: List Events`, `MCP: search_repo`).
+- Arguments the agent sent.
+- The tool's result.
 
-## Sending Messages
+Click any block to jump to its span in the full [trace](/gateway/agent-builder/traces).
 
-Type your message in the "Ask anything" input field and press Enter or click the send button. The agent will process your message and stream the response in real-time.
+## Sending messages
 
-## Conversation Management
+Type into **Ask anything** and press Enter (or click send). The response **streams** in token-by-token. Tool calls execute inline and stream their results as they complete.
 
-### Starting a New Chat
+## Useful per-message actions
 
-Click **New Chat** in the sidebar to start a fresh conversation. This creates a new conversation thread without previous context (unless conversation history is enabled for the agent).
+Each assistant message has a footer row:
 
-### Viewing Past Conversations
+- **Copy** the response.
+- **Thumbs up / thumbs down** for feedback (logged for evals).
+- **Regenerate** to re-run the last turn.
+- **View trace** to jump straight to the OpenTelemetry trace for the run.
 
-All your conversations are listed in the sidebar under "Chats". Click any conversation to resume it. The agent will have access to the conversation history if history is enabled.
+## When to use Chat vs the HTTP API
+
+| Use Chat for | Use the HTTP API for |
+|--------------|----------------------|
+| Manual testing during iteration | Production traffic |
+| Debugging tool calls visually | Integration with your app |
+| Demoing the agent to others | Driving the agent from a [workflow](/gateway/agent-builder/workflows) or [channel](/gateway/agent-builder/channels) |
