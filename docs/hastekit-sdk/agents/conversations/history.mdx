@@ -24,8 +24,10 @@ agent := agents.NewAgent(&agents.AgentOptions{
 
 handle, err := agent.Execute(context.Background(), &agents.AgentInput{
     Namespace: "default",
-    Messages: []responses.InputMessageUnion{
-        responses.UserMessage("Hello! My name is Alice"),
+    Message: history.Message{
+        Messages: []responses.InputMessageUnion{
+            responses.UserMessage("Hello! My name is Alice"),
+        },
     },
 })
 out, err := handle.Result()
@@ -41,8 +43,10 @@ threadID := uuid.NewString()
 handle, err := agent.Execute(context.Background(), &agents.AgentInput{
     Namespace: "default",
     ThreadID:  threadID,
-    Messages: []responses.InputMessageUnion{
-        responses.UserMessage("Hello! My name is Alice"),
+    Message: history.Message{
+        Messages: []responses.InputMessageUnion{
+            responses.UserMessage("Hello! My name is Alice"),
+        },
     },
 })
 out, err := handle.Result()
@@ -51,8 +55,10 @@ out, err := handle.Result()
 handle, err = agent.Execute(context.Background(), &agents.AgentInput{
     Namespace: "default",
     ThreadID:  threadID, // Pass the same thread ID to continue the conversation
-    Messages: []responses.InputMessageUnion{
-        responses.UserMessage("What's my name?"),
+    Message: history.Message{
+        Messages: []responses.InputMessageUnion{
+            responses.UserMessage("What's my name?"),
+        },
     },
 })
 out, err = handle.Result()
@@ -112,21 +118,19 @@ import (
 )
 
 func main() {
-	client, err := hastekit.New(&hastekit.ClientOptions{
-        ProviderConfigs: []gateway.ProviderConfig{
-            {
-                ProviderName:  llm.ProviderNameOpenAI,
-                BaseURL:       "",
-                CustomHeaders: nil,
-                ApiKeys: []*gateway.APIKeyConfig{
-                    {
-                        Name:   "Key 1",
-                        APIKey: os.Getenv("OPENAI_API_KEY"),
-                    },
+    client, err := hastekit.NewWithOptions(
+        hastekit.WithProviderConfigs(gateway.ProviderConfig{
+            ProviderName:  llm.ProviderNameOpenAI,
+            BaseURL:       "",
+            CustomHeaders: nil,
+            ApiKeys: []*gateway.APIKeyConfig{
+                {
+                    Name:   "Key 1",
+                    APIKey: os.Getenv("OPENAI_API_KEY"),
                 },
             },
-        },
-    })
+        }),
+    )
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -149,8 +153,10 @@ func main() {
 	handle, err := agent.Execute(context.Background(), &agents.AgentInput{
 		Namespace: "default",
 		ThreadID:  threadID,
-		Messages: []responses.InputMessageUnion{
-			responses.UserMessage("Hello! My name is Alice"),
+		Message: history.Message{
+            Messages: []responses.InputMessageUnion{
+			    responses.UserMessage("Hello! My name is Alice"),
+			},
 		},
 	})
 	if err != nil {
@@ -175,8 +181,10 @@ func main() {
 	handle, err = agent2.Execute(context.Background(), &agents.AgentInput{
 		Namespace: "default",
 		ThreadID:  threadID,
-		Messages: []responses.InputMessageUnion{
-			responses.UserMessage("What's my name?"),
+		Message: history.Message{
+            Messages: []responses.InputMessageUnion{
+			    responses.UserMessage("What's my name?"),
+			},
 		},
 	})
 	if err != nil {

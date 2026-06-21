@@ -44,27 +44,21 @@ import (
 
 func main() {
     // Initialize SDK with Temporal and Redis configuration
-    client, err := hastekit.New(&hastekit.ClientOptions{
-        ProviderConfigs: []gateway.ProviderConfig{
-            {
-                ProviderName:  llm.ProviderNameOpenAI,
-                BaseURL:       "",
-                CustomHeaders: nil,
-                ApiKeys: []*gateway.APIKeyConfig{
-                    {
-                        Name:   "Key 1",
-                        APIKey: os.Getenv("OPENAI_API_KEY"),
-                    },
+    client, err := hastekit.NewWithOptions(
+        hastekit.WithProviderConfigs(gateway.ProviderConfig{
+            ProviderName:  llm.ProviderNameOpenAI,
+            BaseURL:       "",
+            CustomHeaders: nil,
+            ApiKeys: []*gateway.APIKeyConfig{
+                {
+                    Name:   "Key 1",
+                    APIKey: os.Getenv("OPENAI_API_KEY"),
                 },
             },
-        },
-        TemporalConfig: hastekit.TemporalConfig{
-            Endpoint: "0.0.0.0:7233", // Temporal server endpoint
-        },
-        RedisConfig: hastekit.RedisConfig{
-            Endpoint: "localhost:6379", // Redis for streaming support
-        },
-    })
+        }),
+        hastekit.WithTemporalConfig("0.0.0.0:7233"), // Temporal server endpoint
+        hastekit.WithRedisConfig("http://localhost:6379"), // Redis for streaming support
+    )
     if err != nil {
         log.Fatal(err)
     }
@@ -133,27 +127,21 @@ import (
 )
 
 func main() {
-    client, err := hastekit.New(&hastekit.ClientOptions{
-        ProviderConfigs: []gateway.ProviderConfig{
-            {
-                ProviderName:  llm.ProviderNameOpenAI,
-                BaseURL:       "",
-                CustomHeaders: nil,
-                ApiKeys: []*gateway.APIKeyConfig{
-                    {
-                        Name:   "Key 1",
-                        APIKey: os.Getenv("OPENAI_API_KEY"),
-                    },
+    client, err := hastekit.NewWithOptions(
+        hastekit.WithProviderConfigs(gateway.ProviderConfig{
+            ProviderName:  llm.ProviderNameOpenAI,
+            BaseURL:       "",
+            CustomHeaders: nil,
+            ApiKeys: []*gateway.APIKeyConfig{
+                {
+                    Name:   "Key 1",
+                    APIKey: os.Getenv("OPENAI_API_KEY"),
                 },
             },
-        },
-        TemporalConfig: hastekit.TemporalConfig{
-            Endpoint: "0.0.0.0:7233",
-        },
-        RedisConfig: hastekit.RedisConfig{
-            Endpoint: "localhost:6379",
-        },
-    })
+        }),
+        hastekit.WithTemporalConfig("0.0.0.0:7233"), // Temporal server endpoint
+        hastekit.WithRedisConfig("http://localhost:6379"), // Redis for streaming support
+    )
     if err != nil {
         log.Fatal(err)
     }
@@ -194,27 +182,21 @@ import (
 )
 
 func main() {
-    client, err := hastekit.New(&hastekit.ClientOptions{
-        ProviderConfigs: []gateway.ProviderConfig{
-            {
-                ProviderName:  llm.ProviderNameOpenAI,
-                BaseURL:       "",
-                CustomHeaders: nil,
-                ApiKeys: []*gateway.APIKeyConfig{
-                    {
-                        Name:   "Key 1",
-                        APIKey: os.Getenv("OPENAI_API_KEY"),
-                    },
+    client, err := hastekit.NewWithOptions(
+        hastekit.WithProviderConfigs(gateway.ProviderConfig{
+            ProviderName:  llm.ProviderNameOpenAI,
+            BaseURL:       "",
+            CustomHeaders: nil,
+            ApiKeys: []*gateway.APIKeyConfig{
+                {
+                    Name:   "Key 1",
+                    APIKey: os.Getenv("OPENAI_API_KEY"),
                 },
             },
-        },
-        TemporalConfig: hastekit.TemporalConfig{
-            Endpoint: "0.0.0.0:7233",
-        },
-        RedisConfig: hastekit.RedisConfig{
-            Endpoint: "localhost:6379",
-        },
-    })
+        }),
+        hastekit.WithTemporalConfig("0.0.0.0:7233"), // Temporal server endpoint
+        hastekit.WithRedisConfig("http://localhost:6379"), // Redis for streaming support
+    )
     if err != nil {
         log.Fatal(err)
     }

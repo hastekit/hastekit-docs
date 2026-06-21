@@ -35,21 +35,19 @@ import (
 )
 
 // Initialize the SDK client
-client, err := hastekit.New(&hastekit.ClientOptions{
-    ProviderConfigs: []gateway.ProviderConfig{
-        {
-            ProviderName:  llm.ProviderNameOpenAI,
-            BaseURL:       "",
-            CustomHeaders: nil,
-            ApiKeys: []*gateway.APIKeyConfig{
-                {
-                    Name:   "Key 1",
-                    APIKey: "",
-                },
+client, err := hastekit.NewWithOptions(
+    hastekit.WithProviderConfigs(gateway.ProviderConfig{
+        ProviderName:  llm.ProviderNameOpenAI,
+        BaseURL:       "",
+        CustomHeaders: nil,
+        ApiKeys: []*gateway.APIKeyConfig{
+            {
+                Name:   "Key 1",
+                APIKey: os.Getenv("OPENAI_API_KEY"),
             },
         },
-    },
-})
+    }),
+)
 if err != nil {
     log.Fatal(err)
 }
@@ -92,8 +90,10 @@ Call `handle.Stop(ctx)` at any point to ask the agent to stop at the next iterat
 
 ```go
 handle, err := agent.Execute(context.Background(), &agents.AgentInput{
-    Messages: []responses.InputMessageUnion{
-        responses.UserMessage("Hello!"),
+    Message: history.Message{
+        Messages: []responses.InputMessageUnion{
+            responses.UserMessage("Hello!"),
+        },
     },
 })
 if err != nil {
@@ -184,16 +184,19 @@ import (
 
 func main() {
 	// Initialize SDK client
-	client, err := hastekit.New(&hastekit.ClientOptions{
-		ProviderConfigs: []gateway.ProviderConfig{
-			{
-				ProviderName: llm.ProviderNameOpenAI,
-				ApiKeys: []*gateway.APIKeyConfig{
-					{Name: "default", APIKey: os.Getenv("OPENAI_API_KEY")},
-				},
-			},
-		},
-	})
+    client, err := hastekit.NewWithOptions(
+        hastekit.WithProviderConfigs(gateway.ProviderConfig{
+            ProviderName:  llm.ProviderNameOpenAI,
+            BaseURL:       "",
+            CustomHeaders: nil,
+            ApiKeys: []*gateway.APIKeyConfig{
+                {
+                    Name:   "Key 1",
+                    APIKey: os.Getenv("OPENAI_API_KEY"),
+                },
+            },
+        }),
+    )
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -213,8 +216,10 @@ func main() {
 
 	// Execute agent
 	handle, err := agent.Execute(context.Background(), &agents.AgentInput{
-		Messages: []responses.InputMessageUnion{
-			responses.UserMessage("Hello!"),
+		Message: history.Message{
+            Messages: []responses.InputMessageUnion{
+			    responses.UserMessage("Hello!"),
+            },
 		},
 	})
 	if err != nil {
@@ -236,8 +241,10 @@ Streaming is built into the handle — every run delivers chunks on `handle.Chun
 
 ```go
 handle, err := agent.Execute(context.Background(), &agents.AgentInput{
-    Messages: []responses.InputMessageUnion{
-        responses.UserMessage("Tell me a story"),
+    Message: history.Message{
+        Messages: []responses.InputMessageUnion{
+            responses.UserMessage("Tell me a story"),
+        },
     },
 })
 if err != nil {

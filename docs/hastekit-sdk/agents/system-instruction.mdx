@@ -153,21 +153,19 @@ hastekit "github.com/hastekit/hastekit-sdk-go"
 )
 
 func main() {
-	client, err := hastekit.New(&hastekit.ClientOptions{
-		ProviderConfigs: []gateway.ProviderConfig{
-			{
-				ProviderName:  llm.ProviderNameOpenAI,
-				BaseURL:       "",
-				CustomHeaders: nil,
-				ApiKeys: []*gateway.APIKeyConfig{
-					{
-						Name:   "Key 1",
-						APIKey: "",
-					},
-				},
-			},
-		},
-	})
+    client, err := hastekit.NewWithOptions(
+        hastekit.WithProviderConfigs(gateway.ProviderConfig{
+            ProviderName:  llm.ProviderNameOpenAI,
+            BaseURL:       "",
+            CustomHeaders: nil,
+            ApiKeys: []*gateway.APIKeyConfig{
+                {
+                    Name:   "Key 1",
+                    APIKey: os.Getenv("OPENAI_API_KEY"),
+                },
+            },
+        }),
+    )
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -202,8 +200,10 @@ func main() {
 
 	// Execute agent
 	handle, err := agent2.Execute(context.Background(), &agents.AgentInput{
-		Messages: []responses.InputMessageUnion{
-			responses.UserMessage("Hello!"),
+		Message: history.Message{
+            Messages: []responses.InputMessageUnion{
+			    responses.UserMessage("Hello!"),
+			},
 		},
 		RunContext: map[string]any{
 			"userName": "Bob",

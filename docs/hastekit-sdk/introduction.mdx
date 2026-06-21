@@ -54,8 +54,10 @@ agent := client.NewAgent(&hastekit.AgentOptions{
 })
 
 handle, _ := agent.Execute(ctx, &agents.AgentInput{
-    Messages: []responses.InputMessageUnion{
-        responses.UserMessage("Hello!"),
+    Message: history.Message{
+    	Messages: []responses.InputMessageUnion{
+            responses.UserMessage("Hello!"),
+        },
     },
 })
 out, _ := handle.Result()

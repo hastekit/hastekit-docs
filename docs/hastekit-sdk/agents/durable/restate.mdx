@@ -42,24 +42,21 @@ import (
 
 func main() {
     // Initialize SDK with Restate configuration
-    client, err := hastekit.New(&hastekit.ClientOptions{
-        ProviderConfigs: []gateway.ProviderConfig{
-            {
-                ProviderName:  llm.ProviderNameOpenAI,
-                BaseURL:       "",
-                CustomHeaders: nil,
-                ApiKeys: []*gateway.APIKeyConfig{
-                    {
-                        Name:   "Key 1",
-                        APIKey: os.Getenv("OPENAI_API_KEY"),
-                    },
+    client, err := hastekit.NewWithOptions(
+        hastekit.WithProviderConfigs(gateway.ProviderConfig{
+            ProviderName:  llm.ProviderNameOpenAI,
+            BaseURL:       "",
+            CustomHeaders: nil,
+            ApiKeys: []*gateway.APIKeyConfig{
+                {
+                    Name:   "Key 1",
+                    APIKey: os.Getenv("OPENAI_API_KEY"),
                 },
             },
-        },
-        RestateConfig: hastekit.RestateConfig{
-            Endpoint: "http://localhost:8081", // Restate server endpoint
-        },
-    })
+        }),
+        hastekit.WithRestateConfig("http://localhost:8081"), // Restate server endpoint
+        hastekit.WithRedisConfig("localhost:6379"),
+    )
     if err != nil {
         log.Fatal(err)
     }
@@ -132,24 +129,21 @@ import (
 )
 
 func main() {
-    client, err := hastekit.New(&hastekit.ClientOptions{
-        ProviderConfigs: []gateway.ProviderConfig{
-            {
-                ProviderName:  llm.ProviderNameOpenAI,
-                BaseURL:       "",
-                CustomHeaders: nil,
-                ApiKeys: []*gateway.APIKeyConfig{
-                    {
-                        Name:   "Key 1",
-                        APIKey: os.Getenv("OPENAI_API_KEY"),
-                    },
+    client, err := hastekit.NewWithOptions(
+        hastekit.WithProviderConfigs(gateway.ProviderConfig{
+            ProviderName:  llm.ProviderNameOpenAI,
+            BaseURL:       "",
+            CustomHeaders: nil,
+            ApiKeys: []*gateway.APIKeyConfig{
+                {
+                    Name:   "Key 1",
+                    APIKey: os.Getenv("OPENAI_API_KEY"),
                 },
             },
-        },
-        RestateConfig: hastekit.RestateConfig{
-            Endpoint: "http://localhost:8081", // Restate server
-        },
-    })
+        }),
+        hastekit.WithRestateConfig("http://localhost:8081"),
+        hastekit.WithRedisConfig("localhost:6379"),
+    )
     if err != nil {
         log.Fatal(err)
     }
@@ -191,24 +185,21 @@ import (
 )
 
 func main() {
-    client, err := hastekit.New(&hastekit.ClientOptions{
-        ProviderConfigs: []gateway.ProviderConfig{
-            {
-                ProviderName:  llm.ProviderNameOpenAI,
-                BaseURL:       "",
-                CustomHeaders: nil,
-                ApiKeys: []*gateway.APIKeyConfig{
-                    {
-                        Name:   "Key 1",
-                        APIKey: os.Getenv("OPENAI_API_KEY"),
-                    },
+    client, err := hastekit.NewWithOptions(
+        hastekit.WithProviderConfigs(gateway.ProviderConfig{
+            ProviderName:  llm.ProviderNameOpenAI,
+            BaseURL:       "",
+            CustomHeaders: nil,
+            ApiKeys: []*gateway.APIKeyConfig{
+                {
+                    Name:   "Key 1",
+                    APIKey: os.Getenv("OPENAI_API_KEY"),
                 },
             },
-        },
-        RestateConfig: hastekit.RestateConfig{
-            Endpoint: "http://localhost:8081",
-        },
-    })
+        }),
+        hastekit.WithRestateConfig("http://localhost:8081"),
+        hastekit.WithRedisConfig("localhost:6379"),
+    )
     if err != nil {
         log.Fatal(err)
     }

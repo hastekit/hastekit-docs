@@ -81,8 +81,10 @@ func main() {
     })
 
     handle, err := agent.Execute(context.Background(), &agents.AgentInput{
-        Messages: []responses.InputMessageUnion{
-            responses.UserMessage("Hello! Can you get my name for user_id '123'?"),
+        Message: history.Message{
+            Messages: []responses.InputMessageUnion{
+                responses.UserMessage("Hello! Can you get my name for user_id '123'?"),
+            },
         },
     })
     if err != nil {

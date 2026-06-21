@@ -56,9 +56,9 @@ func main() {
 	}}
 
 	// Create the HasteKit client
-	HasteKit, err := hastekit.New(&hastekit.ClientOptions{
-		ProviderConfigs: providerConfigs,
-	})
+	client, err := hastekit.NewWithOptions(
+        hastekit.WithProviderConfigs(providerConfigs...),
+    )
 	if err != nil {
 		log.Fatalf("failed to create HasteKit client: %v", err)
 	}
