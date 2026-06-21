@@ -14,19 +14,19 @@ Every agent starts with a model. HasteKit talks to eight providers out of the bo
 | Provider | Notes |
 |----------|-------|
 | **OpenAI** | GPT-5, GPT-4.1, o-series, image and audio models |
-| **Anthropic** | Claude Opus, Sonnet, Haiku (including 1M-context variants) |
-| **Gemini** | Gemini 2.5 Pro / Flash family |
+| **Anthropic** | Claude Opus, Sonnet, Haiku, Fable |
+| **Gemini** | Gemini 3.1 Pro / Flash family |
 | **xAI** | Grok models including `grok-imagine` for image generation |
 | **AWS Bedrock** | Bedrock-hosted Claude, Llama, Titan, and others |
 | **OpenRouter** | Aggregator endpoint to 100+ models |
 | **Ollama** | Local models served over an Ollama-compatible endpoint |
 | **ElevenLabs** | Speech synthesis and transcription models |
 
-Providers and their models are configured under **LLM Gateway → Providers**. Once a model is registered there, it shows up in the **Model ID** dropdown here.
+Providers and their models are configured at the organisation-level under **Providers**. Once a model is registered there, it shows up in the **Model ID** dropdown here.
 
 ## Required fields
 
-- **Provider Type** — which provider account to call.
+- **Provider** — which provider account to call.
 - **Model ID** — the specific model from that provider.
 
 ## Generation parameters
@@ -50,4 +50,4 @@ Some providers accept extra fields that don't fit the common set above — e.g. 
 
 ## Iteration cap
 
-The **Agent Info** tab also exposes **Max Iteration** — the maximum number of agent loop turns (LLM call → tool calls → LLM call → ...) before the run is force-terminated. Leave empty to run without a limit. Use this as a safety net for agents that might otherwise loop indefinitely.
+The **General** tab also exposes **Max Iteration** — the maximum number of agent loop turns (LLM call → tool calls → LLM call → ...) before the run is force-terminated. Leave empty to run without a limit. Use this as a safety net for agents that might otherwise loop indefinitely.

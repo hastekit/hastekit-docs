@@ -14,21 +14,19 @@ import (
 )
 
 func main() {
-	client, err := hastekit.New(&hastekit.ClientOptions{
-		ProviderConfigs: []gateway.ProviderConfig{
-			{
-				ProviderName:  llm.ProviderNameOpenAI,
-				BaseURL:       "",
-				CustomHeaders: nil,
-				ApiKeys: []*gateway.APIKeyConfig{
-					{
-						Name:   "Key 1",
-						APIKey: os.Getenv("OPENAI_API_KEY"),
-					},
+	client, err := hastekit.NewWithOptions(
+		hastekit.WithProviderConfigs(gateway.ProviderConfig{
+			ProviderName:  llm.ProviderNameOpenAI,
+			BaseURL:       "",
+			CustomHeaders: nil,
+			ApiKeys: []*gateway.APIKeyConfig{
+				{
+					Name:   "Key 1",
+					APIKey: os.Getenv("OPENAI_API_KEY"),
 				},
 			},
-		},
-	})
+		}),
+	)
 
 	if err != nil {
 		log.Fatal(err)

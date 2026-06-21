@@ -9,6 +9,7 @@ import (
 	"github.com/bytedance/sonic"
 	hastekit "github.com/hastekit/hastekit-sdk-go"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
+	"github.com/hastekit/hastekit-sdk-go/pkg/agents/history"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents/tools"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
@@ -16,24 +17,20 @@ import (
 )
 
 func main() {
-	client, err := hastekit.New(&hastekit.ClientOptions{
-		ServerConfig: hastekit.ServerConfig{
-			Endpoint: "http://localhost:6060",
-		},
-		ProviderConfigs: []gateway.ProviderConfig{
-			{
-				ProviderName:  llm.ProviderNameOpenAI,
-				BaseURL:       "",
-				CustomHeaders: nil,
-				ApiKeys: []*gateway.APIKeyConfig{
-					{
-						Name:   "Key 1",
-						APIKey: os.Getenv("OPENAI_API_KEY"),
-					},
+	client, err := hastekit.NewWithOptions(
+		hastekit.WithProviderConfigs(gateway.ProviderConfig{
+			ProviderName:  llm.ProviderNameOpenAI,
+			BaseURL:       "",
+			CustomHeaders: nil,
+			ApiKeys: []*gateway.APIKeyConfig{
+				{
+					Name:   "Key 1",
+					APIKey: os.Getenv("OPENAI_API_KEY"),
 				},
 			},
-		},
-	})
+		}),
+		hastekit.WithServerConfig("http://localhost:6060", "", "", ""),
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -51,8 +48,10 @@ func main() {
 	})
 
 	handle, err := agent.Execute(context.Background(), &agents.AgentInput{
-		Messages: []responses.InputMessageUnion{
-			responses.UserMessage("what is the current time? use bash tool"),
+		Message: history.Message{
+			Messages: []responses.InputMessageUnion{
+				responses.UserMessage("what is the current time? use bash tool"),
+			},
 		},
 	})
 	if err != nil {

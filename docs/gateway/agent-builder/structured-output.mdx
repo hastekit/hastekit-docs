@@ -5,13 +5,13 @@ description: Enforce a JSON schema on the agent's final response so downstream c
 
 Free-form text is fine for a chat UI, but most production agents need to return data — a classification, a draft email, an extracted record. The **Output Schema** tab pins your agent's final response to a JSON schema so callers always know what shape to expect.
 
-<Frame>
-    <img src="/images/agent-builder/output-schema.png" alt="Output Schema tab" />
-</Frame>
-
 ## Two ways to define the schema
 
 ### Schema Builder
+
+<Frame>
+    <img src="/images/agent-builder/output-schema-builder.png" alt="Output Schema Builder" />
+</Frame>
 
 A visual editor for building the schema property-by-property without writing JSON.
 
@@ -24,6 +24,10 @@ A visual editor for building the schema property-by-property without writing JSO
 Nested objects and arrays are supported.
 
 ### Raw JSON
+
+<Frame>
+    <img src="/images/agent-builder/output-schema-raw.png" alt="Output Schema Raw JSON" />
+</Frame>
 
 When you need full control — `oneOf`, `$ref`, deeply nested structures, or a schema you've already authored — paste the JSON Schema directly.
 

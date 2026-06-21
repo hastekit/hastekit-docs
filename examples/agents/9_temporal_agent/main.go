@@ -10,32 +10,24 @@ import (
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents/tools"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
-	"github.com/hastekit/hastekit-sdk-go/pkg/utils"
 )
 
 func main() {
-	client, err := hastekit.New(&hastekit.ClientOptions{
-		ProviderConfigs: []gateway.ProviderConfig{
-			{
-				ProviderName:  llm.ProviderNameOpenAI,
-				BaseURL:       "",
-				CustomHeaders: nil,
-				ApiKeys: []*gateway.APIKeyConfig{
-					{
-						Name:   "Key 1",
-						APIKey: os.Getenv("OPENAI_API_KEY"),
-					},
+	client, err := hastekit.NewWithOptions(
+		hastekit.WithProviderConfigs(gateway.ProviderConfig{
+			ProviderName:  llm.ProviderNameOpenAI,
+			BaseURL:       "",
+			CustomHeaders: nil,
+			ApiKeys: []*gateway.APIKeyConfig{
+				{
+					Name:   "Key 1",
+					APIKey: os.Getenv("OPENAI_API_KEY"),
 				},
 			},
-		},
-		TemporalConfig: hastekit.TemporalConfig{
-			Endpoint: "0.0.0.0:7233",
-		},
-		RedisConfig: hastekit.RedisConfig{
-			Endpoint: "localhost:6379",
-		},
-	})
+		}),
+		hastekit.WithTemporalConfig("0.0.0.0:7233"),
+		hastekit.WithRedisConfig("localhost:6379"),
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -54,23 +46,8 @@ func main() {
 		History:     history,
 		Tools: []agents.Tool{
 			tools.NewAgentTool(
-				&responses.ToolUnion{
-					OfFunction: &responses.FunctionTool{
-						Name:        "joke-generator-agent",
-						Description: utils.Ptr("Use to generate jokes"),
-						Parameters: map[string]any{
-							"type":     "object",
-							"required": []string{"message"},
-							"properties": map[string]any{
-								"message": map[string]any{
-									"type":        "string",
-									"description": "Message for the agent",
-								},
-							},
-							"additionalProperties": false,
-						},
-					},
-				},
+				"joke-generator-agent",
+				"Use to generate jokes",
 				client.NewTemporalAgent(&hastekit.AgentOptions{
 					Name:        "joke-generator",
 					Instruction: client.Prompt("You are helpful assistant."),

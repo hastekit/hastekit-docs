@@ -9,6 +9,7 @@ import (
 	"github.com/bytedance/sonic"
 	hastekit "github.com/hastekit/hastekit-sdk-go"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
+	"github.com/hastekit/hastekit-sdk-go/pkg/agents/history"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
@@ -56,21 +57,19 @@ func (t *CustomTool) Execute(ctx context.Context, params *agents.ToolCall) (*age
 }
 
 func main() {
-	client, err := hastekit.New(&hastekit.ClientOptions{
-		ProviderConfigs: []gateway.ProviderConfig{
-			{
-				ProviderName:  llm.ProviderNameOpenAI,
-				BaseURL:       "",
-				CustomHeaders: nil,
-				ApiKeys: []*gateway.APIKeyConfig{
-					{
-						Name:   "Key 1",
-						APIKey: os.Getenv("OPENAI_API_KEY"),
-					},
+	client, err := hastekit.NewWithOptions(
+		hastekit.WithProviderConfigs(gateway.ProviderConfig{
+			ProviderName:  llm.ProviderNameOpenAI,
+			BaseURL:       "",
+			CustomHeaders: nil,
+			ApiKeys: []*gateway.APIKeyConfig{
+				{
+					Name:   "Key 1",
+					APIKey: os.Getenv("OPENAI_API_KEY"),
 				},
 			},
-		},
-	})
+		}),
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -80,20 +79,22 @@ func main() {
 		Model:    "gpt-4.1-mini",
 	})
 
-	history := client.NewConversationManager()
+	hist := client.NewConversationManager()
 	agent := client.NewAgent(&hastekit.AgentOptions{
 		Name:        "Hello world agent",
 		Instruction: client.Prompt("You are a helpful assistant. Use the get_user_name tool to get the user's name and greet them."),
 		LLM:         model,
-		History:     history,
+		History:     hist,
 		Tools: []agents.Tool{
 			NewCustomTool(),
 		},
 	})
 
 	handle, err := agent.Execute(context.Background(), &agents.AgentInput{
-		Messages: []responses.InputMessageUnion{
-			responses.UserMessage("Hello! Can you get my name for user_id '123'?"),
+		Message: history.Message{
+			Messages: []responses.InputMessageUnion{
+				responses.UserMessage("Hello! Can you get my name for user_id '123'?"),
+			},
 		},
 		Namespace:         "default",
 		ThreadID:          "",
@@ -102,7 +103,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	
+
 	out, err := handle.Result()
 	if err != nil {
 		log.Fatal(err)

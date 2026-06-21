@@ -15,8 +15,8 @@ import (
 )
 
 func main() {
-	client, err := hastekit.New(&hastekit.ClientOptions{
-		ProviderConfigs: []gateway.ProviderConfig{
+	client, err := hastekit.NewWithOptions(
+		hastekit.WithProviderConfigs([]gateway.ProviderConfig{
 			{
 				ProviderName:  llm.ProviderNameOpenAI,
 				BaseURL:       "",
@@ -39,9 +39,8 @@ func main() {
 					},
 				},
 			},
-		},
-	})
-
+		}...),
+	)
 	if err != nil {
 		log.Fatal(err)
 	}

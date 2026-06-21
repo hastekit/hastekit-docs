@@ -5,15 +5,15 @@ description: Define your agent's behavior — inline or by reference to a versio
 
 The system prompt is what tells the model *what kind of agent it is*. HasteKit lets you write it inline on the agent, or reference an immutable version of a [prompt template](/gateway/agent-builder/prompts) from your project's prompt library so the same prompt can power many agents.
 
-<Frame>
-    <img src="/images/agent-builder/system-prompt.png" alt="System Prompt tab" />
-</Frame>
-
 ## Two ways to configure
 
 ### Use raw prompt text
 
 Write the prompt directly on the agent. The editor supports multi-line text and syntax highlighting.
+
+<Frame>
+    <img src="/images/agent-builder/system-prompt-raw.png" alt="System Prompt Raw Text" />
+</Frame>
 
 Best when:
 
@@ -24,9 +24,13 @@ Best when:
 
 Reference a prompt from your project's [Prompts](/gateway/agent-builder/prompts) library.
 
-1. Select **Use Prompt Reference**.
+1. Select **Reference**.
 2. Pick a prompt from the **Select Prompt** dropdown.
 3. Optionally pin to a specific version (or leave on `$LATEST`).
+
+<Frame>
+    <img src="/images/agent-builder/system-prompt-reference.png" alt="System Prompt Reference" />
+</Frame>
 
 Each prompt version is **immutable** — referencing version `3` of a prompt guarantees the exact same text forever, even if a teammate later publishes version `4`. This is the recommended path for production agents.
 

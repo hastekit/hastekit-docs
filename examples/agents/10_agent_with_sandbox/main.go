@@ -9,6 +9,7 @@ import (
 	"github.com/bytedance/sonic"
 	hastekit "github.com/hastekit/hastekit-sdk-go"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
+	"github.com/hastekit/hastekit-sdk-go/pkg/agents/history"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents/tools"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
@@ -16,27 +17,20 @@ import (
 )
 
 func main() {
-	client, err := hastekit.New(&hastekit.ClientOptions{
-		ProviderConfigs: []gateway.ProviderConfig{
-			{
-				ProviderName:  llm.ProviderNameOpenAI,
-				BaseURL:       "",
-				CustomHeaders: nil,
-				ApiKeys: []*gateway.APIKeyConfig{
-					{
-						Name:   "Key 1",
-						APIKey: os.Getenv("OPENAI_API_KEY"),
-					},
+	client, err := hastekit.NewWithOptions(
+		hastekit.WithProviderConfigs(gateway.ProviderConfig{
+			ProviderName:  llm.ProviderNameOpenAI,
+			BaseURL:       "",
+			CustomHeaders: nil,
+			ApiKeys: []*gateway.APIKeyConfig{
+				{
+					Name:   "Key 1",
+					APIKey: os.Getenv("OPENAI_API_KEY"),
 				},
 			},
-		},
-		ServerConfig: hastekit.ServerConfig{
-			Endpoint:    "https://app.hastekit.ai",
-			VirtualKey:  "",
-			OrgID:       "",
-			ProjectName: "",
-		},
-	})
+		}),
+		hastekit.WithServerConfig("https://app.hastekit.ai", "", "", ""),
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -46,20 +40,22 @@ func main() {
 		Model:    "gpt-4.1-mini",
 	})
 
-	history := client.NewConversationManager()
+	hist := client.NewConversationManager()
 	agent := agents.NewAgent(&agents.AgentOptions{
 		Name:        "hello-world-agent",
 		Instruction: client.Prompt("You are a helpful assistant with access to terminal (bash)"),
 		LLM:         model,
-		History:     history,
+		History:     hist,
 		Tools: []agents.Tool{
 			tools.NewBashTool(client.NewSandboxManager(), "praveenraj9495/hastekit-ai-sandbox:latest", map[string]string{}),
 		},
 	})
 
 	handle, err := agent.Execute(context.Background(), &agents.AgentInput{
-		Messages: []responses.InputMessageUnion{
-			responses.UserMessage("What is the current time?"),
+		Message: history.Message{
+			Messages: []responses.InputMessageUnion{
+				responses.UserMessage("What is the current time?"),
+			},
 		},
 		Namespace:         "default",
 		ThreadID:          "",

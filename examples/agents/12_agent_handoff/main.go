@@ -9,27 +9,26 @@ import (
 	"github.com/bytedance/sonic"
 	hastekit "github.com/hastekit/hastekit-sdk-go"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
+	"github.com/hastekit/hastekit-sdk-go/pkg/agents/history"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
 )
 
 func main() {
-	client, err := hastekit.New(&hastekit.ClientOptions{
-		ProviderConfigs: []gateway.ProviderConfig{
-			{
-				ProviderName:  llm.ProviderNameOpenAI,
-				BaseURL:       "",
-				CustomHeaders: nil,
-				ApiKeys: []*gateway.APIKeyConfig{
-					{
-						Name:   "Key 1",
-						APIKey: os.Getenv("OPENAI_API_KEY"),
-					},
+	client, err := hastekit.NewWithOptions(
+		hastekit.WithProviderConfigs(gateway.ProviderConfig{
+			ProviderName:  llm.ProviderNameOpenAI,
+			BaseURL:       "",
+			CustomHeaders: nil,
+			ApiKeys: []*gateway.APIKeyConfig{
+				{
+					Name:   "Key 1",
+					APIKey: os.Getenv("OPENAI_API_KEY"),
 				},
 			},
-		},
-	})
+		}),
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -65,8 +64,10 @@ func main() {
 	})
 
 	handle, err := routerAgent.Execute(context.Background(), &agents.AgentInput{
-		Messages: []responses.InputMessageUnion{
-			responses.UserMessage("Hello! Tell me a joke about universe"),
+		Message: history.Message{
+			Messages: []responses.InputMessageUnion{
+				responses.UserMessage("Hello! Tell me a joke about universe"),
+			},
 		},
 	})
 	if err != nil {

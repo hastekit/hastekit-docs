@@ -12,6 +12,7 @@ import (
 	hastekit "github.com/hastekit/hastekit-sdk-go"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents/agentstate"
+	"github.com/hastekit/hastekit-sdk-go/pkg/agents/history"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
@@ -101,21 +102,19 @@ func (t *DeleteUserTool) Execute(ctx context.Context, params *agents.ToolCall) (
 func main() {
 	ctx := context.Background()
 
-	client, err := hastekit.New(&hastekit.ClientOptions{
-		ProviderConfigs: []gateway.ProviderConfig{
-			{
-				ProviderName:  llm.ProviderNameOpenAI,
-				BaseURL:       "",
-				CustomHeaders: nil,
-				ApiKeys: []*gateway.APIKeyConfig{
-					{
-						Name:   "Key 1",
-						APIKey: os.Getenv("OPENAI_API_KEY"),
-					},
+	client, err := hastekit.NewWithOptions(
+		hastekit.WithProviderConfigs(gateway.ProviderConfig{
+			ProviderName:  llm.ProviderNameOpenAI,
+			BaseURL:       "",
+			CustomHeaders: nil,
+			ApiKeys: []*gateway.APIKeyConfig{
+				{
+					Name:   "Key 1",
+					APIKey: os.Getenv("OPENAI_API_KEY"),
 				},
 			},
-		},
-	})
+		}),
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -140,8 +139,10 @@ func main() {
 	handle, err := agent.Execute(ctx, &agents.AgentInput{
 		Namespace: "default",
 		ThreadID:  threadID,
-		Messages: []responses.InputMessageUnion{
-			responses.UserMessage("Delete user 123"),
+		Message: history.Message{
+			Messages: []responses.InputMessageUnion{
+				responses.UserMessage("Delete user 123"),
+			},
 		},
 	})
 	if err != nil {
@@ -168,7 +169,11 @@ func main() {
 		handle, err = agent.Execute(ctx, &agents.AgentInput{
 			Namespace: "default",
 			ThreadID:  threadID,
-			Messages:  []responses.InputMessageUnion{approvalResponse},
+			Message: history.Message{
+				Messages: []responses.InputMessageUnion{
+					approvalResponse,
+				},
+			},
 		})
 		if err != nil {
 			log.Fatal(err)

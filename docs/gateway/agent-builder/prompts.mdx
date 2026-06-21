@@ -21,11 +21,10 @@ A prompt in the library has:
 
 - **Immutable versions** — every saved version is frozen. Reference `my-prompt@3` and you'll get the exact same text forever.
 - **Shared use** — one prompt powers many agents.
-- **Variables** — `{{user_name}}`, `{{org_id}}`, anything from the request context interpolated at runtime.
 
 ## Creating a prompt
 
-1. Open **Agent Framework → Prompts**.
+1. Open **Project → Prompts**.
 2. Click **Create Prompt**.
 3. Give it a **Name** (unique per project; used to reference the prompt from agents) and an optional **Description**.
 4. Write the prompt text. Use `{{variable}}` for any dynamic substitutions.
@@ -33,7 +32,7 @@ A prompt in the library has:
 
 ## Versioning
 
-Each time you save edits to an existing prompt, a new immutable version is created. The Prompt detail page lists every version with its creation timestamp; you can view any historical version verbatim.
+Each time you save edits to an existing prompt, it updates the `$LATEST` version. You can create a immutable version from `$LATEST` through the **Versions → Create Version**. The **Versions** tab lists every version with its creation timestamp; you can view any historical version verbatim.
 
 A prompt-reference on an agent ([System Prompt tab](/gateway/agent-builder/system-prompt)) pins to a specific version. If you want an agent to always use the newest version, pin it to `$LATEST`; if you want stable behaviour, pin to an explicit number.
 

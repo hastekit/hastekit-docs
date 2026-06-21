@@ -6,7 +6,7 @@ info:
 servers:
   - url: http://localhost:6060
     description: Local development server
-  - url: https://api.example.com
+  - url: https://app.hastekit.ai
     description: Production server
 
 tags:
