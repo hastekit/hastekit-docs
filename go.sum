@@ -49,8 +49,8 @@ github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.3 h1:B+8ClL/kCQkRiU82d9xajR
 github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.3/go.mod h1:NbCUVmiS4foBGBHOYlCT25+YmGpJ32dZPi75pGEUpj4=
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0 h1:5VipnvEpbqr2gA2VbM+nYVbkIF28c5ZQfqCBQ5g2xfk=
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0/go.mod h1:Hyl3n6Twe1hvtd9XUXDec4pTvgMSEixRuQKPTMH2bNs=
-github.com/hastekit/hastekit-sdk-go v0.0.0-20260621162043-d0f3fbb681c7 h1:SQ3WVmGsJ4yuli9NTDGZSkJRiUuL1p8uWqc+QR8AZF0=
-github.com/hastekit/hastekit-sdk-go v0.0.0-20260621162043-d0f3fbb681c7/go.mod h1:eC3vXeqBFymqngYpLanxu5FoBWkauTMHI5HXQtFnmwI=
+github.com/hastekit/hastekit-sdk-go v0.0.0-20260622180337-4be885794cff h1:TTEumR3kkvLbzY3wr/DhWcJLt79+qwrieVFgqhR3DxU=
+github.com/hastekit/hastekit-sdk-go v0.0.0-20260622180337-4be885794cff/go.mod h1:eC3vXeqBFymqngYpLanxu5FoBWkauTMHI5HXQtFnmwI=
 github.com/invopop/jsonschema v0.13.0 h1:KvpoAJWEjR3uD9Kbm2HWJmqsEaHt8lBUpd0qHcIi21E=
 github.com/invopop/jsonschema v0.13.0/go.mod h1:ffZ5Km5SWWRAIN6wbDXItl95euhFz2uON45H2qjYt+0=
 github.com/kisielk/errcheck v1.5.0/go.mod h1:pFxgyoBC7bSaBwPgfKdkLd5X25qrDl4LWUI2bnpBCr8=

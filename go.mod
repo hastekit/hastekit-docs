@@ -5,7 +5,7 @@ go 1.25.3
 require (
 	github.com/bytedance/sonic v1.15.1
 	github.com/google/uuid v1.6.0
-	github.com/hastekit/hastekit-sdk-go v0.0.0-20260621162043-d0f3fbb681c7
+	github.com/hastekit/hastekit-sdk-go v0.0.0-20260622180337-4be885794cff
 )
 
 require (
