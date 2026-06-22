@@ -3,20 +3,19 @@ title: Sandbox Tool
 description: Run bash commands in a per-session isolated environment
 ---
 
-The Sandbox Tool lets your agent run bash commands in an isolated environment. Each conversation gets its own sandbox (Docker container or Kubernetes pod) with a persistent workspace. The agent uses the **execute_bash_commands** tool to run shell commands and receive stdout, stderr, and exit code.
+The Sandbox tools let your agent run bash commands and manipulate files in an isolated environment. Each conversation gets its own sandbox with a persistent workspace. The agent uses the **execute_bash_commands** tool to run shell commands and receive stdout, stderr, and exit code, plus optional file tools to read, write, and delete files.
 
 ## Overview
 
-When you attach the Sandbox tool to an agent:
+When you attach the Sandbox tools to an agent:
 
 - The agent can call **execute_bash_commands** with a `code` parameter (the bash command to run).
-- Each session gets a dedicated sandbox created by a **sandbox manager** (Docker or Kubernetes).
-- A **sandbox daemon** runs inside the sandbox and handles command execution over HTTP.
-- The workspace is rooted at `/sandbox/workspace`. Agent data (e.g. skills) can be mounted so the agent can read it via bash (e.g. `cat /sandbox/skills/.../SKILL.md`).
+- The sandbox is provisioned through a **sandbox manager** (`sandbox.Manager`). The SDK ships an HTTP-backed manager, `hastekitgateway.NewSandboxClient`, which talks to the HasteKit sandbox service. That service provisions one sandbox per session.
+- The workspace is rooted at `/workspace`. The bash tool persists its working directory across calls, so a `cd` in one command carries over to the next.
 
 ## Example: Agent with Sandbox
 
-The following example uses the HasteKit SDK to create an agent with the Sandbox tool, using the Docker-backed sandbox manager. It runs a single turn asking for the current time; the agent will use **execute_bash_commands** to run e.g. `date`.
+The following example uses the HasteKit SDK to create an agent with the bash tool, backed by the HTTP sandbox manager. It runs a single turn asking for the current time; the agent will use **execute_bash_commands** to run e.g. `date`.
 
 ```go
 package main
@@ -25,15 +24,17 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 
 	"github.com/bytedance/sonic"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
+	"github.com/hastekit/hastekit-sdk-go/pkg/agents/history"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents/tools"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
-	"github.com/hastekit/hastekit-sdk-go/pkg/sandbox/docker_sandbox"
+	"github.com/hastekit/hastekit-sdk-go/pkg/hastekitgateway"
 	hastekit "github.com/hastekit/hastekit-sdk-go"
 )
 
@@ -60,16 +61,18 @@ func main() {
 		Model:    "gpt-4.1-mini",
 	})
 
-	history := client.NewConversationManager()
+	cm := client.NewConversationManager()
+
+	// HTTP-backed sandbox manager that talks to the HasteKit sandbox service.
+	sandboxManager := hastekitgateway.NewSandboxClient("<sandbox-service-endpoint>", http.DefaultClient)
+
 	agent := agents.NewAgent(&agents.AgentOptions{
 		Name:        "hello-world-agent",
 		Instruction: client.Prompt("You are a helpful assistant with access to terminal (bash)"),
 		LLM:         model,
-		History:     history,
-		Tools: []core.Tool{
-			tools.NewSandboxTool(docker_sandbox.NewManager(docker_sandbox.Config{
-				AgentDataPath: "/path/to/agent-data",
-			}), "hastekit-ai-sandbox:v7"),
+		History:     cm,
+		Tools: []agents.Tool{
+			tools.NewBashTool(sandboxManager, "hastekit-ai-sandbox:v7", nil),
 		},
 	})
 
@@ -95,19 +98,27 @@ func main() {
 }
 ```
 
-The full example is in `examples/agents/10_agent_with_sandbox/main.go`.
-
 ## Key pieces
 
-- **SDK client** – `hastekit.New` with `LLMConfigs` (e.g. OpenAI). The client is used to create an LLM, conversation history, and prompts.
-- **Sandbox manager** – `docker_sandbox.NewManager(docker_sandbox.Config{...})` for local or Docker-based sandboxes. For production you would typically use a Kubernetes-backed manager that implements `sandbox.Manager`. The manager creates and tracks one sandbox per session.
-- **AgentDataPath** – Host path where agent data (e.g. skills) lives; it is mounted into the sandbox so the agent can read it via bash. Must exist and be writable if you use skills.
-- **Sandbox image** – The Docker image for the sandbox container (e.g. `hastekit-ai-sandbox`). It must run the HasteKit sandbox daemon (e.g. `hastekit-ai-sandbox sandbox-daemon`). Build from `deployments/sandbox/Dockerfile` or use a pre-built image.
-- **Tool registration** – `tools.NewSandboxTool(manager, image)` returns a `core.Tool` that exposes **execute_bash_commands** to the LLM. Pass it in `AgentOptions.Tools` along with any other tools.
+- **SDK client** – `hastekit.New` with provider configs (e.g. OpenAI). The client is used to create an LLM, conversation history, and prompts.
+- **Sandbox manager** – `hastekitgateway.NewSandboxClient(endpoint, httpClient)` returns an HTTP client that implements `sandbox.Manager` (`CreateSandbox`, `GetSandbox`, `DeleteSandbox`). It talks to the HasteKit sandbox service, which provisions one sandbox per session.
+- **Sandbox image** – The image name passed to the tool (e.g. `hastekit-ai-sandbox:v7`). The sandbox service uses it when provisioning the sandbox for the session.
+- **Environment variables** – The `env map[string]string` argument is forwarded into the sandbox. Its values are run-context templated, so you can reference run-context fields when constructing env values.
+- **Tool registration** – `tools.NewBashTool(svc, image, env)` returns an `agents.Tool` that exposes **execute_bash_commands** to the LLM. Pass it in `AgentOptions.Tools` along with any other tools.
+
+## File tools
+
+Alongside the bash tool, the SDK exposes file tools that share the same `(svc sandbox.Manager, image string, env map[string]string)` signature and operate on the same per-session sandbox:
+
+| Constructor | Tool name | Purpose |
+|-------------|-----------|---------|
+| `tools.NewReadFileTool(svc, image, env)`   | `read_file`   | Read file content from a path |
+| `tools.NewWriteFileTool(svc, image, env)`  | `write_file`  | Write content to a path |
+| `tools.NewDeleteFileTool(svc, image, env)` | `delete_file` | Delete the file at a path |
 
 ## Tool: execute_bash_commands
 
-The Sandbox tool exposes a single function to the LLM:
+The bash tool exposes a single function to the LLM:
 
 | Property       | Value |
 |----------------|-------|
@@ -115,7 +126,7 @@ The Sandbox tool exposes a single function to the LLM:
 | **Description**| Execute bash command and get the output |
 | **Parameters** | `code` (string, required) – the bash command to execute |
 
-Commands are run via `/bin/sh -c` inside the sandbox, so normal shell syntax (pipes, redirections, etc.) is supported.
+The working directory is persisted across calls: after each command the tool records the resulting `cwd` via state updates (`sandbox_cwd`) and restores it on the next call, defaulting to `/workspace`.
 
 ## Response format
 
@@ -132,10 +143,11 @@ Timeouts are enforced by the daemon (default 60 seconds). On timeout, the respon
 
 ## Summary
 
-| Aspect     | Detail |
-|-----------|--------|
-| Tool name | `execute_bash_commands` |
-| Parameter | `code` (string) – bash command |
-| SDK API   | `tools.NewSandboxTool(manager, image)` |
-| Manager   | `docker_sandbox.NewManager(config)` or Kubernetes-backed `sandbox.Manager` |
-| Example   | `examples/agents/10_agent_with_sandbox/main.go` |
+| Aspect      | Detail |
+|-------------|--------|
+| Tool name   | `execute_bash_commands` |
+| Parameter   | `code` (string) – bash command |
+| SDK API     | `tools.NewBashTool(svc, image, env)` |
+| File tools  | `tools.NewReadFileTool` / `tools.NewWriteFileTool` / `tools.NewDeleteFileTool` |
+| Manager     | `hastekitgateway.NewSandboxClient(endpoint, httpClient)` (implements `sandbox.Manager`) |
+| Workspace   | `/workspace` (cwd persisted across calls via `sandbox_cwd`) |

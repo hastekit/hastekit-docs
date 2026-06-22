@@ -1,0 +1,132 @@
+---
+title: Defining Nodes
+description: Implement the Node interface, read and write run state, and pass typed data between nodes
+---
+
+A node is the unit of work in a workflow. Every node implements the `workflow.Node` interface:
+
+```go
+type Node interface {
+	Type() NodeType
+	Validate() error
+	Execute(ctx context.Context, in *Input) (output map[string]any, port string, err error)
+}
+```
+
+- **`Type()`** returns the node's kind (a `NodeType` string). Embedding `workflow.BaseNode` supplies this for you.
+- **`Validate()`** runs at **compile time**. Return an error to reject a misconfigured node before the workflow ever runs.
+- **`Execute()`** runs at **run time**. It returns a partial state update, the output **port** to follow, and an error.
+
+## A basic node
+
+Embed `BaseNode` to get `Type()`, then implement `Validate` and `Execute`:
+
+```go
+type FetchUserNode struct {
+	workflow.BaseNode
+	db *sql.DB // host dependencies captured on the struct
+}
+
+func NewFetchUserNode(db *sql.DB) *FetchUserNode {
+	return &FetchUserNode{
+		BaseNode: workflow.BaseNode{NodeType: "fetch_user"},
+		db:       db,
+	}
+}
+
+func (n *FetchUserNode) Validate() error {
+	if n.db == nil {
+		return errors.New("fetch_user: db is required")
+	}
+	return nil
+}
+
+func (n *FetchUserNode) Execute(ctx context.Context, in *workflow.Input) (map[string]any, string, error) {
+	userID, _ := workflow.ResolvePath(in, "user_id")
+
+	name, err := lookupUserName(ctx, n.db, userID)
+	if err != nil {
+		return nil, "", err // a returned error fails the run
+	}
+
+	return map[string]any{"user_name": name}, workflow.DefaultPort, nil
+}
+```
+
+<Note>Capture host dependencies (DB handles, HTTP clients, API clients) on the node struct via its constructor. The `workflow.NodeFactory` type — `func() (Node, error)` — is provided for hosts that build nodes lazily.</Note>
+
+## Reading run state
+
+All nodes share a single `Input`. Its `RunContext` is an opaque `map[string]any` that accumulates as the run progresses. Read from it in two ways:
+
+- **`workflow.ResolvePath(in, "a.b.c")`** — walk a dotted path into nested maps. Returns `(value, ok)`.
+- **`in.RunContext["key"]`** — direct access to a top-level key.
+
+```go
+userID, ok := workflow.ResolvePath(in, "user.id")
+if !ok {
+	return nil, "", errors.New("user.id missing from run context")
+}
+```
+
+## Writing run state
+
+The map you return from `Execute` is **deep-merged** into `RunContext`: keys that hold maps on both sides merge recursively, and all other values replace (last writer wins at the leaves). You only return what changed — never the whole context.
+
+```go
+return map[string]any{
+	"user": map[string]any{"name": name}, // merges into an existing "user" map
+	"fetched_at": time.Now().Unix(),
+}, workflow.DefaultPort, nil
+```
+
+Because independent nodes in the same wave run concurrently, prefer writing to **distinct keys** per node to avoid one node's update clobbering another's.
+
+## Output ports
+
+The second return value of `Execute` is the **port** — the named output the engine follows to pick the next node. Return `workflow.DefaultPort` (`"default"`) for linear flow, or a custom port name to branch:
+
+```go
+// Route to different downstream nodes based on the result.
+if score > threshold {
+	return out, "approved", nil
+}
+return out, "rejected", nil
+```
+
+Wire each port to its target with [`AddEdgeOnPort`](/hastekit-sdk/workflows/edges-and-branching#static-edges-and-ports). A port with no matching edge simply ends that branch.
+
+## Typed inputs and outputs
+
+Working with `map[string]any` everywhere is error-prone. The package provides generic helpers to round-trip between the wire format and your own structs via JSON:
+
+```go
+type FetchUserInput struct {
+	UserID string `json:"user_id"`
+}
+
+type FetchUserOutput struct {
+	UserName string `json:"user_name"`
+}
+
+func (n *FetchUserNode) Execute(ctx context.Context, in *workflow.Input) (map[string]any, string, error) {
+	args, err := workflow.DecodeInput[FetchUserInput](in.RunContext)
+	if err != nil {
+		return nil, "", err
+	}
+
+	name, err := lookupUserName(ctx, n.db, args.UserID)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return workflow.EncodeOutput(&FetchUserOutput{UserName: name})
+}
+```
+
+- **`DecodeInput[T](map[string]any) (*T, error)`** — unmarshal the run context (or any map) into a typed struct.
+- **`EncodeOutput[T](*T) (map[string]any, error)`** — marshal a typed result back into the `map[string]any` every node returns.
+
+## Pausing instead of completing
+
+A node can suspend the entire run instead of returning output — for example, to wait on a human approval. Return `workflow.Pause(payload)` from `Execute`; the run stops cleanly with its state preserved. See [Pausing & Resuming](/hastekit-sdk/workflows/pausing-and-resuming) for the full flow.

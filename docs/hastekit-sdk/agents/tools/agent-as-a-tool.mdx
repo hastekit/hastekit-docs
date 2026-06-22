@@ -32,11 +32,12 @@ agentTool := tools.NewAgentTool("get_user_name", "Returns the user's name", subA
 
 ### Parameters
 
-- **`toolUnion`**: A `*responses.ToolUnion` that defines the tool's interface (name, description, parameters)
-- **`agent`**: The agent instance that will be executed when the tool is called
+- **`name`**: The tool name exposed to the calling LLM.
+- **`description`**: A human-readable description of what the tool does.
+- **`agent`**: The agent instance that will be executed when the tool is called.
 - **`contextMode`**: Context mode for the agent tool.
-    - `SubAgentContextModeNone` - Each invocation of the agent tool starts with an empty context.
-    - `SubAgentContextModeIsolated` - Each invocation of the agent tool starts with context of all the previous invocation.
+    - `SubAgentContextModeNone` - The thread id is derived from the LLM-provided `thread_id` argument. When it is empty, each invocation starts a fresh conversation; the LLM can pass back a returned thread id to continue an earlier one.
+    - `SubAgentContextModeIsolated` - A single sub-agent thread is stored and reused across calls, so invocations share and persist accumulated context within the session.
 
 When the tool is called, the agent receives the tool's arguments as input and returns its output as the tool's result.
 
@@ -65,10 +66,12 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/bytedance/sonic"
 	hastekit "github.com/hastekit/hastekit-sdk-go"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
+	"github.com/hastekit/hastekit-sdk-go/pkg/agents/history"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents/tools"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"

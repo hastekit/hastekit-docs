@@ -65,6 +65,18 @@ resp, err := client.NewResponses(
 )
 ```
 
+The `ImageGenerationTool` accepts the following options:
+
+- **`Size`** (`string`): Image dimensions, e.g. `"1024x1024"`.
+- **`Quality`** (`string`): Image quality, e.g. `"high"` or `"medium"`.
+
+```go
+OfImageGeneration: &responses.ImageGenerationTool{
+    Size:    "1024x1024",
+    Quality: "high",
+},
+```
+
 ---
 
 ### Image Generation Responses
@@ -133,9 +145,9 @@ func main() {
 
 When streaming, image generation progress is reported through different chunk types:
 
-- `image_generation_call.in_progress`: Generation has started
-- `image_generation_call.generating`: Image is being generated
-- `image_generation_call.partial_image`: Partial image data
+- `response.image_generation_call.in_progress`: Generation has started
+- `response.image_generation_call.generating`: Image is being generated
+- `response.image_generation_call.partial_image`: Partial image data
 
 ```go
 import (
@@ -161,7 +173,9 @@ func main() {
         Tools: []responses.ToolUnion{
             {
                 OfImageGeneration: &responses.ImageGenerationTool{
-                    Type: "image_generation",
+                    Type:    "image_generation",
+                    Size:    "1024x1024",
+                    Quality: "high",
                 },
             },
         },
@@ -197,7 +211,7 @@ func main() {
             item := chunk.OfOutputItemDone.Item
             if item.Type == "image_generation_call" {
                 // The image generation is complete
-				// Final image is available in chunk.OfOutputItemDone.Result
+				// Final image is available in chunk.OfOutputItemDone.Item.Result
             }
         }
     }

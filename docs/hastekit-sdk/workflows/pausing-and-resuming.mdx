@@ -1,0 +1,113 @@
+---
+title: Pausing & Resuming
+description: Suspend a run for an external decision and resume it durably, without re-running completed nodes
+---
+
+A node can **suspend** the entire workflow instead of completing — to wait on a human approval, an external callback, or any out-of-band decision. The run stops cleanly with its state preserved, and you resume it later from exactly where it paused. Already-completed nodes are not re-executed, so resumes are idempotent and side-effect-free.
+
+This is the engine-level primitive behind [human-in-the-loop](/hastekit-sdk/agents/tools/human-in-the-loop) approval gates.
+
+## Pausing a run
+
+Return `workflow.Pause(payload)` from a node's `Execute`. The `payload` is an opaque, host-defined bag describing what the run is waiting on — it's surfaced to the caller so they can act on it.
+
+```go
+type ApprovalNode struct {
+	workflow.BaseNode
+	nodeID string
+}
+
+func (n *ApprovalNode) Execute(ctx context.Context, in *workflow.Input) (map[string]any, string, error) {
+	// If a decision has been staged for this node, proceed using it
+	// as the output port (e.g. "approved" / "rejected").
+	if decision, ok := in.Resume(n.nodeID); ok {
+		return map[string]any{"decided": true}, decision["decision"].(string), nil
+	}
+
+	// Otherwise suspend the run and describe what we're waiting on.
+	return nil, "", workflow.Pause(map[string]any{
+		"title":       "Publish article?",
+		"description": "Approve to publish, reject to discard.",
+	})
+}
+```
+
+When a node pauses, the run returns **without an error**. The engine:
+
+- marks the node `NodeStatusPaused`,
+- stamps `Input.Pause` with a `PauseState{NodeID, Payload}`,
+- records any sibling nodes that completed in the same wave, and
+- stops the walk.
+
+```go
+out, err := compiled.Execute(ctx, &workflow.Input{RunID: "r1"})
+if err != nil {
+	log.Fatal(err)
+}
+
+if out.Pause != nil {
+	fmt.Printf("paused at %s: %v\n", out.Pause.NodeID, out.Pause.Payload)
+	// surface the payload to a human, persist `out`, and return.
+}
+```
+
+## Durability: persist the paused run
+
+The entire `Input` is the run's durable memory — every field carries JSON tags. When a run pauses, serialize `out` and store it; restore it when the decision arrives.
+
+```go
+blob, _ := json.Marshal(out)      // persist to your store
+// ... later, when the decision arrives ...
+var resumed workflow.Input
+_ = json.Unmarshal(blob, &resumed)
+```
+
+## Resuming
+
+Stage the decision with `SetResume`, then run the **same compiled graph** again with the restored input:
+
+```go
+resumed.SetResume("approval", map[string]any{"decision": "approved"})
+
+out, err := compiled.Execute(ctx, &resumed)
+```
+
+`SetResume(nodeID, decision)` stores the decision for that node and clears `Input.Pause`, so the run is no longer considered suspended. On the resume walk:
+
+- The engine re-walks from the roots, but any node already marked `NodeStatusCompleted` is **short-circuited** — its cached output port is replayed to follow its edges instead of re-executing it. Completed nodes never run twice.
+- The previously paused node runs again; this time `in.Resume(nodeID)` returns the staged decision, so it proceeds instead of pausing.
+
+The paused node decides what to do with the decision — typically emitting a port (`"approved"` / `"rejected"`) that routes the rest of the graph.
+
+## Detecting a pause from an error
+
+If you call a node's `Execute` directly, or wrap it, use `IsPauseErr` to distinguish a pause from a real failure:
+
+```go
+if pe, ok := workflow.IsPauseErr(err); ok {
+	// pe.Payload describes what the run is waiting on; this is a
+	// suspension, not a failure.
+}
+```
+
+The built-in `InProcessRuntime` already does this for you — it translates a node's `PauseError` into a paused run rather than a failed one.
+
+## End-to-end shape
+
+```go
+compiled, _ := g.Compile()
+
+// 1. First run — pauses at the approval node.
+out, _ := compiled.Execute(ctx, &workflow.Input{RunID: "r1"})
+if out.Pause != nil {
+	persist(out) // store the suspended run, notify a human
+	return
+}
+
+// 2. Later — load the run, stage the human's decision, resume.
+resumed := load("r1")
+resumed.SetResume("approval", map[string]any{"decision": "approved"})
+final, _ := compiled.Execute(ctx, resumed)
+// `final` contains the completed run; the approval node and everything
+// after it ran, while nodes before the pause were replayed from cache.
+```

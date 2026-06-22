@@ -1,0 +1,103 @@
+---
+title: Edges & Branching
+description: Wire nodes together, run independent branches in parallel, and route at runtime with conditional edges
+---
+
+Edges define the flow of a workflow. The engine starts at the graph's roots and follows edges from each node's output **port** to the next node, running independent branches concurrently.
+
+## Static edges and ports
+
+The simplest edge connects a node's default port to another node:
+
+```go
+g := workflow.NewGraph("pipeline")
+g.AddNode("fetch", NewFetchNode())
+g.AddNode("transform", NewTransformNode())
+
+g.AddEdge(workflow.StartNode, "fetch") // START → fetch
+g.AddEdge("fetch", "transform")        // fetch → transform (default port)
+g.AddEdge("transform", workflow.EndNode)
+```
+
+- **`AddEdge(src, dst)`** wires `src`'s default port to `dst`.
+- **`AddEdgeOnPort(src, port, dst)`** wires a named output port to `dst` — use this when a node returns a custom port to branch.
+
+```go
+// gate emits either "approved" or "rejected" as its port.
+g.AddNode("gate", NewGateNode())
+g.AddEdgeOnPort("gate", "approved", "publish")
+g.AddEdgeOnPort("gate", "rejected", "notify")
+```
+
+### START and END
+
+`workflow.StartNode` (`"START"`) and `workflow.EndNode` (`"END"`) are reserved, implicit ids — you never `AddNode` them. Edges **from** `START` mark a graph's entry points; edges **to** `END` terminate a branch.
+
+If you don't wire any `START` edges, the engine treats every node with no incoming edge as a root. Wiring `START` explicitly is clearer and lets you choose the entry points yourself.
+
+## Parallel execution
+
+The engine runs in **waves**: all ready nodes in a wave execute concurrently (one goroutine per node), and the next wave begins once they finish. Fan a node out to several successors and they run in parallel; fan them back into a shared node and it runs once, after all its predecessors complete.
+
+```go
+g.AddEdge(workflow.StartNode, "fetch")
+g.AddEdge("fetch", "enrich_a") // enrich_a and enrich_b run
+g.AddEdge("fetch", "enrich_b") // concurrently
+g.AddEdge("enrich_a", "merge")
+g.AddEdge("enrich_b", "merge") // merge waits for both, runs once
+g.AddEdge("merge", workflow.EndNode)
+```
+
+Because parallel nodes share one `Input`, have each write to **distinct** `RunContext` keys so their updates don't clobber one another.
+
+## Conditional edges
+
+Static ports branch on a value the node itself chose. **Conditional edges** decide the next node at runtime by inspecting the accumulated state, without the node knowing about routing:
+
+```go
+g.AddNode("score", NewScoreNode())
+g.AddNode("high", NewHighNode())
+g.AddNode("low", NewLowNode())
+
+g.AddConditionalEdge("score",
+	func(in *workflow.Input) string {
+		v, _ := workflow.ResolvePath(in, "score")
+		if n, ok := v.(float64); ok && n >= 0.8 {
+			return "high"
+		}
+		return "low"
+	},
+	map[string]string{
+		"high": "high",
+		"low":  "low",
+	},
+)
+```
+
+The **router** — `func(in *Input) string` — runs after the node completes and returns a **label**. The engine resolves that label against the `targets` map to pick the next node. A label that isn't in the map, or one mapped to `workflow.EndNode`, ends the branch.
+
+<Note>A node may have **either** static edges **or** a conditional edge, not both — `Compile` rejects a node that has both. The router targets must be known node ids or `END` (they cannot target `START`).</Note>
+
+### Boolean expressions
+
+For simple comparisons inside a router, the `workflow/expr` helper evaluates a minimal boolean expression:
+
+```go
+import "github.com/hastekit/hastekit-sdk-go/pkg/workflow/expr"
+
+ok, err := expr.EvalBool("5 >= 3") // true
+```
+
+It supports the operators `==`, `!=`, `>`, `<`, `>=`, `<=`. Operands compare numerically when both parse as numbers, otherwise as strings. With no operator, any non-empty value other than `"0"` or `"false"` is truthy. There is no quoting, logical `&&`/`||`, or parentheses — build those with regular Go in your router.
+
+## Validation
+
+Edges are validated when you `Compile` the graph. The compiler reports, as a single joined error:
+
+- Edges referencing an unknown `from`/`to` node.
+- Using `START` or `END` as a registered node id (they're reserved).
+- A node that has both static and conditional edges.
+- A conditional target that isn't a known node or `END`.
+- **Cycles** — the graph must be acyclic; a back-edge is reported with the offending path.
+
+See [Running Workflows](/hastekit-sdk/workflows/running-workflows#compilation-and-validation) for how to surface these errors.

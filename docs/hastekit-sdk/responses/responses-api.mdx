@@ -27,12 +27,23 @@ The `Parameters` struct contains additional configuration options:
 | **Text** | `*TextFormat` | Structured output format configuration (JSON schema). See [Structured Output](/hastekit-sdk/responses/structured-output).       |
 | **Stream** | `*bool` | Enable streaming responses. When `true`, responses are returned incrementally.                                             |
 | **Reasoning** | `*ReasoningParam` | Reasoning configuration for models that support chain-of-thought reasoning. See [Reasoning](/hastekit-sdk/responses/reasoning). |
-| **Include** | `[]string` | Additional data to include in the response (e.g., `"reasoning.encrypted_content"`).                    |
+| **Include** | `[]Includable` | Additional data to include in the response (e.g., `IncludableReasoningEncryptedContent`).                    |
 | **Metadata** | `map[string]string` | Custom metadata to attach to the request.                                                                                  |
 | **MaxToolCalls** | `*int` | Maximum number of tool calls allowed in a single response.                                                                 |
 | **ParallelToolCalls** | `*bool` | Allow parallel execution of multiple tool calls.                                                                           |
 | **Store** | `*bool` | Whether to store the request and response.                                                                                |
 | **Background** | `*bool` | If `true`, the request is processed in the background and the response is not returned immediately.                        |
+| **ExtraFields** | `map[string]any` | Optional. Provider-specific extra fields merged into the request payload. The reserved key `additional_headers` (a `map[string]any`) sets custom per-request HTTP headers.                        |
+
+You can use `ExtraFields` to attach custom per-request HTTP headers via the reserved `additional_headers` key:
+
+```go
+ExtraFields: map[string]any{
+    "additional_headers": map[string]any{
+        "X-My-Header": "value",
+    },
+},
+```
 
 ### Reasoning Parameters
 
@@ -41,7 +52,7 @@ The `ReasoningParam` struct configures reasoning behavior:
 | Parameter | Type | Description |
 | :--- | :--- | :--- |
 | **Summary** | `*string` | Reasoning summary level: `"auto"`, `"concise"`, or `"detailed"`. |
-| **Effort** | `*string` | Reasoning effort level: `"none"`, `"minimal"`, `"low"`, `"medium"`, `"high"`, `"xhigh"`. |
+| **Effort** | `*string` | Reasoning effort level: `"none"`, `"low"`, `"medium"`, `"high"`, `"xhigh"`. |
 | **BudgetTokens** | `*int` | Maximum tokens to allocate for reasoning steps. Not used for OpenAI. |
 
 ### Text Format (Structured Output)
@@ -185,47 +196,47 @@ The `ResponseChunk` union type can contain various chunk types that indicate dif
 - `response.completed`: Response generation completed
 
 **Output Item Chunks:**
-- `output_item.added`: A new output item (message, function call, etc.) was added
-- `output_item.done`: An output item is complete
+- `response.output_item.added`: A new output item (message, function call, etc.) was added
+- `response.output_item.done`: An output item is complete
 
 **Text Content Chunks:**
-- `content_part.added`: A new content part was added to a message
-- `content_part.done`: A content part is complete
-- `output_text.delta`: Incremental text delta (new text fragment)
-- `output_text.annotation.added`: A text annotation was added
-- `output_text.done`: Text generation is complete (includes full accumulated text)
+- `response.content_part.added`: A new content part was added to a message
+- `response.content_part.done`: A content part is complete
+- `response.output_text.delta`: Incremental text delta (new text fragment)
+- `response.output_text.annotation.added`: A text annotation was added
+- `response.output_text.done`: Text generation is complete (includes full accumulated text)
 
 **Function Call Chunks:**
-- `function_call.arguments.delta`: Incremental function call arguments
-- `function_call.arguments.done`: Function call arguments are complete
+- `response.function_call_arguments.delta`: Incremental function call arguments
+- `response.function_call_arguments.done`: Function call arguments are complete
 
 **Reasoning Chunks:**
-- `reasoning_summary_part.added`: A new reasoning summary part was added
-- `reasoning_summary_part.done`: A reasoning summary part is complete
-- `reasoning_summary_text.delta`: Incremental reasoning summary text
-- `reasoning_summary_text.done`: Reasoning summary text is complete
+- `response.reasoning_summary_part.added`: A new reasoning summary part was added
+- `response.reasoning_summary_part.done`: A reasoning summary part is complete
+- `response.reasoning_summary_text.delta`: Incremental reasoning summary text
+- `response.reasoning_summary_text.done`: Reasoning summary text is complete
 
 **Image Generation Chunks:**
-- `image_generation_call.in_progress`: Image generation started
-- `image_generation_call.generating`: Image is being generated
-- `image_generation_call.partial_image`: Partial image data available
+- `response.image_generation_call.in_progress`: Image generation started
+- `response.image_generation_call.generating`: Image is being generated
+- `response.image_generation_call.partial_image`: Partial image data available
 
 **Web Search Chunks:**
-- `web_search_call.in_progress`: Web search started
-- `web_search_call.searching`: Search in progress
-- `web_search_call.completed`: Search completed
+- `response.web_search_call.in_progress`: Web search started
+- `response.web_search_call.searching`: Search in progress
+- `response.web_search_call.completed`: Search completed
 
 #### Streaming Example
 
 When streaming, chunks are delivered in this general order:
 
 1. `response.created` - Response object initialized
-2. `output_item.added` - First output item (e.g., a message) added
-3. `content_part.added` - Content part added to the message
-4. `output_text.delta` - Text deltas streamed incrementally (multiple chunks)
-5. `output_text.done` - Text generation complete (contains full text)
-6. `content_part.done` - Content part complete
-7. `output_item.done` - Output item complete
+2. `response.output_item.added` - First output item (e.g., a message) added
+3. `response.content_part.added` - Content part added to the message
+4. `response.output_text.delta` - Text deltas streamed incrementally (multiple chunks)
+5. `response.output_text.done` - Text generation complete (contains full text)
+6. `response.content_part.done` - Content part complete
+7. `response.output_item.done` - Output item complete
 8. `response.completed` - Response generation finished (includes final usage stats)
 
 Each chunk includes:
@@ -237,10 +248,10 @@ Each chunk includes:
 
 To process streaming responses, you'll receive chunks via a channel (Go) or SSE stream (HTTP). Each chunk should be handled based on its type:
 
-- **Text deltas**: Accumulate `output_text.delta` chunks to build the complete text
-- **Function calls**: Accumulate `function_call.arguments.delta` chunks to build complete arguments
+- **Text deltas**: Accumulate `response.output_text.delta` chunks to build the complete text
+- **Function calls**: Accumulate `response.function_call_arguments.delta` chunks to build complete arguments
 - **Usage stats**: Available in `response.completed` chunk
-- **Final text**: Available in `output_text.done` chunk's `text` field
+- **Final text**: Available in `response.output_text.done` chunk's `text` field
 
 ## Supported Providers
 

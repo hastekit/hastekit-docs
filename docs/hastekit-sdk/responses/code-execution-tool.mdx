@@ -125,11 +125,11 @@ func main() {
 
 When streaming, code execution progress is reported through different chunk types:
 
-- `code_interpreter_call.in_progress`: Code execution has started
-- `code_interpreter_call.code.delta`: Incremental code updates as the model writes code
-- `code_interpreter_call.code.done`: Code writing is complete
-- `code_interpreter_call.interpreting`: Code is being executed
-- `code_interpreter_call.completed`: Code execution is complete
+- `response.code_interpreter_call.in_progress`: Code execution has started
+- `response.code_interpreter_call_code.delta`: Incremental code updates as the model writes code
+- `response.code_interpreter_call_code.done`: Code writing is complete
+- `response.code_interpreter_call.interpreting`: Code is being executed
+- `response.code_interpreter_call.completed`: Code execution is complete
 
 ```go
 import (

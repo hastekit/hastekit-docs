@@ -96,9 +96,10 @@ for chunk := range stream {
 | **Input** | `string` | The text input to convert to speech. |
 | **Model** | `string` | The speech model to use (e.g., `"tts-1"`, `"tts-1-hd"`). |
 | **Voice** | `string` | The voice to use (e.g., `"alloy"`, `"echo"`, `"fable"`, `"onyx"`, `"nova"`, `"shimmer"`). |
+| **Language** | `*string` | Optional. Language of the speech output. |
 | **Instruction** | `*string` | Optional. Instructions for the voice style or pronunciation. |
 | **ResponseFormat** | `*string` | Optional. Audio format: `"mp3"`, `"opus"`, `"aac"`, `"flac"`, or `"pcm"`. Default is `"mp3"`. |
-| **Speed** | `*int` | Optional. Speed of the generated audio. When set, enables streaming mode. Range typically 0.25 to 4.0. |
+| **Speed** | `*int` | Optional. Integer speed multiplier for the generated audio (must be a whole number). When set, enables streaming mode (`IsStreamingRequest` returns true iff `Speed != nil`). |
 | **StreamFormat** | `*string` | Optional. Format for streaming responses (e.g., `"pcm"`). |
 
 ## Response Structure
@@ -107,6 +108,8 @@ for chunk := range stream {
 | :--- | :--- | :--- |
 | **Audio** | `[]byte` | Raw binary audio data. Automatically decompressed if gzip-compressed. |
 | **ContentType** | `string` | MIME type of the audio (e.g., `"audio/mpeg"`, `"audio/opus"`). |
+| **Usage** | `Usage` | Token usage statistics. |
+| **RawFields** | `map[string]any` | Raw provider response fields. |
 
 ## Streaming Response Chunks
 
@@ -135,7 +138,9 @@ Sent when streaming is complete, includes usage statistics.
 | Field | Type | Description |
 | :--- | :--- | :--- |
 | **InputTokens** | `int` | Number of input tokens processed. |
+| **InputTokensDetails.CachedTokens** | `int` | Number of cached input tokens. |
 | **OutputTokens** | `int` | Number of output tokens generated. |
+| **OutputTokensDetails.ReasoningTokens** | `int` | Number of reasoning tokens. |
 | **TotalTokens** | `int` | Total tokens used. |
 
 ## Example: Complete Speech Generation

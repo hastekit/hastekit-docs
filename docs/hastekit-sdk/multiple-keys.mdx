@@ -24,7 +24,7 @@ If all keys have the same weight (e.g., all set to `1` or not specified), the se
 
 ## Configuration Example
 
-When using the HasteKit SDK in direct mode, you can configure multiple keys using the `InMemoryConfigStore`.
+When using the HasteKit SDK in direct mode, you can configure multiple keys by passing one or more `gateway.ProviderConfig` values to `hastekit.WithProviderConfigs`, assigning each `APIKeyConfig` a `Weight`.
 
 ```go
 package main

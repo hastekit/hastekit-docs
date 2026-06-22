@@ -79,6 +79,7 @@ for _, data := range resp.Data {
 | **Input** | `InputUnion` | The text input (single string or list of strings). |
 | **Dimensions** | `*int` | Number of dimensions for the output embeddings. |
 | **EncodingFormat** | `*string` | Format for embeddings: `"float"` or `"base64"`. |
+| **ExtraFields** | `map[string]any` | Optional. Provider-specific extra fields merged into the request payload. |
 
 ## Response Structure
 
@@ -93,6 +94,7 @@ for _, data := range resp.Data {
 
 | Field | Type | Description |
 | :--- | :--- | :--- |
+| **Object** | `string` | Object type identifier for the embedding entry. |
 | **Index** | `int` | Index of the input text this embedding corresponds to. |
 | **Embedding** | `EmbeddingDataUnion` | The embedding vector (float array or base64 string). |
 

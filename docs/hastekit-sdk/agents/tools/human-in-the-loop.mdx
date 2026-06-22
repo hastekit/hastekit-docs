@@ -45,7 +45,7 @@ func NewDeleteUserTool() *DeleteUserTool {
     }
 }
 
-func (t *DeleteUserTool) Execute(ctx context.Context, params *agents.ToolCall) (*responses.FunctionCallOutputMessage, error) {
+func (t *DeleteUserTool) Execute(ctx context.Context, params *agents.ToolCall) (*agents.ToolCallResponse, error) {
     // This only runs after human approval
     args := map[string]interface{}{}
     json.Unmarshal([]byte(params.Arguments), &args)
@@ -53,11 +53,13 @@ func (t *DeleteUserTool) Execute(ctx context.Context, params *agents.ToolCall) (
     userID := args["user_id"].(string)
     err := deleteUser(userID)
     
-    return &responses.FunctionCallOutputMessage{
-        ID:     params.ID,
-        CallID: params.CallID,
-        Output: responses.FunctionCallOutputContentUnion{
-            OfString: utils.Ptr(fmt.Sprintf("User %s deleted successfully", userID)),
+    return &agents.ToolCallResponse{
+        FunctionCallOutputMessage: &responses.FunctionCallOutputMessage{
+            ID:     params.ID,
+            CallID: params.CallID,
+            Output: responses.FunctionCallOutputContentUnion{
+                OfString: utils.Ptr(fmt.Sprintf("User %s deleted successfully", userID)),
+            },
         },
     }, err
 }
@@ -68,7 +70,8 @@ func (t *DeleteUserTool) Execute(ctx context.Context, params *agents.ToolCall) (
 For MCP tools, use the `WithMcpApprovalRequiredTools` option when retrieving tools:
 
 ```go
-mcpClient, err := mcpclient.NewSSEClient(context.Background(), "http://localhost:9001/sse",
+mcpClient, err := mcpclient.NewClient(context.Background(), "http://localhost:9001/sse",
+		mcpclient.WithTransport("sse"),
 		mcpclient.WithHeaders(map[string]string{
 			"token": "your-token",
 		}),
@@ -91,17 +94,20 @@ agent := client.NewAgent(&hastekit.AgentOptions{
 
 When a tool requires approval, the agent execution pauses and returns with a `paused` status. The pending tool calls are available in the run state.
 
-### Run State
+### Agent Output
 
-The run state includes pending tool calls when approval is needed:
+`Execute()` (via the handle's `Result()`/`Wait()`) returns an `*agents.AgentOutput`. When approval is needed, its `Status` is `RunStatusPaused` and the pending tool calls are available in `PendingApprovals`:
 
 ```go
-type RunState struct {
-    CurrentStep      Step                            `json:"current_step"`       // "await_approval"
-    PendingToolCalls []responses.FunctionCallMessage `json:"pending_tool_calls"` // Tools awaiting approval
-    // ...
+type AgentOutput struct {
+    RunID            string                          `json:"run_id"`
+    Status           agentstate.RunStatus            `json:"status"`            // RunStatusPaused when approval is required
+    Output           []responses.InputMessageUnion   `json:"output"`
+    PendingApprovals []responses.FunctionCallMessage `json:"pending_approvals"` // Tools awaiting approval
 }
 ```
+
+> Approval-required tools inside sub-agents (see [Agent as a tool](./agent-as-a-tool)) bubble up to the parent's `PendingApprovals`. The nested agent's pending approvals are propagated through `ToolCallResponse.PendingApprovals`, so the parent run pauses and surfaces them just like its own tools.
 
 ### Resuming Execution
 
@@ -118,8 +124,8 @@ approvalResponse := responses.InputMessageUnion{
 }
 
 handle, err := agent.Execute(ctx, &agents.AgentInput{
-    Messages: []responses.InputMessageUnion{
-        approvalResponse,
+    Message: history.Message{
+        Messages: []responses.InputMessageUnion{approvalResponse},
     },
 })
 if err != nil {
@@ -163,6 +169,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents/agentstate"
+	"github.com/hastekit/hastekit-sdk-go/pkg/agents/history"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
@@ -196,12 +203,14 @@ func NewGetUserTool() *GetUserTool {
 	}
 }
 
-func (t *GetUserTool) Execute(ctx context.Context, params *agents.ToolCall) (*responses.FunctionCallOutputMessage, error) {
-	return &responses.FunctionCallOutputMessage{
-		ID:     params.ID,
-		CallID: params.CallID,
-		Output: responses.FunctionCallOutputContentUnion{
-			OfString: utils.Ptr(`{"name": "John Doe", "email": "john@example.com"}`),
+func (t *GetUserTool) Execute(ctx context.Context, params *agents.ToolCall) (*agents.ToolCallResponse, error) {
+	return &agents.ToolCallResponse{
+		FunctionCallOutputMessage: &responses.FunctionCallOutputMessage{
+			ID:     params.ID,
+			CallID: params.CallID,
+			Output: responses.FunctionCallOutputContentUnion{
+				OfString: utils.Ptr(`{"name": "John Doe", "email": "john@example.com"}`),
+			},
 		},
 	}, nil
 }
@@ -232,15 +241,17 @@ func NewDeleteUserTool() *DeleteUserTool {
 	}
 }
 
-func (t *DeleteUserTool) Execute(ctx context.Context, params *agents.ToolCall) (*responses.FunctionCallOutputMessage, error) {
+func (t *DeleteUserTool) Execute(ctx context.Context, params *agents.ToolCall) (*agents.ToolCallResponse, error) {
 	args := map[string]any{}
 	json.Unmarshal([]byte(params.Arguments), &args)
 
-	return &responses.FunctionCallOutputMessage{
-		ID:     params.ID,
-		CallID: params.CallID,
-		Output: responses.FunctionCallOutputContentUnion{
-			OfString: utils.Ptr(fmt.Sprintf("User %s has been deleted", args["user_id"])),
+	return &agents.ToolCallResponse{
+		FunctionCallOutputMessage: &responses.FunctionCallOutputMessage{
+			ID:     params.ID,
+			CallID: params.CallID,
+			Output: responses.FunctionCallOutputContentUnion{
+				OfString: utils.Ptr(fmt.Sprintf("User %s has been deleted", args["user_id"])),
+			},
 		},
 	}, nil
 }
@@ -313,7 +324,9 @@ func main() {
 		handle, err = agent.Execute(ctx, &agents.AgentInput{
 			Namespace:         "default",
 			PreviousMessageID: result.RunID,
-			Messages:          []responses.InputMessageUnion{approvalResponse},
+			Message: history.Message{
+				Messages: []responses.InputMessageUnion{approvalResponse},
+			},
 		})
 		if err != nil {
 			log.Fatal(err)

@@ -2,21 +2,28 @@
 title: Reasoning
 ---
 
-Reasoning models (like OpenAI's `o1` and `o3` series) perform internal chain-of-thought processing before generating a final answer. The HasteKit SDK allows you to configure reasoning parameters and access these reasoning steps.
+Reasoning models (like OpenAI's `o3` and `o4` series) perform internal chain-of-thought processing before generating a final answer. The HasteKit SDK allows you to configure reasoning parameters and access these reasoning steps. Non-reasoning models (such as `gpt-4o`) do not emit reasoning summaries.
 
 ## Enabling Reasoning
 
 To use reasoning features, you typically need to use a compatible model and configure the `Reasoning` parameters in your request.
 
+The `ReasoningParam` struct supports the following fields:
+
+- **`Summary`** (`*string`): Reasoning summary level: `"auto"`, `"concise"`, or `"detailed"`.
+- **`Effort`** (`*string`): Reasoning effort level: `"none"`, `"low"`, `"medium"`, `"high"`, or `"xhigh"`.
+- **`BudgetTokens`** (`*int`): Maximum tokens to allocate for reasoning steps. Used by Anthropic and Gemini; not used for OpenAI.
+
 ```go
 resp, err := client.NewResponses(ctx, &responses.Request{
-    Model: "OpenAI/gpt-4o",
+    Model: "OpenAI/o3-mini",
     Input: responses.InputUnion{
         OfString: utils.Ptr("If 2+4=6, what would be 22+44=?"),
     },
     Parameters: responses.Parameters{
         Reasoning: &responses.ReasoningParam{
             Summary: utils.Ptr("detailed"),
+            Effort:  utils.Ptr("medium"),
         },
 		Include: []responses.Includable{
             responses.IncludableReasoningEncryptedContent,

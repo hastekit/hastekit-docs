@@ -11,7 +11,7 @@ To use MCP tools, you first need to create an MCP client using the `mcpclient.Ne
 ```go
 import (
     "context"
-    "github.com/hastekit/hastekit-sdk-go/pkg/agents/tools"
+    "github.com/hastekit/hastekit-sdk-go/pkg/agents/mcpclient"
 )
 
 mcpClient, err := mcpclient.NewClient(context.Background(), "http://localhost:9001/sse",
@@ -42,7 +42,7 @@ mcpClient, err := mcpclient.NewClient(context.Background(), "http://localhost:90
 
 ### Filtering Tools
 
-You can optionally filter which tools to use by passing tool names to `GetTools()`:
+You can optionally restrict which tools are exposed to the agent using the `WithToolFilter(...)` option. Only the named tools are surfaced; all others are dropped.
 
 ```go
 // Only use specific tools
@@ -51,6 +51,38 @@ mcpClient, err := mcpclient.NewClient(context.Background(), "http://localhost:90
 		mcpclient.WithToolFilter("list_users"),
 	)
 ```
+
+### Deferred (Lazy-Loaded) Tools
+
+Use `WithDeferredTools(...)` to mark tools as deferred. Deferred tools are not added to the LLM's tool list upfront; instead they are discovered and activated on demand via the `ToolSearch` meta-tool. This keeps the prompt small when an MCP server exposes a large number of tools.
+
+```go
+mcpClient, err := mcpclient.NewClient(context.Background(), "http://localhost:9001/sse",
+    mcpclient.WithTransport("sse"),
+    mcpclient.WithDeferredTools("rarely_used_tool"),
+)
+```
+
+See [Deferred Tools](/hastekit-sdk/agents/tools/deferred-tools) for how the activation flow works and when to defer a tool.
+
+### Schema Caching
+
+By default, the client connects to the MCP server to fetch tool schemas on every `ListTools` call. You can cache schemas to avoid repeated round-trips:
+
+- `WithCacheTTL(ttl time.Duration)` sets how long cached schemas remain valid.
+- `WithSchemaCache(cache SchemaCache)` injects a `SchemaCache` implementation. When set, `ListTools()` checks the cache before connecting to the MCP server. Back it with Redis (or a similar shared store) to share cached schemas across multiple pods.
+
+```go
+mcpClient, err := mcpclient.NewClient(context.Background(), "http://localhost:9001/sse",
+    mcpclient.WithTransport("sse"),
+		mcpclient.WithCacheTTL(5*time.Minute),
+		mcpclient.WithSchemaCache(myRedisSchemaCache),
+	)
+```
+
+### Approval-Required Tools
+
+Use `WithApprovalRequiredTools(...)` to mark specific MCP tools as requiring human approval before they run. See the [Human in the Loop](./human-in-the-loop) page for the full approval flow.
 
 ### Transport
 
@@ -76,6 +108,7 @@ import (
 
 	"github.com/bytedance/sonic"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
+	"github.com/hastekit/hastekit-sdk-go/pkg/agents/history"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents/mcpclient"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
@@ -109,7 +142,7 @@ func main() {
     })
 
     // Create conversation history
-    history := client.NewConversationManager("default", uuid.NewString(), "")
+    conv := client.NewConversationManager()
 
     // Connect to MCP server
     mcpClient, err := mcpclient.NewClient(context.Background(), "http://localhost:9001/sse",
@@ -124,7 +157,7 @@ func main() {
         Name:        "Hello world agent",
         Instruction: client.Prompt("You are helpful assistant."),
         LLM:         model,
-        History:     history,
+        History:     conv,
         McpServers:  []agents.MCPToolset{mcpClient},
     })
 

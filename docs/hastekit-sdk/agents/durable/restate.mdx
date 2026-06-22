@@ -54,7 +54,7 @@ func main() {
                 },
             },
         }),
-        hastekit.WithRestateConfig("http://localhost:8081"), // Restate server endpoint
+        hastekit.WithRestateConfig("http://localhost:8080"), // Restate ingress endpoint
         hastekit.WithRedisConfig("localhost:6379"),
     )
     if err != nil {
@@ -98,7 +98,7 @@ func main() {
 ```
 
 With this setup:
-- The Restate service runs on `http://localhost:9080`
+- The Restate service runs on `http://localhost:9081`
 - Your application server runs on `http://localhost:8070`
 - Both are in the same process
 
@@ -115,16 +115,12 @@ For production deployments, run the Restate service and application in separate 
 package main
 
 import (
-    "context"
     "log"
     "net/http"
     "os"
 
-    "github.com/hastekit/hastekit-sdk-go/pkg/agents"
-    "github.com/hastekit/hastekit-sdk-go/pkg/agents/prompts""
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway"
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
-    "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
     hastekit "github.com/hastekit/hastekit-sdk-go"
 )
 
@@ -141,7 +137,7 @@ func main() {
                 },
             },
         }),
-        hastekit.WithRestateConfig("http://localhost:8081"),
+        hastekit.WithRestateConfig("http://localhost:8080"),
         hastekit.WithRedisConfig("localhost:6379"),
     )
     if err != nil {
@@ -178,7 +174,6 @@ import (
     "log"
     "os"
 
-    "github.com/hastekit/hastekit-sdk-go/pkg/agents/prompts""
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway"
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
     hastekit "github.com/hastekit/hastekit-sdk-go"
@@ -197,7 +192,7 @@ func main() {
                 },
             },
         }),
-        hastekit.WithRestateConfig("http://localhost:8081"),
+        hastekit.WithRestateConfig("http://localhost:8080"),
         hastekit.WithRedisConfig("localhost:6379"),
     )
     if err != nil {

@@ -26,8 +26,11 @@ import (
     "fmt"
     "log"
 
+    "os"
+
     "github.com/hastekit/hastekit-sdk-go/pkg/utils"
     "github.com/hastekit/hastekit-sdk-go/pkg/agents"
+    "github.com/hastekit/hastekit-sdk-go/pkg/agents/history"
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway"
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
@@ -71,13 +74,16 @@ agent := client.NewAgent(&hastekit.AgentOptions{
 | Field | Type | Description |
 | :--- | :--- | :--- |
 | **Name** | `string` | A unique identifier for the agent |
-| **Instruction** | `core.SystemPromptProvider` | System prompt defining agent behavior (use `client.Prompt()` for simple strings) |
+| **Instruction** | `agents.SystemPromptProvider` | System prompt defining agent behavior (use `client.Prompt()` for simple strings) |
 | **LLM** | `llm.Provider` | The LLM provider instance (created via `client.NewLLM()`) |
 | **Parameters** | `responses.Parameters` | Optional LLM parameters (temperature, max tokens, etc.) |
-| **Tools** | `[]core.Tool` | Optional array of tools the agent can use |
+| **Tools** | `[]agents.Tool` | Optional array of tools the agent can use |
+| **Handoffs** | `[]*agents.Handoff` | Optional sub-agents this agent can hand off to (see [Handoffs](/hastekit-sdk/agents/multi-agents/handoff)) |
+| **MaxLoops** | `*int` | Optional cap on agent loop iterations (defaults to `50`) |
 | **History** | `*history.CommonConversationManager` | Optional conversation history manager |
 | **Output** | `map[string]any` | Optional JSON schema for structured output |
 | **McpServers** | `[]*mcpclient.MCPClient` | Optional MCP server clients |
+| **Runtime** | `agents.Runtime` | Optional durable execution runtime (see the [Durable Execution](/hastekit-sdk/agents/durable/restate) pages) |
 
 ## Executing an Agent
 
@@ -123,6 +129,8 @@ out, err := handle.Wait()
 | :--- | :--- | :--- |
 | **Messages** | `[]responses.InputMessageUnion` | Array of input messages (use `responses.UserMessage()` helper) |
 | **Namespace** | `string` | Optional namespace for conversation isolation |
+| **ThreadID** | `string` (json `thread_id`) | Optional ID of the thread to continue |
+| **SessionID** | `string` (json `shared_session_id`) | Optional conversation ID shared between a parent agent and its sub-agent |
 | **PreviousMessageID** | `string` | Optional ID of previous message for conversation continuity |
 | **RunContext** | `map[string]any` | Optional context data for template variable resolution |
 | **StreamID** | `string` | Optional broker channel id. `Execute()` generates one if empty; supply your own to resume an existing stream or coordinate a stop signal. |
@@ -175,6 +183,7 @@ import (
 	"os"
 
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
+	"github.com/hastekit/hastekit-sdk-go/pkg/agents/history"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
@@ -288,8 +297,6 @@ for chunk := range handle.Chunks {
 The SDK provides convenient helper functions for creating messages:
 
 - **`responses.UserMessage(msg string)`**: Creates a user message from a string
-- **`responses.SystemMessage(msg string)`**: Creates a system message
-- **`responses.AssistantMessage(msg string)`**: Creates an assistant message
 
 ## Next Steps
 

@@ -72,28 +72,66 @@ The conversation manager supports three persistence configurations for storing c
 
 ### 1. File Persistence
 
-When the SDK client is initialized without `endpoint` and `projectName`, messages are persisted as JSON files written to the disk.
+When the SDK client is initialized without an `endpoint`, messages are persisted as JSON files written to the disk (under `./conversations`).
 
 ### 2. HasteKit Gateway Persistence
 
-When the SDK client is initialized with `endpoint` and `projectName`, the conversation manager automatically persists messages to the HasteKit's Gateway server.
+When the SDK client is initialized with an `endpoint`, the conversation manager automatically persists messages to the HasteKit's Gateway server.
 
 ### 3. Custom Persistence
 
-To implement custom persistence, implement the `ConversationPersistenceManager` interface:
+To implement custom persistence, implement the `ConversationPersistenceAdapter` interface:
 
 ```go
-type ConversationPersistenceManager interface {
-	LoadMessages(ctx context.Context, namespace string, threadID string, previousMessageID string) ([]conversation.ConversationMessage, error)
-	SaveMessages(ctx context.Context, namespace, msgId, previousMsgId, threadID string, conversationId string, messages []responses.InputMessageUnion, meta map[string]any) error
-	SaveSummary(ctx context.Context, namespace string, summary conversation.Summary) error
+type ConversationPersistenceAdapter interface {
+	NewConversationID(ctx context.Context) string
+	NewRunID(ctx context.Context) string
+	LoadMessages(ctx context.Context, namespace string, threadID string, previousMessageID string) ([]history.ConversationMessage, error)
+	SaveMessages(ctx context.Context, namespace, msgId, previousMsgId, threadID string, conversationId string, messages []history.Message, meta map[string]any) error
+	SaveSummary(ctx context.Context, namespace string, summary history.Summary) error
 }
 ```
 
-Then pass your implementation to the conversation manager:
+Then pass your implementation to the conversation manager constructor:
 
 ```go
-cm := client.NewConversationManager(history.WithPersistence(yourImpl))
+cm := history.NewConversationManager(yourAdapter)
+```
+
+When you use `client.NewConversationManager()`, the SDK selects and wires the appropriate adapter automatically (file or gateway, depending on whether an `endpoint` is configured).
+
+## Message Filtering & Attribution
+
+Each stored message bundle (`messages.Message`) carries a `SenderID`, which lets the conversation manager attribute turns to a specific participant in multi-participant conversations.
+
+You can transform a run's message bundles before they are attributed and sent to the provider by supplying a `MessageFilter` via `history.WithMessageFilter`. A common use is rewriting each bundle's `SenderID` from an opaque id into a human-friendly name.
+
+```go
+type MessageFilter interface {
+	Filter(ctx context.Context, msgs []messages.Message, agentID string) []messages.Message
+}
+
+cm := history.NewConversationManager(
+	yourAdapter,
+	history.WithMessageFilter(yourFilter),
+)
+```
+
+The other available option is `history.WithSummarizer`, covered on the [Summarization](/hastekit-sdk/agents/conversations/summarization) page.
+
+## Listing Threads
+
+`agent.History()` returns the agent's `*history.CommonConversationManager`. When its persistence adapter implements `history.ThreadLister`, you can enumerate stored threads. Pass an empty namespace (`""`) to list across all namespaces.
+
+```go
+type ThreadLister interface {
+	ListThreads(ctx context.Context, namespace string) ([]ThreadInfo, error)
+}
+
+if lister, ok := agent.History().ConversationPersistenceAdapter.(history.ThreadLister); ok {
+	threads, err := lister.ListThreads(context.Background(), "")
+	// ...
+}
 ```
 
 ## Complete Example
@@ -110,7 +148,9 @@ import (
 	"os"
 
 	"github.com/bytedance/sonic"
+	"github.com/google/uuid"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
+	"github.com/hastekit/hastekit-sdk-go/pkg/agents/history"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
@@ -140,12 +180,12 @@ func main() {
 		Model:    "gpt-4.1-mini",
 	})
 
-	history := client.NewConversationManager()
+	cm := client.NewConversationManager()
 	agent := agents.NewAgent(&agents.AgentOptions{
 		Name:        "Hello world agent",
 		Instruction: client.Prompt("You are helpful assistant."),
 		LLM:         model,
-		History:     history,
+		History:     cm,
 	})
 
     threadID := uuid.NewString()
@@ -175,7 +215,7 @@ func main() {
 		Name:        "Hello world agent",
 		Instruction: client.Prompt("You are helpful assistant."),
 		LLM:         model,
-		History:     history,
+		History:     cm,
 	})
 
 	handle, err = agent2.Execute(context.Background(), &agents.AgentInput{

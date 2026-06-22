@@ -201,6 +201,7 @@
                     "pages": [
                       "hastekit-sdk/agents/tools/function-tools",
                       "hastekit-sdk/agents/tools/mcp-tools",
+                      "hastekit-sdk/agents/tools/deferred-tools",
                       "hastekit-sdk/agents/tools/sandbox-tool",
                       "hastekit-sdk/agents/tools/human-in-the-loop"
                     ]
@@ -214,6 +215,7 @@
                     ]
                   },
                   "hastekit-sdk/agents/serving-agents/serving-agents-http",
+                  "hastekit-sdk/agents/serving-agents/serving-agents-agui",
                   {
                     "group": "Durable Execution",
                     "expanded": true,
@@ -222,6 +224,17 @@
                       "hastekit-sdk/agents/durable/temporal"
                     ]
                   }
+                ]
+              },
+              {
+                "group": "Workflows",
+                "expanded": true,
+                "pages": [
+                  "hastekit-sdk/workflows/introduction",
+                  "hastekit-sdk/workflows/defining-nodes",
+                  "hastekit-sdk/workflows/edges-and-branching",
+                  "hastekit-sdk/workflows/running-workflows",
+                  "hastekit-sdk/workflows/pausing-and-resuming"
                 ]
               }
             ]

@@ -48,14 +48,31 @@ Send a POST request to `http://localhost:8070/?agent=<agent-name>` with the requ
 curl -X POST "http://localhost:8070/?agent=SampleAgent" \
   -H "Content-Type: application/json" \
   -d '{
-    "messages": [
-      {
-        "role": "user",
-        "content": "Hello!"
-      }
-    ]
+    "messages": {
+      "sender_id": "user",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Hello!"
+        }
+      ]
+    }
   }'
 ```
+
+The `messages` key maps to `AgentInput.Message`, which is a single message **object** (not an array). It holds a `sender_id` and the actual `messages` array of input messages.
+
+### Response: Server-Sent Events
+
+The handler streams the run back as an event stream, not a single JSON body. It sets `Content-Type: text/event-stream` and emits one frame per chunk:
+
+```
+event: <ChunkType>
+data: <json chunk>
+
+```
+
+The server requires the response writer to support flushing (an `http.Flusher`); if it doesn't, it responds with `500 streaming unsupported`. Clients should read the response as an SSE stream and process each `data:` payload as it arrives.
 
 ### Request Structure
 
@@ -63,22 +80,33 @@ The request body follows the `agents.AgentInput` structure:
 
 ```go
 type AgentInput struct {
-    Namespace         string
-    ThreadID          string
-    PreviousMessageID string
-    Messages          []responses.InputMessageUnion
-    RunContext        map[string]any
-    StreamID          string
-    SessionID         string
+    Namespace         string          `json:"namespace"`
+    ThreadID          string          `json:"thread_id"`
+    PreviousMessageID string          `json:"previous_message_id"`
+    Message           history.Message `json:"messages"`
+    RunContext        map[string]any  `json:"run_context"`
+    StreamID          string          `json:"stream_id,omitempty"`
+    SessionID         string          `json:"shared_session_id"`
 }
 ```
 
-- `Namespace` - Optional. Namespace for conversation isolation
-- `ThreadID` - Optional. Thread to continue (or empty to start a new one)
-- `PreviousMessageID` - Optional. Previous message ID for conversation history
-- `Messages` - Required. Array of input messages
-- `RunContext` - Optional. Additional context for the execution
-- `StreamID` - Optional. Broker channel id; the server generates one if empty. The HTTP handler streams chunks back as Server-Sent Events as the run progresses.
+Where `history.Message` (an alias of `messages.Message`) carries a sender-attributed bundle of provider messages:
+
+```go
+type Message struct {
+    ID       string                        `json:"id"`
+    SenderID string                        `json:"sender_id"`
+    Messages []responses.InputMessageUnion `json:"messages"`
+}
+```
+
+- `namespace` - Optional. Namespace for conversation isolation
+- `thread_id` - Optional. Thread to continue (or empty to start a new one)
+- `previous_message_id` - Optional. Previous message ID for conversation history
+- `messages` - Required. A single message bundle (`history.Message`) with a `sender_id` and the `messages` array of input messages
+- `run_context` - Optional. Additional context for the execution
+- `stream_id` - Optional. Broker channel id; the server generates one if empty. The HTTP handler streams chunks back as Server-Sent Events as the run progresses.
+- `shared_session_id` - Optional. Conversation ID shared by a parent agent and its sub-agent
 
 ## Complete Example
 
@@ -134,13 +162,20 @@ func main() {
 		  curl -X POST "http://localhost:8070/?agent=SampleAgent" \
 		  -H "Content-Type: application/json" \
 		  -d '{
-			"messages": [
-			  {
-				"role": "user",
-				"content": "Hello!"
-			  }
-			]
+			"messages": {
+			  "sender_id": "user",
+			  "messages": [
+				{
+				  "role": "user",
+				  "content": "Hello!"
+				}
+			  ]
+			}
 		  }'
 	*/
 }
 ```
+
+## Serving over AG-UI
+
+The raw `http.Handler` above is the simplest way to expose an agent, but it speaks the SDK's own `AgentInput` shape. For a standards-based option that works with CopilotKit and other off-the-shelf clients — and a ready-made browser chat UI — serve your agents over the AG-UI protocol instead. See [Serving Agents over AG-UI](/hastekit-sdk/agents/serving-agents/serving-agents-agui).

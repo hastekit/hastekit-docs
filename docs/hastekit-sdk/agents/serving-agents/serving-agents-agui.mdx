@@ -1,0 +1,213 @@
+---
+title: Serving Agents over AG-UI
+description: Expose agents over the AG-UI protocol and get a ready-made browser chat client for free
+---
+
+The `pkg/agui` package serves your agents over the [AG-UI protocol](https://docs.ag-ui.com) — the same wire format CopilotKit and `@ag-ui/client` speak. You get streaming assistant text, reasoning, tool calls, conversation threads, and human-in-the-loop approvals over a single SSE endpoint, plus an optional embedded chat UI so you can talk to an agent in the browser without building a frontend.
+
+There are three layers, from highest to lowest level:
+
+| Use | Function |
+| --- | --- |
+| Ship a browser chat UI with zero frontend work | `web.Serve` / `web.Handler` (`pkg/agui/web`) |
+| Expose every registered agent to external AG-UI clients | `agui.NewHandler` (`pkg/agui`) |
+| Mount a single agent's run endpoint on your own mux | `agui.AgentHandler` (`pkg/agui`) |
+
+`*hastekit.SDK` satisfies the `agui.Registry` interface (`Agent(name)` + `AgentNames()`), so you pass the client directly to any of these.
+
+## Embedded chat UI
+
+The fastest way to interact with an agent. `web.Serve` mounts a ready-made CopilotKit chat client and the AG-UI protocol endpoints on the same address:
+
+```go
+package main
+
+import (
+	"log"
+	"os"
+
+	"github.com/hastekit/hastekit-sdk-go/pkg/agui/web"
+	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
+	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
+	hastekit "github.com/hastekit/hastekit-sdk-go"
+)
+
+func main() {
+	client, err := hastekit.NewWithOptions(
+		hastekit.WithProviderConfigs(gateway.ProviderConfig{
+			ProviderName: llm.ProviderNameOpenAI,
+			ApiKeys: []*gateway.APIKeyConfig{
+				{Name: "Key 1", APIKey: os.Getenv("OPENAI_API_KEY")},
+			},
+		}),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	client.NewAgent(&hastekit.AgentOptions{
+		Name:        "Assistant",
+		Instruction: client.Prompt("You are a helpful assistant."),
+		LLM: client.NewLLM(hastekit.LLMOptions{
+			Provider: llm.ProviderNameOpenAI,
+			Model:    "gpt-4.1-mini",
+		}),
+	})
+
+	// Serves the chat UI and the AG-UI endpoints on :8080.
+	if err := web.Serve(":8080", client); err != nil {
+		log.Fatal(err)
+	}
+}
+```
+
+Open `http://localhost:8080`. The default UI lists registered agents, shows a sidebar of prior conversations to resume, streams assistant text / reasoning / tool calls live, and renders approval cards inline for human-in-the-loop pauses.
+
+`web.Handler(registry, opts...)` returns the same surface as an `http.Handler` for mounting into an existing server. It serves:
+
+| Path | Description |
+| --- | --- |
+| `GET /` | Embedded CopilotKit chat UI |
+| `GET /basic.html` | Offline, zero-dependency fallback UI (no CDN) |
+| `GET /api/agui/agents` | Registered agent names |
+| `POST /api/agui/agents/{name}/run` | AG-UI run endpoint (SSE) |
+| `GET /api/agui/agents/{name}/threads` | Conversation list |
+| `GET /api/agui/agents/{name}/threads/{thread}/messages` | Thread history |
+
+The protocol endpoints are mounted under `/api/agui` (exported as `web.APIPrefix`), so external AG-UI clients can target them too — the embedded UIs are just two more consumers.
+
+## Protocol handler
+
+If you have your own frontend (CopilotKit's `HttpAgent`, raw `@ag-ui/client`, or a custom SSE consumer), serve just the protocol with `agui.NewHandler`:
+
+```go
+import "github.com/hastekit/hastekit-sdk-go/pkg/agui"
+
+// ... create the client and register agents ...
+
+http.ListenAndServe(":8080", agui.NewHandler(client))
+```
+
+### Routes
+
+| Method & Path | Description |
+| --- | --- |
+| `GET /agents` | List registered agent names |
+| `POST /agents/{agent}/run` | Run the agent; SSE stream of AG-UI events from a `RunAgentInput` body |
+| `GET /agents/{agent}/threads` | Stored conversation threads, newest first |
+| `GET /agents/{agent}/threads/{thread}/messages` | Thread history as AG-UI messages |
+
+The threads endpoints power conversation pickers. Listing requires the agent's persistence adapter to implement `history.ThreadLister` (the SDK's in-memory and file adapters do); when it doesn't, the listing endpoint answers `501` so clients can hide the picker. See [Conversation History](/hastekit-sdk/agents/conversations/history) for persistence setup.
+
+### Single agent
+
+To mount one agent's run endpoint on an existing mux, use `agui.AgentHandler`, which runs the agent for every `POST` regardless of path:
+
+```go
+mux.Handle("POST /my-agent/run", agui.AgentHandler(agent))
+```
+
+## Request body
+
+The run endpoint accepts the canonical AG-UI `RunAgentInput` body (camelCase field names):
+
+```go
+type RunAgentInput struct {
+	ThreadID       string         `json:"threadId"`       // required
+	RunID          string         `json:"runId,omitempty"`
+	State          any            `json:"state,omitempty"`
+	Messages       []Message      `json:"messages"`
+	Tools          []InputTool    `json:"tools,omitempty"`
+	Context        []InputContext `json:"context,omitempty"`
+	ForwardedProps any            `json:"forwardedProps,omitempty"`
+}
+```
+
+Each `Message` follows the AG-UI message shape:
+
+```go
+type Message struct {
+	ID         string     `json:"id"`
+	Role       string     `json:"role"`              // "user", "assistant", ...
+	Content    string     `json:"content,omitempty"`
+	Name       string     `json:"name,omitempty"`
+	ToolCalls  []ToolCall `json:"toolCalls,omitempty"`
+	ToolCallID string     `json:"toolCallId,omitempty"`
+}
+```
+
+A request must have a `threadId` and at least one of `messages` or an approval decision (see [Human-in-the-loop](#human-in-the-loop) below).
+
+```bash
+curl -N -X POST "http://localhost:8080/agents/Assistant/run" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "threadId": "thread-1",
+    "messages": [
+      { "id": "m1", "role": "user", "content": "Hello!" }
+    ]
+  }'
+```
+
+By default the handler extracts only the new trailing turn from `messages` and relies on the SDK's conversation persistence for prior history. Use [`WithFullHistory`](#options) if the client owns history and the agent has no persistence.
+
+### Grounding context
+
+`context` entries are flattened into the run's `RunContext` so prompt templates can reference them. A `{description, value}` pair becomes `{{Context.<description>}}`, while `state` and `forwardedProps` are available as `{{State.x}}` and `{{ForwardedProps.y}}`.
+
+## Event stream
+
+The run endpoint responds with `Content-Type: text/event-stream` and emits canonical AG-UI events. It always starts with `RUN_STARTED` and always ends with `RUN_FINISHED` (or `RUN_ERROR`), synthesising the terminal event if the stream closes early so clients never hang. The main event types:
+
+| Group | Events |
+| --- | --- |
+| Run lifecycle | `RUN_STARTED`, `RUN_FINISHED`, `RUN_ERROR` |
+| Steps | `STEP_STARTED`, `STEP_FINISHED` |
+| Assistant text | `TEXT_MESSAGE_START`, `TEXT_MESSAGE_CONTENT`, `TEXT_MESSAGE_END`, `TEXT_MESSAGE_CHUNK` |
+| Reasoning | `REASONING_START`, `REASONING_MESSAGE_CONTENT`, `REASONING_END`, … |
+| Tool calls | `TOOL_CALL_START`, `TOOL_CALL_ARGS`, `TOOL_CALL_END`, `TOOL_CALL_RESULT`, `TOOL_CALL_CHUNK` |
+| State / messages | `STATE_SNAPSHOT`, `STATE_DELTA`, `MESSAGES_SNAPSHOT` |
+| Escape hatches | `RAW`, `CUSTOM` |
+
+Right after `RUN_STARTED`, the handler also emits a `CUSTOM` event carrying the broker `streamId`, `runId`, and `threadId` so a client can correlate the AG-UI run with the SDK's streaming surface.
+
+### Correlation headers
+
+The response sets these headers before the first event:
+
+- `X-Stream-Id` — the broker stream id (matches `handle.StreamID`)
+- `X-Agui-Run-Id` — the AG-UI run id (echoed from `runId`, or generated)
+- `X-Agui-Thread-Id` — the thread id from the request
+
+An idle connection receives a keep-alive SSE comment every 15 seconds (configurable) so reverse proxies don't reap it.
+
+## Options
+
+All three entry points (`web.Serve`, `web.Handler`, `agui.NewHandler`, `agui.AgentHandler`) accept the same options:
+
+- `agui.WithNamespace(ns)` — Conversation namespace (default `"default"`).
+- `agui.WithSenderID(id)` — Sender attribution for messages POSTed by AG-UI clients (default `"user"`).
+- `agui.WithFullHistory()` — Forward the client's complete message list into the run instead of only the trailing turn. Use this when the agent has no conversation persistence and the client owns history; with persistence enabled (the SDK default) it would duplicate prior turns in the thread on every POST.
+- `agui.WithKeepalive(d)` — SSE keep-alive comment interval (default `15s`).
+
+## Human-in-the-loop
+
+When an agent pauses on an [approval-gated tool](/hastekit-sdk/agents/tools/human-in-the-loop), the run ends with a `RUN_FINISHED` in a paused state and the client renders an approval card. To resume, the client POSTs back to the same `threadId` with the decision under `forwardedProps.command.resume` (CopilotKit's `useInterrupt` shape) — no new `messages` are required:
+
+```json
+{
+  "threadId": "thread-1",
+  "messages": [],
+  "forwardedProps": {
+    "command": {
+      "resume": {
+        "decisions": [
+          { "toolCallId": "call_xyz", "approved": true }
+        ]
+      }
+    }
+  }
+}
+```
+
+A flat `forwardedProps.hastekitApprovals` array with the same `{toolCallId, approved}` entries is also accepted for simpler clients. The handler maps these decisions onto the SDK's approval resume flow and continues the paused run.

@@ -66,6 +66,37 @@ agent := client.NewAgent(&hastekit.AgentOptions{
 })
 ```
 
+## Skills
+
+You can inject **skills** into the system prompt using `prompts.WithSkills`. Each skill adds more specialised context, instructions and scripts that the agent can pull in when a task requires it.
+
+```go
+import "github.com/hastekit/hastekit-sdk-go/pkg/agents/prompts"
+
+agent := client.NewAgent(&hastekit.AgentOptions{
+    Name: "Skilled Assistant",
+    Instruction: client.Prompt(
+        "You are a helpful assistant.",
+        prompts.WithSkills([]agents.Skill{
+            {
+                Name:         "pdf-generation",
+                Description:  "Generate PDF documents from structured data.",
+                FileLocation: "skills/pdf-generation/SKILL.md",
+            },
+        }),
+    ),
+    LLM: model,
+})
+```
+
+The `agents.Skill` fields are loaded from a skill's `SKILL.md`:
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| **Name** | `string` | Skill name from the `SKILL.md` frontmatter |
+| **Description** | `string` | Skill description from the `SKILL.md` frontmatter |
+| **FileLocation** | `string` | Path to the `SKILL.md` file relative to sandbox-data |
+
 ## Remote Prompts
 
 You can load system instructions from the HasteKit Gateway server using `RemotePrompt`.
@@ -73,7 +104,7 @@ You can load system instructions from the HasteKit Gateway server using `RemoteP
 ```go
 agent := client.NewAgent(&hastekit.AgentOptions{
     Name:        "Remote Assistant",
-    Instruction: client.RemotePrompt("my-prompt-name", "production-alias"),
+    Instruction: client.RemotePrompt("my-prompt-name", "production"),
     LLM:         model,
 })
 ```
@@ -143,13 +174,15 @@ package main
 import (
 	"context"
 	"log"
+	"os"
 
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
+	"github.com/hastekit/hastekit-sdk-go/pkg/agents/history"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents/prompts"
-"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
-"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
-"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
-hastekit "github.com/hastekit/hastekit-sdk-go"
+	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
+	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
+	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
+	hastekit "github.com/hastekit/hastekit-sdk-go"
 )
 
 func main() {
@@ -225,6 +258,6 @@ func main() {
 ## Notes
 
 - Template variables use the syntax `{{variable}}` which is automatically converted to Go template format
-- Remote prompts require the SDK client to be initialized with `endpoint` and `projectName`
+- Remote prompts require the SDK client to be initialized with `endpoint`, organisation name and `projectName`
 - Custom prompt loaders must implement the `PromptLoader` interface with a `LoadPrompt(ctx context.Context) (string, error)` method
 

@@ -57,7 +57,7 @@ func main() {
             },
         }),
         hastekit.WithTemporalConfig("0.0.0.0:7233"), // Temporal server endpoint
-        hastekit.WithRedisConfig("http://localhost:6379"), // Redis for streaming support
+        hastekit.WithRedisConfig("localhost:6379"), // Redis for streaming support
     )
     if err != nil {
         log.Fatal(err)
@@ -140,7 +140,7 @@ func main() {
             },
         }),
         hastekit.WithTemporalConfig("0.0.0.0:7233"), // Temporal server endpoint
-        hastekit.WithRedisConfig("http://localhost:6379"), // Redis for streaming support
+        hastekit.WithRedisConfig("localhost:6379"), // Redis for streaming support
     )
     if err != nil {
         log.Fatal(err)
@@ -195,7 +195,7 @@ func main() {
             },
         }),
         hastekit.WithTemporalConfig("0.0.0.0:7233"), // Temporal server endpoint
-        hastekit.WithRedisConfig("http://localhost:6379"), // Redis for streaming support
+        hastekit.WithRedisConfig("localhost:6379"), // Redis for streaming support
     )
     if err != nil {
         log.Fatal(err)

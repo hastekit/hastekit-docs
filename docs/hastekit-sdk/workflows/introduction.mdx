@@ -1,0 +1,83 @@
+---
+title: Workflows
+description: Build deterministic, code-first DAGs of nodes — with parallel branches, conditional routing, and durable pause/resume
+---
+
+The `pkg/workflow` package is a code-first engine for orchestrating multi-step logic as a directed acyclic graph (DAG). You define **nodes**, wire them together with **edges**, and the engine runs them: independent branches execute in parallel, conditional edges route at runtime, and a node can suspend the whole run for an external decision and resume later exactly where it left off.
+
+Unlike [durable agents](/hastekit-sdk/agents/durable/temporal), a workflow is deterministic — you control every node and every transition — which makes it a good fit for pipelines, approval flows, fan-out/fan-in processing, and any orchestration you want to be replayable and inspectable.
+
+```go
+import "github.com/hastekit/hastekit-sdk-go/pkg/workflow"
+```
+
+## Core concepts
+
+| Concept | What it is |
+|---------|------------|
+| **Graph** | The fluent builder (`workflow.NewGraph(id)`). You add nodes and edges, then `Compile()` it into a runnable `*Compiled`. |
+| **Node** | A unit of work implementing the `workflow.Node` interface. Its `Execute` returns a partial state update and an output **port**. |
+| **Edge** | A connection from one node's output port to another node. Static (`AddEdge`) or conditional (`AddConditionalEdge`). |
+| **Port** | The named output a node emits (`"default"` unless you branch). Edges follow the port the node returned. |
+| **Input** | The run object. Its `RunContext` map is the shared, accumulating state that nodes read from and write into. |
+| **Runtime** | Executes a compiled graph. The default `InProcessRuntime` runs each wave of ready nodes concurrently. |
+
+`START` and `END` are reserved, implicit node ids (`workflow.StartNode` / `workflow.EndNode`) that bookend a graph. You never register them — you just wire edges to and from them.
+
+## Quickstart
+
+A minimal one-node workflow that reads a name from the run context and writes a greeting:
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+
+	"github.com/hastekit/hastekit-sdk-go/pkg/workflow"
+)
+
+// GreetNode reads "name" from the run context and emits a greeting.
+type GreetNode struct {
+	workflow.BaseNode
+}
+
+func NewGreetNode() *GreetNode {
+	return &GreetNode{BaseNode: workflow.BaseNode{NodeType: "greet"}}
+}
+
+func (n *GreetNode) Validate() error { return nil }
+
+func (n *GreetNode) Execute(ctx context.Context, in *workflow.Input) (map[string]any, string, error) {
+	name, _ := workflow.ResolvePath(in, "name")
+	output := map[string]any{"greeting": fmt.Sprintf("Hello, %v!", name)}
+	return output, workflow.DefaultPort, nil
+}
+
+func main() {
+	g := workflow.NewGraph("greeter")
+	g.AddNode("greet", NewGreetNode())
+	g.AddEdge(workflow.StartNode, "greet")
+	g.AddEdge("greet", workflow.EndNode)
+
+	out, err := g.Invoke(context.Background(), &workflow.Input{
+		RunContext: map[string]any{"name": "Ada"},
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(out.RunContext["greeting"]) // Hello, Ada!
+}
+```
+
+`Invoke` compiles the graph and runs it in one call. For graphs you run repeatedly, [compile once and reuse](/hastekit-sdk/workflows/running-workflows) the `*Compiled`.
+
+## Where to go next
+
+- [Defining Nodes](/hastekit-sdk/workflows/defining-nodes) — implement the `Node` interface, read and write state, and use typed inputs/outputs.
+- [Edges & Branching](/hastekit-sdk/workflows/edges-and-branching) — static edges, parallel fan-out/fan-in, and conditional routing.
+- [Running Workflows](/hastekit-sdk/workflows/running-workflows) — compilation, runtimes, options, and inspecting results.
+- [Pausing & Resuming](/hastekit-sdk/workflows/pausing-and-resuming) — suspend a run for an external decision and resume it durably.

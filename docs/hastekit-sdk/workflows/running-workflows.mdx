@@ -1,0 +1,114 @@
+---
+title: Running Workflows
+description: Compile and execute graphs, configure the runtime, and inspect per-node results
+---
+
+A graph goes through two phases: **compilation** validates the structure and prepares it for execution, and **execution** runs the compiled graph against an `Input`.
+
+## Invoke vs. compile-and-execute
+
+`Invoke` does both in one call — convenient for one-off runs:
+
+```go
+out, err := g.Invoke(ctx, in)
+```
+
+For a graph you run repeatedly, compile once and reuse the `*Compiled` — validation and preparation happen a single time:
+
+```go
+compiled, err := g.Compile()
+if err != nil {
+	log.Fatal(err) // structural errors surface here
+}
+
+for _, job := range jobs {
+	out, err := compiled.Execute(ctx, &workflow.Input{RunContext: job})
+	// ...
+}
+```
+
+Both `Invoke` and `Execute` accept the same options.
+
+## The Input
+
+`Input` is the run object you pass in and get back. The fields you care about going in:
+
+```go
+in := &workflow.Input{
+	RunID:      "run-123",                       // optional run identifier
+	RunContext: map[string]any{"name": "Ada"},   // initial shared state
+	Metadata:   map[string]any{"source": "api"}, // free-form host bag
+}
+```
+
+`RunContext` is the seed state every node reads from and merges into. The same `*Input` is returned, populated with results.
+
+## Options
+
+Pass `InvokeOption`s to `Invoke` or `Execute`:
+
+| Option | Effect |
+|--------|--------|
+| `workflow.WithRuntime(rt)` | Select the `Runtime`. Defaults to `InProcessRuntime` when unset. |
+| `workflow.WithLogger(l)` | Override the `*slog.Logger` used during the run. |
+| `workflow.WithMaxSteps(n)` | Cap how many node executions a single run may perform (default **500**). Exceeding it fails the run. |
+
+```go
+out, err := g.Invoke(ctx, in,
+	workflow.WithMaxSteps(1000),
+	workflow.WithLogger(myLogger),
+)
+```
+
+## The runtime
+
+The default **`InProcessRuntime`** runs the graph in-process, dispatching each wave of ready nodes to its own goroutine. Within a wave, dispatch order is sorted so that deterministic runtimes replay identically. The first node to fail cancels its in-flight siblings via a shared context and the run returns that error.
+
+`Runtime` is an interface, so a host can supply its own executor (for example, a durable runtime that records each node as an activity) via `WithRuntime`:
+
+```go
+type Runtime interface {
+	Execute(ctx context.Context, c *Compiled, in *Input, opts RuntimeOptions) (*Input, error)
+}
+```
+
+## Inspecting results
+
+The returned `*Input` carries the full picture of the run — it is returned **even on error**, so you can inspect partial state.
+
+```go
+out, err := g.Invoke(ctx, in)
+
+// Accumulated state from every node's output.
+greeting := out.RunContext["greeting"]
+
+// Per-node lifecycle status.
+for id, status := range out.Status {
+	fmt.Printf("%s: %s\n", id, status)
+}
+```
+
+`Status` records one marker per node:
+
+| Status | Meaning |
+|--------|---------|
+| `NodeStatusRunning` | Dispatched, not yet finished. |
+| `NodeStatusCompleted` | Finished successfully. |
+| `NodeStatusFailed` | `Execute` returned an error. |
+| `NodeStatusSkipped` | Never reached (e.g. an untaken branch). |
+| `NodeStatusPaused` | Suspended the run — see [Pausing & Resuming](/hastekit-sdk/workflows/pausing-and-resuming). |
+
+`out.Ports` records the output port each completed node emitted, which the engine uses to follow edges (and to replay completed nodes on resume).
+
+## Compilation and validation
+
+`Compile` returns a single joined error describing everything wrong with the graph — missing nodes, dangling edges, reserved-id clashes, conditional/static conflicts, and cycles:
+
+```go
+if _, err := g.Compile(); err != nil {
+	// e.g. "workflow pipeline: cycle detected: a → b → a"
+	log.Fatalf("invalid workflow: %v", err)
+}
+```
+
+Builder-time mistakes (an empty node id, a duplicate `AddNode`, a nil router) are also collected and surfaced here, so a single `Compile` check catches both structural and wiring problems.
