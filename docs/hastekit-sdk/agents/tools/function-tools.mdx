@@ -36,7 +36,7 @@ func NewCustomTool() *CustomTool {
 	}
 }
 
-func (t *CustomTool) Execute(ctx context.Context, params *agents.ToolCall) (*responses.FunctionCallOutputMessage, error) {
+func (t *CustomTool) Execute(ctx context.Context, params *agents.ToolCall) (*agents.ToolCallResponse, error) {
     // Parse arguments
     args := map[string]interface{}{}
     if err := json.Unmarshal([]byte(params.Arguments), &args); err != nil {
@@ -49,12 +49,15 @@ func (t *CustomTool) Execute(ctx context.Context, params *agents.ToolCall) (*res
     userName := lookupUserName(userID)  // Example function
     
     // Return the result
-    return &responses.FunctionCallOutputMessage{
-        ID:     params.ID,
-        CallID: params.CallID,
-        Output: responses.FunctionCallOutputContentUnion{
-            OfString: utils.Ptr(userName),
+    return &agents.ToolCallResponse{
+        FunctionCallOutputMessage: &responses.FunctionCallOutputMessage{
+            ID:     params.ID,
+            CallID: params.CallID,
+            Output: responses.FunctionCallOutputContentUnion{
+                OfString: utils.Ptr(userName),
+            },
         },
+        StateUpdates: map[string]string{},
     }, nil
 }
 ```

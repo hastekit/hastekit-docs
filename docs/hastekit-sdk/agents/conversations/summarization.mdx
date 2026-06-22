@@ -21,9 +21,9 @@ The LLM summarizer uses an LLM to create intelligent summaries of conversation h
 
 ```go
 import (
-    "github.com/hastekit/hastekit-sdk-go/pkg/agents/history/summariser""
-    "github.com/hastekit/hastekit-sdk-go/pkg/agents/history""
-    "github.com/hastekit/hastekit-sdk-go/pkg/agents/prompts""
+    "github.com/hastekit/hastekit-sdk-go/pkg/agents/history/summariser"
+    "github.com/hastekit/hastekit-sdk-go/pkg/agents/history"
+    "github.com/hastekit/hastekit-sdk-go/pkg/agents/prompts"
 )
 
 // Create a summarizer LLM (can be different from the agent's LLM)
@@ -38,7 +38,7 @@ summarizerInstruction := client.Prompt("You are a conversation summarizer. Creat
 // Create the LLM summarizer
 summarizer := summariser.NewLLMHistorySummarizer(&summariser.LLMHistorySummarizerOptions{
     LLM:                 summarizerLLM,
-    InstructionProvider: summarizerInstruction,
+    Instruction:         summarizerInstruction,
     TokenThreshold:      1000,        // Summarize when total tokens exceed this
     KeepRecentCount:     5,            // Keep the last 5 runs unsummarized (default: 5)
     Parameters:          responses.Parameters{}, // Optional LLM parameters
@@ -48,7 +48,7 @@ summarizer := summariser.NewLLMHistorySummarizer(&summariser.LLMHistorySummarize
 ### Parameters
 
 - **`LLM`**: The LLM provider to use for summarization (can be different from the agent's LLM)
-- **`InstructionProvider`**: System prompt provider that defines how the summarizer should summarize conversations
+- **`Instruction`**: System prompt that defines how the summarizer should summarize conversations
 - **`TokenThreshold`**: The token count threshold at which summarization triggers
 - **`KeepRecentCount`**: Number of recent conversation runs to keep unsummarized (default: 5)
 - **`Parameters`**: Optional LLM parameters (temperature, etc.) for the summarization call
@@ -68,7 +68,7 @@ The sliding window summarizer keeps only the most recent N conversation runs and
 ### Configuration
 
 ```go
-import "github.com/hastekit/hastekit-sdk-go/pkg/agents/history/summariser""
+import "github.com/hastekit/hastekit-sdk-go/pkg/agents/history/summariser"
 
 summarizer := summariser.NewSlidingWindowHistorySummarizer(&summariser.SlidingWindowHistorySummarizerOptions{
     KeepCount: 10, // Keep only the last 10 conversation runs
@@ -92,14 +92,14 @@ To use a summarizer, pass it to the conversation manager using `history.WithSumm
 
 ```go
 import (
-    "github.com/hastekit/hastekit-sdk-go/pkg/agents/history""
-    "github.com/hastekit/hastekit-sdk-go/pkg/agents/history/summariser""
+    "github.com/hastekit/hastekit-sdk-go/pkg/agents/history"
+    "github.com/hastekit/hastekit-sdk-go/pkg/agents/history/summariser"
 )
 
 // Create a summarizer
 summarizer := summariser.NewLLMHistorySummarizer(&summariser.LLMHistorySummarizerOptions{
     LLM:                 summarizerLLM,
-    InstructionProvider: summarizerInstruction,
+    Instruction:         summarizerInstruction,
     TokenThreshold:      1000,
     KeepRecentCount:     5,
 })

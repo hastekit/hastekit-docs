@@ -6,15 +6,17 @@ MCP (Model Context Protocol) tools allow your agent to connect to external MCP s
 
 ## Connecting to an MCP Server
 
-To use MCP tools, you first need to create an MCP client using the `mcpclient.NewSSEClient` function. The server should expose an SSE (Server-Sent Events) endpoint:
+To use MCP tools, you first need to create an MCP client using the `mcpclient.NewClient` function.:
 
 ```go
 import (
     "context"
-    "github.com/hastekit/hastekit-sdk-go/pkg/agents/tools""
+    "github.com/hastekit/hastekit-sdk-go/pkg/agents/tools"
 )
 
-mcpClient, err := mcpclient.NewSSEClient(context.Background(), "http://localhost:9001/sse")
+mcpClient, err := mcpclient.NewClient(context.Background(), "http://localhost:9001/sse",
+    mcpclient.WithTransport("sse"),
+)
 if err != nil {
     log.Fatal(err)
 }
@@ -31,6 +33,7 @@ You can also configure the MCP Client to send custom HTTP headers while interact
 
 ```go
 mcpClient, err := mcpclient.NewClient(context.Background(), "http://localhost:9001/sse",
+    mcpclient.WithTransport("sse"),
 	mcpclient.WithHeaders(map[string]string{
         "token": "your-token",
     }),
@@ -44,6 +47,7 @@ You can optionally filter which tools to use by passing tool names to `GetTools(
 ```go
 // Only use specific tools
 mcpClient, err := mcpclient.NewClient(context.Background(), "http://localhost:9001/sse",
+    mcpclient.WithTransport("sse"),
 		mcpclient.WithToolFilter("list_users"),
 	)
 ```
@@ -72,7 +76,7 @@ import (
 
 	"github.com/bytedance/sonic"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
-	"github.com/hastekit/hastekit-sdk-go/pkg/agents/mcpclient""
+	"github.com/hastekit/hastekit-sdk-go/pkg/agents/mcpclient"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"

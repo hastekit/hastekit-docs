@@ -7,7 +7,7 @@ Conversation history enables agents to maintain context across multiple interact
 ## Overview
 
 When a conversation history manager is provided to an agent, it performs the following operations:
-- **Loads Previous Messages**: Automatically retrieves conversation history based on the previous message ID
+- **Loads Previous Messages**: Automatically retrieves conversation history based on the thread ID
 - **Saves Automatically**: Persists new messages after each execution
 
 ## Enabling Conversation History
@@ -70,9 +70,9 @@ out, err = handle.Result()
 
 The conversation manager supports three persistence configurations for storing conversation history:
 
-### 1. No Persistence
+### 1. File Persistence
 
-When the SDK client is initialized without `endpoint` and `projectName`, messages are not persisted by default. History remains available in-memory for the lifetime of the client itself.
+When the SDK client is initialized without `endpoint` and `projectName`, messages are persisted as JSON files written to the disk.
 
 ### 2. HasteKit Gateway Persistence
 

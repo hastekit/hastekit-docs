@@ -15,7 +15,7 @@ Each API key must be assigned a `Weight`. The probability of a key being selecte
 
 ### How it Works
 
-1.  HasteKit retrieves all enabled API keys for the requested provider.
+1.  HasteKit retrieves all the configured API keys for the requested provider.
 2.  It extracts the `Weight` from each `APIKeyConfig`.
 3.  If multiple keys exist, it performs a weighted random selection.
 4.  The request is then executed using the selected API key.

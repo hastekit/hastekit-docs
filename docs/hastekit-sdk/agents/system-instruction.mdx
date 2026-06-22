@@ -53,9 +53,9 @@ The template syntax `{{variable}}` is automatically converted to Go template for
 You can create custom resolvers functions for more complex template resolution logic. The resolver function will have access to the raw prompt and the run context.
 
 ```go
-import "github.com/hastekit/hastekit-sdk-go/pkg/agents/prompts""
+import "github.com/hastekit/hastekit-sdk-go/pkg/agents/prompts"
 
-customResolver := func(promptStr string, data map[string]any) (string, error) {
+customResolver := func(promptStr string, runContext map[string]any) (string, error) {
     // Your logic to resolve the prompt into the final system format
 }
 
@@ -73,7 +73,7 @@ You can load system instructions from the HasteKit Gateway server using `RemoteP
 ```go
 agent := client.NewAgent(&hastekit.AgentOptions{
     Name:        "Remote Assistant",
-    Instruction: client.RemotePrompt("my-prompt-name", "production"),
+    Instruction: client.RemotePrompt("my-prompt-name", "production-alias"),
     LLM:         model,
 })
 ```
@@ -81,10 +81,9 @@ agent := client.NewAgent(&hastekit.AgentOptions{
 ### Parameters
 
 - **`name`**: The name of the prompt stored in the HasteKit Gateway server
-- **`label`**: The prompt label (`"production"` or `"latest"`)
-- **`resolvers`**: Optional resolvers for template variable resolution
+- **`alias`**: The prompt alias (`"production"` or `"latest"`)
 
-<Note>For this to work, you should have configured the `client` with the gateway's endpoint, project name and credentials.</Note>
+<Note>For this to work, you should have configured the `client` with the gateway's endpoint, organisation name, project name and an API key.</Note>
 
 ### Remote Prompt with Resolvers
 
@@ -96,6 +95,7 @@ agent := client.NewAgent(&hastekit.AgentOptions{
     Instruction: client.RemotePrompt(
         "assistant-prompt",
         "production",
+        prompts.WithResolver(customResolver),
     ),
     LLM: model,
 })
