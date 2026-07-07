@@ -22,25 +22,23 @@ import (
     "os"
 
     hastekit "github.com/hastekit/hastekit-sdk-go"
-    "github.com/hastekit/hastekit-sdk-go/pkg/gateway"
-    "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
 )
 
 func main() {
-    client, err := hastekit.NewWithOptions(
-        hastekit.WithProviderConfigs(gateway.ProviderConfig{
-            ProviderName:  llm.ProviderNameOpenAI,
+    client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
+        {
+            ProviderName:  hastekit.ProviderOpenAI,
             BaseURL:       "",
             CustomHeaders: nil,
-            ApiKeys: []*gateway.APIKeyConfig{
+            ApiKeys: []*hastekit.APIKeyConfig{
                 {
                     Name:   "Key 1",
                     APIKey: os.Getenv("OPENAI_API_KEY"),
                 },
             },
-        }),
-    )
+        },
+    })
 }
 ```
 
@@ -48,8 +46,8 @@ func main() {
 Make a call to the model provider to generate a response:
 
 ```go
-resp, err := client.NewResponses(ctx, &responses.Request{
-    Model:        "OpenAI/gpt-4.1-mini",
+model := client.Model("OpenAI/gpt-4.1-mini")
+resp, err := model.NewResponses(ctx, &responses.Request{
     Instructions: utils.Ptr("You are a helpful assistant."),
     Input: responses.InputUnion{
         OfString: utils.Ptr("What is the capital of France?"),
@@ -77,13 +75,10 @@ for _, output := range resp.Output {
 ## Creating Agents
 Create a simple agent with system instructions and an LLM:
 ```go
-agent := client.NewAgent(&hastekit.AgentOptions{
+agent := hastekit.NewAgent(&hastekit.AgentConfig{
     Name:        "Assistant",
-    Instruction: client.Prompt("You are a helpful assistant."),
-    LLM: client.NewLLM(hastekit.LLMOptions{
-        Provider: llm.ProviderNameOpenAI,
-        Model:    "gpt-4o-mini",
-    }),
+    Instruction: hastekit.NewPrompt("You are a helpful assistant."),
+    LLM:         client.Model("OpenAI/gpt-4o-mini"),
 })
 ```
 

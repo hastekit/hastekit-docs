@@ -12,11 +12,11 @@ When a conversation history manager is provided to an agent, it performs the fol
 
 ## Enabling Conversation History
 
-To enable conversation history, create an instance of `ConversationManager` and pass the created instance to the agent's `History` field. While invoking the agent, optionally set `Namespace` to bucket the conversations by namespaces.
+To enable conversation history, create a history manager with `hastekit.NewFileHistory` and pass the created instance to the agent's `History` field. While invoking the agent, optionally set `Namespace` to bucket the conversations by namespaces.
 
 ```go
-cm := client.NewConversationManager()
-agent := agents.NewAgent(&agents.AgentOptions{
+cm := hastekit.NewFileHistory("./conversations")
+agent := hastekit.NewAgent(&hastekit.AgentConfig{
     Name:        "Hello world agent",
     LLM:         model,
     History:     cm,
@@ -98,7 +98,7 @@ Then pass your implementation to the conversation manager constructor:
 cm := history.NewConversationManager(yourAdapter)
 ```
 
-When you use `client.NewConversationManager()`, the SDK selects and wires the appropriate adapter automatically (file or gateway, depending on whether an `endpoint` is configured).
+When you use `hastekit.NewFileHistory("./conversations")`, the SDK wires a file-backed adapter that persists messages as JSON on disk.
 
 ## Message Filtering & Attribution
 
@@ -151,39 +151,31 @@ import (
 	"github.com/google/uuid"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents/history"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
 	hastekit "github.com/hastekit/hastekit-sdk-go"
 )
 
 func main() {
-    client, err := hastekit.NewWithOptions(
-        hastekit.WithProviderConfigs(gateway.ProviderConfig{
-            ProviderName:  llm.ProviderNameOpenAI,
+    client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
+        {
+            ProviderName:  hastekit.ProviderOpenAI,
             BaseURL:       "",
             CustomHeaders: nil,
-            ApiKeys: []*gateway.APIKeyConfig{
+            ApiKeys: []*hastekit.APIKeyConfig{
                 {
                     Name:   "Key 1",
                     APIKey: os.Getenv("OPENAI_API_KEY"),
                 },
             },
-        }),
-    )
-	if err != nil {
-		log.Fatal(err)
-	}
+        },
+    })
 
-	model := client.NewLLM(hastekit.LLMOptions{
-		Provider: llm.ProviderNameOpenAI,
-		Model:    "gpt-4.1-mini",
-	})
+	model := client.Model("OpenAI/gpt-4.1-mini")
 
-	cm := client.NewConversationManager()
-	agent := agents.NewAgent(&agents.AgentOptions{
+	cm := hastekit.NewFileHistory("./conversations")
+	agent := hastekit.NewAgent(&hastekit.AgentConfig{
 		Name:        "Hello world agent",
-		Instruction: client.Prompt("You are helpful assistant."),
+		Instruction: hastekit.NewPrompt("You are helpful assistant."),
 		LLM:         model,
 		History:     cm,
 	})
@@ -211,9 +203,9 @@ func main() {
 	fmt.Println(string(b))
 
 	// Agent itself is stateless - you can either re-create another agent or reuse the same agent instance, but ensure to pass the correct `ThreadID`
-	agent2 := client.NewAgent(&hastekit.AgentOptions{
+	agent2 := hastekit.NewAgent(&hastekit.AgentConfig{
 		Name:        "Hello world agent",
-		Instruction: client.Prompt("You are helpful assistant."),
+		Instruction: hastekit.NewPrompt("You are helpful assistant."),
 		LLM:         model,
 		History:     cm,
 	})

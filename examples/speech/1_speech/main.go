@@ -6,34 +6,27 @@ import (
 	"os"
 
 	hastekit "github.com/hastekit/hastekit-sdk-go"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/speech"
 	"github.com/hastekit/hastekit-sdk-go/pkg/utils"
 )
 
 func main() {
 	// Initialize SDK client
-	client, err := hastekit.NewWithOptions(
-		hastekit.WithProviderConfigs(gateway.ProviderConfig{
-			ProviderName:  llm.ProviderNameOpenAI,
-			BaseURL:       "",
-			CustomHeaders: nil,
-			ApiKeys: []*gateway.APIKeyConfig{
+	client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
+		{
+			ProviderName: hastekit.ProviderOpenAI,
+			ApiKeys: []*hastekit.APIKeyConfig{
 				{
 					Name:   "Key 1",
 					APIKey: os.Getenv("OPENAI_API_KEY"),
 				},
 			},
-		}),
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
+		},
+	})
 
 	// Generate speech
-	resp, err := client.NewSpeech(context.Background(), &speech.Request{
-		Model:          "OpenAI/tts-1",
+	model := client.Model("OpenAI/tts-1")
+	resp, err := model.NewSpeech(context.Background(), &speech.Request{
 		Input:          "Hello! This is a text-to-speech example using HasteKit SDK.",
 		Voice:          "alloy",
 		ResponseFormat: utils.Ptr("mp3"),

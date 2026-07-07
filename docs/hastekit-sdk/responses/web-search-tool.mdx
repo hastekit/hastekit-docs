@@ -86,8 +86,7 @@ webSearchTool := responses.ToolUnion{
 Include the web search tool in your request:
 
 ```go
-resp, err := client.NewResponses(ctx, &responses.Request{
-    Model: "OpenAI/gpt-4.1-mini",
+resp, err := model.NewResponses(ctx, &responses.Request{
     Input: responses.InputUnion{
         OfString: utils.Ptr("What are the latest developments in AI?"),
     },
@@ -173,8 +172,7 @@ type WebSearchCallActionOfFind struct {
 When using streaming responses, web search calls are delivered through specific chunk types:
 
 ```go
-stream, err := client.NewStreamingResponses(ctx, &responses.Request{
-    Model: "OpenAI/gpt-4.1-mini",
+stream, err := model.NewStreamingResponses(ctx, &responses.Request{
     Input: responses.InputUnion{
         OfString: utils.Ptr("What's happening in the tech world today?"),
     },
@@ -227,29 +225,26 @@ import (
     "os"
 
     "github.com/hastekit/hastekit-sdk-go/pkg/utils"
-    "github.com/hastekit/hastekit-sdk-go/pkg/gateway"
-    "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
     hastekit "github.com/hastekit/hastekit-sdk-go"
 )
 
 func main() {
-    client, err := hastekit.NewWithOptions(
-        hastekit.WithProviderConfigs(gateway.ProviderConfig{
-            ProviderName:  llm.ProviderNameOpenAI,
+    client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
+        {
+            ProviderName:  hastekit.ProviderOpenAI,
             BaseURL:       "",
             CustomHeaders: nil,
-            ApiKeys: []*gateway.APIKeyConfig{
+            ApiKeys: []*hastekit.APIKeyConfig{
                 {
                     Name:   "Key 1",
                     APIKey: os.Getenv("OPENAI_API_KEY"),
                 },
             },
-        }),
-    )
-    if err != nil {
-        log.Fatal(err)
-    }
+        },
+    })
+
+    model := client.Model("OpenAI/gpt-4o")
 
     // Define web search tool
     webSearchTool := responses.ToolUnion{
@@ -261,8 +256,7 @@ func main() {
     }
 
     // Make request with web search
-    resp, err := client.NewResponses(context.Background(), &responses.Request{
-        Model: "OpenAI/gpt-4o",
+    resp, err := model.NewResponses(context.Background(), &responses.Request{
         Input: responses.InputUnion{
             OfString: utils.Ptr("What are the latest news about artificial intelligence?"),
         },

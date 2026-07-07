@@ -105,44 +105,35 @@ import (
     "context"
     "fmt"
     "log"
+    "os"
 
 	"github.com/bytedance/sonic"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents/history"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents/mcpclient"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
 	hastekit "github.com/hastekit/hastekit-sdk-go"
 )
 
 func main() {
-    // Initialize SDK client
-    client, err := hastekit.NewWithOptions(
-        hastekit.WithProviderConfigs(gateway.ProviderConfig{
-            ProviderName:  llm.ProviderNameOpenAI,
-            BaseURL:       "",
-            CustomHeaders: nil,
-            ApiKeys: []*gateway.APIKeyConfig{
+    // Initialize LLM client
+    client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
+        {
+            ProviderName: hastekit.ProviderOpenAI,
+            ApiKeys: []*hastekit.APIKeyConfig{
                 {
                     Name:   "Key 1",
                     APIKey: os.Getenv("OPENAI_API_KEY"),
                 },
             },
-        }),
-    )
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    // Create LLM model
-    model := client.NewLLM(hastekit.LLMOptions{
-        Provider: llm.ProviderNameOpenAI,
-        Model:    "gpt-4o-mini",
+        },
     })
 
+    // Bind a model
+    model := client.Model("OpenAI/gpt-4o-mini")
+
     // Create conversation history
-    conv := client.NewConversationManager()
+    conv := hastekit.NewFileHistory("./conversations")
 
     // Connect to MCP server
     mcpClient, err := mcpclient.NewClient(context.Background(), "http://localhost:9001/sse",
@@ -153,9 +144,9 @@ func main() {
 	)
 
     // Create agent with MCP tools
-    agent := client.NewAgent(&hastekit.AgentOptions{
+    agent := hastekit.NewAgent(&hastekit.AgentConfig{
         Name:        "Hello world agent",
-        Instruction: client.Prompt("You are helpful assistant."),
+        Instruction: hastekit.NewPrompt("You are helpful assistant."),
         LLM:         model,
         History:     conv,
         McpServers:  []agents.MCPToolset{mcpClient},

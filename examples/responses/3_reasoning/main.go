@@ -7,35 +7,27 @@ import (
 	"os"
 
 	hastekit "github.com/hastekit/hastekit-sdk-go"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
 	"github.com/hastekit/hastekit-sdk-go/pkg/utils"
 )
 
 func main() {
-	client, err := hastekit.NewWithOptions(
-		hastekit.WithProviderConfigs(gateway.ProviderConfig{
-			ProviderName:  llm.ProviderNameOpenAI,
-			BaseURL:       "",
-			CustomHeaders: nil,
-			ApiKeys: []*gateway.APIKeyConfig{
+	client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
+		{
+			ProviderName: hastekit.ProviderOpenAI,
+			ApiKeys: []*hastekit.APIKeyConfig{
 				{
 					Name:   "Key 1",
 					APIKey: os.Getenv("OPENAI_API_KEY"),
 				},
 			},
-		}),
-	)
+		},
+	})
 
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	stream, err := client.NewStreamingResponses(
+	model := client.Model("OpenAI/o4-mini")
+	stream, err := model.NewStreamingResponses(
 		context.Background(),
 		&responses.Request{
-			Model:        "OpenAI/o4-mini",
 			Instructions: utils.Ptr("You are helpful assistant. Reason before answering."),
 			Input: responses.InputUnion{
 				OfString: utils.Ptr("If 2+4=6, what would be 22+44=?"),

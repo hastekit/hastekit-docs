@@ -7,35 +7,28 @@ import (
 	"os"
 
 	hastekit "github.com/hastekit/hastekit-sdk-go"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
 	"github.com/hastekit/hastekit-sdk-go/pkg/utils"
 )
 
 func main() {
-	client, err := hastekit.NewWithOptions(
-		hastekit.WithProviderConfigs(gateway.ProviderConfig{
-			ProviderName:  llm.ProviderNameOpenAI,
-			BaseURL:       "",
-			CustomHeaders: nil,
-			ApiKeys: []*gateway.APIKeyConfig{
+	client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
+		{
+			ProviderName: hastekit.ProviderOpenAI,
+			ApiKeys: []*hastekit.APIKeyConfig{
 				{
 					Name:   "Key 1",
 					APIKey: os.Getenv("OPENAI_API_KEY"),
 				},
 			},
-		}),
-	)
+		},
+	})
 
-	if err != nil {
-		log.Fatal(err)
-	}
+	model := client.Model("OpenAI/gpt-4.1-mini")
 
-	stream, err := client.NewStreamingResponses(
+	stream, err := model.NewStreamingResponses(
 		context.Background(),
 		&responses.Request{
-			Model:        "OpenAI/gpt-4.1-mini",
 			Instructions: utils.Ptr("You are helpful assistant. You greet user with a light-joke"),
 			Input: responses.InputUnion{
 				OfString: utils.Ptr("Hello!"),

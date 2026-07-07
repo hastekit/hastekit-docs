@@ -24,11 +24,11 @@ import (
 )
 
 // Create a specialized agent
-jokeAgent := client.NewAgent(&hastekit.AgentOptions{
+jokeAgent := hastekit.NewAgent(&hastekit.AgentConfig{
     Name:        "JokeAgent",
-    Instruction: client.Prompt("You are a joke teller"),
+    Instruction: hastekit.NewPrompt("You are a joke teller"),
     LLM:         model,
-    History:     client.NewConversationManager(),
+    History:     hastekit.NewFileHistory("./conversations"),
 })
 
 // Create a handoff to this agent
@@ -49,18 +49,18 @@ handoff := agents.NewHandoff(
 
 ## Using Handoffs with a Router Agent
 
-Handoffs are configured on the router agent using the `Handoffs` field in `AgentOptions`:
+Handoffs are configured on the router agent using the `Handoffs` field in `AgentConfig`:
 
 ```go
-routerAgent := client.NewAgent(&hastekit.AgentOptions{
+routerAgent := hastekit.NewAgent(&hastekit.AgentConfig{
     Name:        "RouterAgent",
-    Instruction: client.Prompt("You are a router agent. You must not respond directly. Your role is only to delegate to other agents"),
+    Instruction: hastekit.NewPrompt("You are a router agent. You must not respond directly. Your role is only to delegate to other agents"),
     LLM:         model,
     Handoffs: []*agents.Handoff{
         agents.NewHandoff(jokeAgent.Name, "Use this agent to generate jokes", jokeAgent),
         agents.NewHandoff(factAgent.Name, "Use this agent to generate facts", factAgent),
     },
-    History: client.NewConversationManager(),
+    History: hastekit.NewFileHistory("./conversations"),
 })
 ```
 
@@ -80,64 +80,56 @@ import (
 
     hastekit "github.com/hastekit/hastekit-sdk-go"
     "github.com/hastekit/hastekit-sdk-go/pkg/agents"
-    "github.com/hastekit/hastekit-sdk-go/pkg/gateway"
-    "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
 )
 
 func main() {
-    // Initialize SDK client with required services
-    client, err := hastekit.NewWithOptions(
-        hastekit.WithProviderConfigs(gateway.ProviderConfig{
-            ProviderName:  llm.ProviderNameOpenAI,
+    // Configure an LLM client
+    client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
+        {
+            ProviderName:  hastekit.ProviderOpenAI,
             BaseURL:       "",
             CustomHeaders: nil,
-            ApiKeys: []*gateway.APIKeyConfig{
+            ApiKeys: []*hastekit.APIKeyConfig{
                 {
                     Name:   "Key 1",
                     APIKey: os.Getenv("OPENAI_API_KEY"),
                 },
             },
-        }),
-    )
-    if err != nil {
-        log.Fatal(err)
-    }
+        },
+    })
 
     // Create LLM model
-    model := client.NewLLM(hastekit.LLMOptions{
-        Provider: llm.ProviderNameOpenAI,
-        Model:    "gpt-4.1-mini",
-    })
+    model := client.Model("OpenAI/gpt-4.1-mini")
 
     // Create specialized agents
-    jokeAgent := client.NewAgent(&hastekit.AgentOptions{
+    jokeAgent := hastekit.NewAgent(&hastekit.AgentConfig{
         Name:        "JokeAgent",
-        Instruction: client.Prompt("You are a joke teller"),
+        Instruction: hastekit.NewPrompt("You are a joke teller"),
         LLM:         model,
-        History:     client.NewConversationManager(),
+        History:     hastekit.NewFileHistory("./conversations"),
     })
 
-    factAgent := client.NewAgent(&hastekit.AgentOptions{
+    factAgent := hastekit.NewAgent(&hastekit.AgentConfig{
         Name:        "FactAgent",
-        Instruction: client.Prompt("You are a fact teller"),
+        Instruction: hastekit.NewPrompt("You are a fact teller"),
         LLM:         model,
-        History:     client.NewConversationManager(),
+        History:     hastekit.NewFileHistory("./conversations"),
     })
 
     // Create router agent with handoffs
-    _ = client.NewAgent(&hastekit.AgentOptions{
+    _ = hastekit.NewAgent(&hastekit.AgentConfig{
         Name:        "RouterAgent",
-        Instruction: client.Prompt("You are a router agent. You must not respond directly. Your role is only to delegate to other agents"),
+        Instruction: hastekit.NewPrompt("You are a router agent. You must not respond directly. Your role is only to delegate to other agents"),
         LLM:         model,
         Handoffs: []*agents.Handoff{
             agents.NewHandoff(jokeAgent.Name, "Use this agent to generate jokes", jokeAgent),
             agents.NewHandoff(factAgent.Name, "Use this agent to generate facts", factAgent),
         },
-        History: client.NewConversationManager(),
+        History: hastekit.NewFileHistory("./conversations"),
     })
 
     // Serve the agents
-    err = http.ListenAndServe(":8070", client)
+    err := http.ListenAndServe(":8070", hastekit.NewHTTPHandler())
     if err != nil {
         log.Fatal(err)
     }

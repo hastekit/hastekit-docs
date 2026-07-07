@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 
 	"github.com/bytedance/sonic"
@@ -11,43 +12,39 @@ import (
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents/history"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents/tools"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
+	"github.com/hastekit/hastekit-sdk-go/pkg/hastekitgateway"
 )
 
 func main() {
-	client, err := hastekit.NewWithOptions(
-		hastekit.WithProviderConfigs(gateway.ProviderConfig{
-			ProviderName:  llm.ProviderNameOpenAI,
-			BaseURL:       "",
-			CustomHeaders: nil,
-			ApiKeys: []*gateway.APIKeyConfig{
+	client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
+		{
+			ProviderName: hastekit.ProviderOpenAI,
+			ApiKeys: []*hastekit.APIKeyConfig{
 				{
 					Name:   "Key 1",
 					APIKey: os.Getenv("OPENAI_API_KEY"),
 				},
 			},
-		}),
-		hastekit.WithServerConfig("https://app.hastekit.ai", "", "", ""),
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	model := client.NewLLM(hastekit.LLMOptions{
-		Provider: llm.ProviderNameOpenAI,
-		Model:    "gpt-4.1-mini",
+		},
 	})
 
-	hist := client.NewConversationManager()
-	agent := agents.NewAgent(&agents.AgentOptions{
+	model := client.Model("OpenAI/gpt-4.1-mini")
+
+	// The sandbox manager talks to the HasteKit sandbox service.
+	sandboxCfg := &hastekitgateway.Config{
+		Endpoint:   "https://app.hastekit.ai",
+		HttpClient: http.DefaultClient,
+	}
+
+	hist := hastekit.NewFileHistory("./conversations")
+	agent := hastekit.NewAgent(&hastekit.AgentConfig{
 		Name:        "hello-world-agent",
-		Instruction: client.Prompt("You are a helpful assistant with access to terminal (bash)"),
+		Instruction: hastekit.NewPrompt("You are a helpful assistant with access to terminal (bash)"),
 		LLM:         model,
 		History:     hist,
 		Tools: []agents.Tool{
-			tools.NewBashTool(client.NewSandboxManager(), "praveenraj9495/hastekit-ai-sandbox:latest", map[string]string{}),
+			tools.NewBashTool(sandboxCfg.NewSandboxClient(), "praveenraj9495/hastekit-ai-sandbox:latest", map[string]string{}),
 		},
 	})
 

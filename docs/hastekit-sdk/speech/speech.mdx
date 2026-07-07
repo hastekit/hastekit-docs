@@ -17,8 +17,7 @@ import (
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/speech"
 )
 
-resp, err := client.NewSpeech(context.Background(), &speech.Request{
-    Model: "OpenAI/tts-1",
+resp, err := model.NewSpeech(context.Background(), &speech.Request{
     Input: "Hello, this is a test of the text-to-speech system.",
     Voice: "alloy",
 })
@@ -65,8 +64,7 @@ import (
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/speech"
 )
 
-stream, err := client.NewStreamingSpeech(context.Background(), &speech.Request{
-    Model: "OpenAI/tts-1",
+stream, err := model.NewStreamingSpeech(context.Background(), &speech.Request{
     Input: "This is a streaming text-to-speech example.",
     Voice: "alloy",
     Speed: utils.Ptr(1), // Speed parameter enables streaming
@@ -154,34 +152,30 @@ import (
     "os"
     
     "github.com/hastekit/hastekit-sdk-go/pkg/utils"
-    "github.com/hastekit/hastekit-sdk-go/pkg/gateway"
-    "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/speech"
     hastekit "github.com/hastekit/hastekit-sdk-go"
 )
 
 func main() {
-    // Initialize SDK client
-    client, err := hastekit.NewWithOptions(
-        hastekit.WithProviderConfigs(gateway.ProviderConfig{
-            ProviderName:  llm.ProviderNameOpenAI,
+    // Initialize the LLM client and bind a model
+    client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
+        {
+            ProviderName:  hastekit.ProviderOpenAI,
             BaseURL:       "",
             CustomHeaders: nil,
-            ApiKeys: []*gateway.APIKeyConfig{
+            ApiKeys: []*hastekit.APIKeyConfig{
                 {
                     Name:   "Key 1",
                     APIKey: os.Getenv("OPENAI_API_KEY"),
                 },
             },
-        }),
-    )
-    if err != nil {
-        log.Fatal(err)
-    }
+        },
+    })
+
+    model := client.Model("OpenAI/tts-1")
 
     // Generate speech
-    resp, err := client.NewSpeech(context.Background(), &speech.Request{
-        Model:          "OpenAI/tts-1",
+    resp, err := model.NewSpeech(context.Background(), &speech.Request{
         Input:          "Hello! This is a text-to-speech example using HasteKit SDK.",
         Voice:          "alloy",
         ResponseFormat: utils.Ptr("mp3"),

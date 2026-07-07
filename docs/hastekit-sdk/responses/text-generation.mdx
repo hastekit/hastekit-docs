@@ -9,8 +9,7 @@ HasteKit SDK supports generating text content with various LLM providers like Op
 You can then invoke the model with parameters like model identifer, system instruction, temperature, topP, user message, etc.
 
 ```go
-resp, err := client.NewResponses(ctx, &responses.Request{
-    Model:        "OpenAI/gpt-4.1-mini",
+resp, err := model.NewResponses(ctx, &responses.Request{
     Instructions: utils.Ptr("You are a helpful assistant."),
     Input: responses.InputUnion{
         OfString: utils.Ptr("What is the capital of France?"),
@@ -52,8 +51,7 @@ import (
 func main() {
     // ... client and model initialization ...
 
-    stream, err := client.NewStreamingResponses(context.Background(), &responses.Request{
-        Model:        "OpenAI/gpt-4.1-mini",
+    stream, err := model.NewStreamingResponses(context.Background(), &responses.Request{
         Input: responses.InputUnion{
             OfString: utils.Ptr("Write a poem about coding."),
         },
@@ -76,8 +74,7 @@ func main() {
 Instead of a single string, you can pass a list of messages for context-aware conversations.
 
 ```go
-resp, err := client.NewResponses(ctx, &responses.Request{
-    Model: "OpenAI/gpt-4.1-mini",
+resp, err := model.NewResponses(ctx, &responses.Request{
     Input: responses.InputUnion{
         OfInputMessageList: responses.InputMessageList{
             {

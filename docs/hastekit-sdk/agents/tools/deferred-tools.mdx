@@ -48,14 +48,24 @@ func NewLookupTool() *CustomTool {
 }
 ```
 
+If you build the tool with the [`hastekit.NewTool`](/hastekit-sdk/agents/tools/function-tools) helper instead, mark it deferred with the `hastekit.WithDeferred` option:
+
+```go
+lookupTool := hastekit.NewTool(lookupUser,
+	hastekit.WithName("lookup_user"),
+	hastekit.WithDescription[LookupArgs, User]("Look up a user record by ID"),
+	hastekit.WithDeferred[LookupArgs, User](true), // keep out of the prompt until activated
+)
+```
+
 Attach it like any other tool — the SDK detects the deferred flag and wires up `ToolSearch` for you:
 
 ```go
-agent := client.NewAgent(&hastekit.AgentOptions{
+agent := hastekit.NewAgent(&hastekit.AgentConfig{
 	Name:        "Assistant",
-	Instruction: client.Prompt("You are a helpful assistant."),
+	Instruction: hastekit.NewPrompt("You are a helpful assistant."),
 	LLM:         model,
-	Tools: []agents.Tool{
+	Tools: []hastekit.Tool{
 		NewLookupTool(), // deferred — discovered via ToolSearch
 		NewWeatherTool(), // regular — always in the prompt
 	},

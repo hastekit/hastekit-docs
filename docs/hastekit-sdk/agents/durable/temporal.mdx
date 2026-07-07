@@ -27,7 +27,7 @@ With durable execution:
 
 ## Creating a Durable Agent
 
-To create a durable agent with Temporal, use `NewTemporalAgent()` instead of `NewAgent()`:
+To make an agent durable with Temporal, create a Temporal runtime with `hastekit.NewTemporalRuntime` and attach it to the agent with `hastekit.WithRuntime`:
 
 ```go
 package main
@@ -37,45 +37,43 @@ import (
     "net/http"
     "os"
 
-    "github.com/hastekit/hastekit-sdk-go/pkg/gateway"
-    "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
     hastekit "github.com/hastekit/hastekit-sdk-go"
 )
 
 func main() {
-    // Initialize SDK with Temporal and Redis configuration
-    client, err := hastekit.NewWithOptions(
-        hastekit.WithProviderConfigs(gateway.ProviderConfig{
-            ProviderName:  llm.ProviderNameOpenAI,
-            BaseURL:       "",
-            CustomHeaders: nil,
-            ApiKeys: []*gateway.APIKeyConfig{
+    client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
+        {
+            ProviderName: hastekit.ProviderOpenAI,
+            ApiKeys: []*hastekit.APIKeyConfig{
                 {
                     Name:   "Key 1",
                     APIKey: os.Getenv("OPENAI_API_KEY"),
                 },
             },
-        }),
-        hastekit.WithTemporalConfig("0.0.0.0:7233"), // Temporal server endpoint
-        hastekit.WithRedisConfig("localhost:6379"), // Redis for streaming support
-    )
+        },
+    })
+
+    model := client.Model("OpenAI/gpt-4o-mini")
+
+    // Create a Temporal runtime: (Temporal server endpoint, Redis endpoint)
+    rt, err := hastekit.NewTemporalRuntime("0.0.0.0:7233", "localhost:6379")
     if err != nil {
         log.Fatal(err)
     }
 
-    model := client.NewLLM(hastekit.LLMOptions{
-        Provider: llm.ProviderNameOpenAI,
-        Model:    "gpt-4o-mini",
-    })
+    broker, err := hastekit.NewRedisStreamBroker("localhost:6379")
+    if err != nil {
+        log.Fatal(err)
+    }
 
-    // Create a durable agent with NewTemporalAgent
+    // Create a durable agent by attaching the runtime
     agentName := "SampleAgent"
-    agent := client.NewTemporalAgent(&hastekit.AgentOptions{
+    agent := hastekit.NewAgent(&hastekit.AgentConfig{
         Name:        agentName,
-        Instruction: client.Prompt("You are helpful assistant."),
+        Instruction: hastekit.NewPrompt("You are helpful assistant."),
         LLM:         model,
-        History:     client.NewConversationManager(),
-    })
+        History:     hastekit.NewFileHistory("./conversations"),
+    }, hastekit.WithRuntime(rt, broker))
 }
 ```
 
@@ -89,13 +87,13 @@ Run both the Temporal worker and the application code in the same process. This 
 
 ```go
 func main() {
-    // ... client and agent setup from above ...
+    // ... client, runtime, and agent setup from above ...
 
-    // Start Temporal worker in a goroutine
-    client.StartTemporalService()
-    
+    // Start the Temporal worker in a goroutine
+    rt.Start()
+
     // Start HTTP server for invoking the workflow
-    http.ListenAndServe(":8070", client)
+    http.ListenAndServe(":8070", hastekit.NewHTTPHandler())
 }
 ```
 
@@ -121,48 +119,45 @@ import (
     "net/http"
     "os"
 
-    "github.com/hastekit/hastekit-sdk-go/pkg/gateway"
-    "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
     hastekit "github.com/hastekit/hastekit-sdk-go"
 )
 
 func main() {
-    client, err := hastekit.NewWithOptions(
-        hastekit.WithProviderConfigs(gateway.ProviderConfig{
-            ProviderName:  llm.ProviderNameOpenAI,
-            BaseURL:       "",
-            CustomHeaders: nil,
-            ApiKeys: []*gateway.APIKeyConfig{
+    client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
+        {
+            ProviderName: hastekit.ProviderOpenAI,
+            ApiKeys: []*hastekit.APIKeyConfig{
                 {
                     Name:   "Key 1",
                     APIKey: os.Getenv("OPENAI_API_KEY"),
                 },
             },
-        }),
-        hastekit.WithTemporalConfig("0.0.0.0:7233"), // Temporal server endpoint
-        hastekit.WithRedisConfig("localhost:6379"), // Redis for streaming support
-    )
+        },
+    })
+
+    model := client.Model("OpenAI/gpt-4o-mini")
+
+    rt, err := hastekit.NewTemporalRuntime("0.0.0.0:7233", "localhost:6379")
+    if err != nil {
+        log.Fatal(err)
+    }
+    broker, err := hastekit.NewRedisStreamBroker("localhost:6379")
     if err != nil {
         log.Fatal(err)
     }
 
-    model := client.NewLLM(hastekit.LLMOptions{
-        Provider: llm.ProviderNameOpenAI,
-        Model:    "gpt-4o-mini",
-    })
-
-    // Register the agent
+    // Register the agent with the runtime attached (but don't start the worker here)
     agentName := "my-agent"
-    _ = client.NewTemporalAgent(&hastekit.AgentOptions{
+    _ = hastekit.NewAgent(&hastekit.AgentConfig{
         Name:        agentName,
-        Instruction: client.Prompt("You are a helpful assistant."),
+        Instruction: hastekit.NewPrompt("You are a helpful assistant."),
         LLM:         model,
-        History:     client.NewConversationManager(),
-    })
+        History:     hastekit.NewFileHistory("./conversations"),
+    }, hastekit.WithRuntime(rt, broker))
 
     // Start application server (no Temporal worker here)
     log.Println("Application server starting on :8070")
-    http.ListenAndServe(":8070", client)
+    http.ListenAndServe(":8070", hastekit.NewHTTPHandler())
 }
 ```
 
@@ -176,49 +171,46 @@ import (
     "log"
     "os"
 
-    "github.com/hastekit/hastekit-sdk-go/pkg/gateway"
-    "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
     hastekit "github.com/hastekit/hastekit-sdk-go"
 )
 
 func main() {
-    client, err := hastekit.NewWithOptions(
-        hastekit.WithProviderConfigs(gateway.ProviderConfig{
-            ProviderName:  llm.ProviderNameOpenAI,
-            BaseURL:       "",
-            CustomHeaders: nil,
-            ApiKeys: []*gateway.APIKeyConfig{
+    client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
+        {
+            ProviderName: hastekit.ProviderOpenAI,
+            ApiKeys: []*hastekit.APIKeyConfig{
                 {
                     Name:   "Key 1",
                     APIKey: os.Getenv("OPENAI_API_KEY"),
                 },
             },
-        }),
-        hastekit.WithTemporalConfig("0.0.0.0:7233"), // Temporal server endpoint
-        hastekit.WithRedisConfig("localhost:6379"), // Redis for streaming support
-    )
+        },
+    })
+
+    model := client.Model("OpenAI/gpt-4o-mini")
+
+    rt, err := hastekit.NewTemporalRuntime("0.0.0.0:7233", "localhost:6379")
+    if err != nil {
+        log.Fatal(err)
+    }
+    broker, err := hastekit.NewRedisStreamBroker("localhost:6379")
     if err != nil {
         log.Fatal(err)
     }
 
-    model := client.NewLLM(hastekit.LLMOptions{
-        Provider: llm.ProviderNameOpenAI,
-        Model:    "gpt-4o-mini",
-    })
-
     // Register the SAME agent with the SAME configuration
     agentName := "my-agent"
-    _ = client.NewTemporalAgent(&hastekit.AgentOptions{
+    _ = hastekit.NewAgent(&hastekit.AgentConfig{
         Name:        agentName,
-        Instruction: client.Prompt("You are a helpful assistant."),
+        Instruction: hastekit.NewPrompt("You are a helpful assistant."),
         LLM:         model,
-        History:     client.NewConversationManager(),
-    })
+        History:     hastekit.NewFileHistory("./conversations"),
+    }, hastekit.WithRuntime(rt, broker))
 
     // Start only the Temporal worker
     log.Println("Temporal worker starting...")
-    client.StartTemporalService()
-    
+    rt.Start()
+
     // Block forever (worker runs in background goroutine)
     select {}
 }

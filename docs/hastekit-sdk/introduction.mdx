@@ -31,8 +31,8 @@ A Golang SDK for developers who want fine-grained control over LLM interactions 
     Use the SDK as a lightweight wrapper to call any LLM provider. Simply change the `Provider` and `Model` to switch between providers—your application logic stays the same:
 
 ```go
-resp, _ := client.NewResponses(ctx, &responses.Request{
-    Model: "OpenAI/gpt-4.1-mini", // or "Anthropic/claude-haiku-4-5" or "Gemini/gemini-2.5-flash"
+model := client.Model("OpenAI/gpt-4.1-mini") // or "Anthropic/claude-haiku-4-5" or "Gemini/gemini-2.5-flash"
+resp, _ := model.NewResponses(ctx, &responses.Request{
     Instructions: utils.Ptr("You are a helpful assistant."),
     Input: responses.InputUnion{
         OfString: utils.Ptr("What is the capital of France?"),
@@ -44,13 +44,10 @@ resp, _ := client.NewResponses(ctx, &responses.Request{
     Create agents with tools, memory, and multi-step reasoning. Agents work the same way across all providers:
 
 ```go
-agent := client.NewAgent(&hastekit.AgentOptions{
+agent := hastekit.NewAgent(&hastekit.AgentConfig{
     Name:        "Assistant",
-    Instruction: client.Prompt("You are a helpful assistant."),
-    LLM: client.NewLLM(hastekit.LLMOptions{
-        Provider: llm.ProviderNameOpenAI,
-        Model:    "gpt-4o-mini",
-    }),
+    Instruction: hastekit.NewPrompt("You are a helpful assistant."),
+    LLM:         client.Model("OpenAI/gpt-4o-mini"),
 })
 
 handle, _ := agent.Execute(ctx, &agents.AgentInput{

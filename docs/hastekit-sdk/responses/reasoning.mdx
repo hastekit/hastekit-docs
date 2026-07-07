@@ -15,8 +15,7 @@ The `ReasoningParam` struct supports the following fields:
 - **`BudgetTokens`** (`*int`): Maximum tokens to allocate for reasoning steps. Used by Anthropic and Gemini; not used for OpenAI.
 
 ```go
-resp, err := client.NewResponses(ctx, &responses.Request{
-    Model: "OpenAI/o3-mini",
+resp, err := model.NewResponses(ctx, &responses.Request{
     Input: responses.InputUnion{
         OfString: utils.Ptr("If 2+4=6, what would be 22+44=?"),
     },
@@ -37,7 +36,7 @@ resp, err := client.NewResponses(ctx, &responses.Request{
 Reasoning steps are returned as distinct output items, separate from the final text response. You can access them like this:
 
 ```go
-resp, err := client.NewResponses(ctx, request)
+resp, err := model.NewResponses(ctx, request)
 if err != nil {
     panic(err)
 }

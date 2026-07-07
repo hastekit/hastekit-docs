@@ -23,8 +23,7 @@ if err != nil {
     log.Fatal(err)
 }
 
-resp, err := client.NewTranscription(context.Background(), &transcription.Request{
-    Model:         "OpenAI/whisper-1",
+resp, err := model.NewTranscription(context.Background(), &transcription.Request{
     Audio:         audio,
     AudioFilename: "recording.mp3",
 })
@@ -66,8 +65,7 @@ if resp.Usage != nil {
 Request word-level timestamps for precise timing information.
 
 ```go
-resp, err := client.NewTranscription(context.Background(), &transcription.Request{
-    Model:                  "OpenAI/whisper-1",
+resp, err := model.NewTranscription(context.Background(), &transcription.Request{
     Audio:                  audio,
     AudioFilename:          "recording.mp3",
     ResponseFormat:         utils.Ptr("verbose_json"),
@@ -87,8 +85,7 @@ for _, word := range resp.Words {
 Request segment-level timestamps for paragraph or sentence-level timing.
 
 ```go
-resp, err := client.NewTranscription(context.Background(), &transcription.Request{
-    Model:                  "OpenAI/whisper-1",
+resp, err := model.NewTranscription(context.Background(), &transcription.Request{
     Audio:                  audio,
     AudioFilename:          "recording.mp3",
     ResponseFormat:         utils.Ptr("verbose_json"),
@@ -169,30 +166,27 @@ import (
     "os"
 
     "github.com/hastekit/hastekit-sdk-go/pkg/utils"
-    "github.com/hastekit/hastekit-sdk-go/pkg/gateway"
-    "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/transcription"
     hastekit "github.com/hastekit/hastekit-sdk-go"
 )
 
 func main() {
-    // Initialize SDK client
-    client, err := hastekit.NewWithOptions(
-        hastekit.WithProviderConfigs(gateway.ProviderConfig{
-            ProviderName:  llm.ProviderNameOpenAI,
+    // Initialize the LLM client and bind a model
+    client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
+        {
+            ProviderName:  hastekit.ProviderOpenAI,
             BaseURL:       "",
             CustomHeaders: nil,
-            ApiKeys: []*gateway.APIKeyConfig{
+            ApiKeys: []*hastekit.APIKeyConfig{
                 {
                     Name:   "Key 1",
                     APIKey: os.Getenv("OPENAI_API_KEY"),
                 },
             },
-        }),
-    )
-    if err != nil {
-        log.Fatal(err)
-    }
+        },
+    })
+
+    model := client.Model("OpenAI/whisper-1")
 
     // Read audio file
     audio, err := os.ReadFile("meeting.mp3")
@@ -201,8 +195,7 @@ func main() {
     }
 
     // Transcribe with word-level timestamps
-    resp, err := client.NewTranscription(context.Background(), &transcription.Request{
-        Model:                  "OpenAI/whisper-1",
+    resp, err := model.NewTranscription(context.Background(), &transcription.Request{
         Audio:                  audio,
         AudioFilename:          "meeting.mp3",
         Language:               utils.Ptr("en"),

@@ -9,10 +9,9 @@ If the downstream LLM provider supports image processing (vision) and generation
 Models that supports image processing or vision can understand images as input. You can attach images in either as a URL or as a base64 encoded string like this:
 
 ```go
-resp, err := client.NewResponses(
+resp, err := model.NewResponses(
     context.Background(),
     &responses.Request{
-        Model:        "OpenAI/gpt-4.1-mini",
         Instructions: utils.Ptr("Describe this image"),
         Input: responses.InputUnion{
             OfInputMessageList: responses.InputMessageList{
@@ -49,10 +48,9 @@ resp, err := client.NewResponses(
 To enable image generation, include the `ImageGenerationTool` in your request's `Tools` array:
 
 ```go
-resp, err := client.NewResponses(
+resp, err := model.NewResponses(
     context.Background(),
     &responses.Request{
-        Model: "OpenAI/gpt-4.1-mini",
         Input: responses.InputUnion{
             OfString: utils.Ptr("Generate a beautiful sunset over mountains"),
         },
@@ -96,8 +94,7 @@ import (
 func main() {
     // ... client initialization ...
 
-    resp, err := client.NewResponses(context.Background(), &responses.Request{
-        Model: "OpenAI/gpt-4.1-mini",
+    resp, err := model.NewResponses(context.Background(), &responses.Request{
         Input: responses.InputUnion{
             OfString: utils.Ptr("Create an image of a serene lake at sunset"),
         },
@@ -162,8 +159,7 @@ import (
 func main() {
     // ... client initialization ...
 
-    stream, err := client.NewStreamingResponses(context.Background(), &responses.Request{
-        Model: "OpenAI/gpt-4.1-mini",
+    stream, err := model.NewStreamingResponses(context.Background(), &responses.Request{
         Input: responses.InputUnion{
             OfString: utils.Ptr("Generate a futuristic cityscape"),
         },

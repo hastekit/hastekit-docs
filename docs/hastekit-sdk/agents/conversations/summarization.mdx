@@ -27,13 +27,10 @@ import (
 )
 
 // Create a summarizer LLM (can be different from the agent's LLM)
-summarizerLLM := client.NewLLM(hastekit.LLMOptions{
-    Provider: llm.ProviderNameOpenAI,
-    Model:    "gpt-4o-mini",
-})
+summarizerLLM := client.Model("OpenAI/gpt-4o-mini")
 
 // Create an instruction provider for the summarizer
-summarizerInstruction := client.Prompt("You are a conversation summarizer. Create concise summaries that preserve important context, decisions, and information.")
+summarizerInstruction := hastekit.NewPrompt("You are a conversation summarizer. Create concise summaries that preserve important context, decisions, and information.")
 
 // Create the LLM summarizer
 summarizer := summariser.NewLLMHistorySummarizer(&summariser.LLMHistorySummarizerOptions{
@@ -105,14 +102,16 @@ summarizer := summariser.NewLLMHistorySummarizer(&summariser.LLMHistorySummarize
 })
 
 // Create conversation manager with summarizer
-cm := client.NewConversationManager(
+p, _ := history.NewFileConversationPersistence("./conversations")
+cm := history.NewConversationManager(
+    p,
     history.WithSummarizer(summarizer),
 )
 
 // Use with agent
-agent := client.NewAgent(&hastekit.AgentOptions{
+agent := hastekit.NewAgent(&hastekit.AgentConfig{
     Name:        "Assistant",
-    Instruction: client.Prompt("You are a helpful assistant."),
+    Instruction: hastekit.NewPrompt("You are a helpful assistant."),
     LLM:         model,
     History:     cm,
 })
@@ -134,44 +133,33 @@ import (
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents/history"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents/history/summariser"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
 )
 
 func main() {
-	// Initialize SDK client
-    client, err := hastekit.NewWithOptions(
-        hastekit.WithProviderConfigs(gateway.ProviderConfig{
-            ProviderName:  llm.ProviderNameOpenAI,
+	// Configure an LLM client
+    client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
+        {
+            ProviderName:  hastekit.ProviderOpenAI,
             BaseURL:       "",
             CustomHeaders: nil,
-            ApiKeys: []*gateway.APIKeyConfig{
+            ApiKeys: []*hastekit.APIKeyConfig{
                 {
                     Name:   "Key 1",
                     APIKey: os.Getenv("OPENAI_API_KEY"),
                 },
             },
-        }),
-    )
-	if err != nil {
-		log.Fatal(err)
-	}
+        },
+    })
 
 	// Create main agent LLM
-	model := client.NewLLM(hastekit.LLMOptions{
-		Provider: llm.ProviderNameOpenAI,
-		Model:    "gpt-4o-mini",
-	})
+	model := client.Model("OpenAI/gpt-4o-mini")
 
 	// Create summarizer LLM (can use a cheaper/faster model)
-	summarizerLLM := client.NewLLM(hastekit.LLMOptions{
-		Provider: llm.ProviderNameOpenAI,
-		Model:    "gpt-4o-mini",
-	})
+	summarizerLLM := client.Model("OpenAI/gpt-4o-mini")
 
 	// Create summarizer instruction
-	summarizerInstruction := client.Prompt(
+	summarizerInstruction := hastekit.NewPrompt(
 		"You are a conversation summarizer. Create concise summaries that preserve important context, decisions, and information needed for future interactions.",
 	)
 
@@ -185,14 +173,16 @@ func main() {
 	})
 
 	// Create conversation manager with summarizer
-	cm := client.NewConversationManager(
+	p, _ := history.NewFileConversationPersistence("./conversations")
+	cm := history.NewConversationManager(
+		p,
 		history.WithSummarizer(summarizer),
 	)
 
 	// Create agent with history
-	agent := client.NewAgent(&hastekit.AgentOptions{
+	agent := hastekit.NewAgent(&hastekit.AgentConfig{
 		Name:        "Assistant",
-		Instruction: client.Prompt("You are a helpful assistant."),
+		Instruction: hastekit.NewPrompt("You are a helpful assistant."),
 		LLM:         model,
 		History:     cm,
 	})
@@ -233,34 +223,26 @@ import (
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents/history"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents/history/summariser"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
 )
 
 func main() {
-	// Initialize SDK client
-    client, err := hastekit.NewWithOptions(
-        hastekit.WithProviderConfigs(gateway.ProviderConfig{
-            ProviderName:  llm.ProviderNameOpenAI,
+	// Configure an LLM client
+    client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
+        {
+            ProviderName:  hastekit.ProviderOpenAI,
             BaseURL:       "",
             CustomHeaders: nil,
-            ApiKeys: []*gateway.APIKeyConfig{
+            ApiKeys: []*hastekit.APIKeyConfig{
                 {
                     Name:   "Key 1",
                     APIKey: os.Getenv("OPENAI_API_KEY"),
                 },
             },
-        }),
-    )
-	if err != nil {
-		log.Fatal(err)
-	}
+        },
+    })
 
-	model := client.NewLLM(hastekit.LLMOptions{
-		Provider: llm.ProviderNameOpenAI,
-		Model:    "gpt-4o-mini",
-	})
+	model := client.Model("OpenAI/gpt-4o-mini")
 
 	// Create sliding window summarizer
 	summarizer := summariser.NewSlidingWindowHistorySummarizer(&summariser.SlidingWindowHistorySummarizerOptions{
@@ -268,14 +250,16 @@ func main() {
 	})
 
 	// Create conversation manager with summarizer
-	cm := client.NewConversationManager(
+	p, _ := history.NewFileConversationPersistence("./conversations")
+	cm := history.NewConversationManager(
+		p,
 		history.WithSummarizer(summarizer),
 	)
 
 	// Create agent
-	agent := client.NewAgent(&hastekit.AgentOptions{
+	agent := hastekit.NewAgent(&hastekit.AgentConfig{
 		Name:        "Assistant",
-		Instruction: client.Prompt("You are a helpful assistant."),
+		Instruction: hastekit.NewPrompt("You are a helpful assistant."),
 		LLM:         model,
 		History:     cm,
 	})

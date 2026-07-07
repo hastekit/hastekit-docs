@@ -25,7 +25,7 @@ With durable execution:
 
 ## Creating a Durable Agent
 
-To create a durable agent, use `NewRestateAgent()` instead of `NewAgent()`:
+To make an agent durable, create a Restate runtime with `hastekit.NewRestateRuntime` and attach it to the agent with `hastekit.WithRuntime`:
 
 ```go
 package main
@@ -35,45 +35,43 @@ import (
     "net/http"
     "os"
 
-    "github.com/hastekit/hastekit-sdk-go/pkg/gateway"
-    "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
     hastekit "github.com/hastekit/hastekit-sdk-go"
 )
 
 func main() {
-    // Initialize SDK with Restate configuration
-    client, err := hastekit.NewWithOptions(
-        hastekit.WithProviderConfigs(gateway.ProviderConfig{
-            ProviderName:  llm.ProviderNameOpenAI,
-            BaseURL:       "",
-            CustomHeaders: nil,
-            ApiKeys: []*gateway.APIKeyConfig{
+    client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
+        {
+            ProviderName: hastekit.ProviderOpenAI,
+            ApiKeys: []*hastekit.APIKeyConfig{
                 {
                     Name:   "Key 1",
                     APIKey: os.Getenv("OPENAI_API_KEY"),
                 },
             },
-        }),
-        hastekit.WithRestateConfig("http://localhost:8080"), // Restate ingress endpoint
-        hastekit.WithRedisConfig("localhost:6379"),
-    )
+        },
+    })
+
+    model := client.Model("OpenAI/gpt-4o-mini")
+
+    // Create a Restate runtime: (Restate service address, Redis endpoint)
+    rt, err := hastekit.NewRestateRuntime("0.0.0.0:9081", "localhost:6379")
     if err != nil {
         log.Fatal(err)
     }
 
-    model := client.NewLLM(hastekit.LLMOptions{
-        Provider: llm.ProviderNameOpenAI,
-        Model:    "gpt-4o-mini",
-    })
+    broker, err := hastekit.NewRedisStreamBroker("localhost:6379")
+    if err != nil {
+        log.Fatal(err)
+    }
 
-    // Create a durable agent with NewRestateAgent
+    // Create a durable agent by attaching the runtime
     agentName := "SampleAgent"
-    agent := client.NewRestateAgent(&hastekit.AgentOptions{
+    agent := hastekit.NewAgent(&hastekit.AgentConfig{
         Name:        agentName,
-        Instruction: client.Prompt("You are helpful assistant."),
+        Instruction: hastekit.NewPrompt("You are helpful assistant."),
         LLM:         model,
-        History:     client.NewConversationManager(),
-    })
+        History:     hastekit.NewFileHistory("./conversations"),
+    }, hastekit.WithRuntime(rt, broker))
 }
 ```
 
@@ -87,13 +85,13 @@ Run both the Restate service handler and the application code in the same proces
 
 ```go
 func main() {
-    // ... client and agent setup from above ...
+    // ... client, runtime, and agent setup from above ...
 
-    // Start Restate service in a goroutine
-    client.StartRestateService("0.0.0.0", "9081")
-    
+    // Start the Restate service in a goroutine
+    rt.Start()
+
     // Start HTTP server for invoking the workflow
-    http.ListenAndServe(":8070", client)
+    http.ListenAndServe(":8070", hastekit.NewHTTPHandler())
 }
 ```
 
@@ -119,48 +117,45 @@ import (
     "net/http"
     "os"
 
-    "github.com/hastekit/hastekit-sdk-go/pkg/gateway"
-    "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
     hastekit "github.com/hastekit/hastekit-sdk-go"
 )
 
 func main() {
-    client, err := hastekit.NewWithOptions(
-        hastekit.WithProviderConfigs(gateway.ProviderConfig{
-            ProviderName:  llm.ProviderNameOpenAI,
-            BaseURL:       "",
-            CustomHeaders: nil,
-            ApiKeys: []*gateway.APIKeyConfig{
+    client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
+        {
+            ProviderName: hastekit.ProviderOpenAI,
+            ApiKeys: []*hastekit.APIKeyConfig{
                 {
                     Name:   "Key 1",
                     APIKey: os.Getenv("OPENAI_API_KEY"),
                 },
             },
-        }),
-        hastekit.WithRestateConfig("http://localhost:8080"),
-        hastekit.WithRedisConfig("localhost:6379"),
-    )
+        },
+    })
+
+    model := client.Model("OpenAI/gpt-4o-mini")
+
+    rt, err := hastekit.NewRestateRuntime("0.0.0.0:9081", "localhost:6379")
+    if err != nil {
+        log.Fatal(err)
+    }
+    broker, err := hastekit.NewRedisStreamBroker("localhost:6379")
     if err != nil {
         log.Fatal(err)
     }
 
-    model := client.NewLLM(hastekit.LLMOptions{
-        Provider: llm.ProviderNameOpenAI,
-        Model:    "gpt-4o-mini",
-    })
-
-    // Register the agent
+    // Register the agent with the runtime attached (but don't start the service here)
     agentName := "my-agent"
-    _ = client.NewRestateAgent(&hastekit.AgentOptions{
+    _ = hastekit.NewAgent(&hastekit.AgentConfig{
         Name:        agentName,
-        Instruction: client.Prompt("You are a helpful assistant."),
+        Instruction: hastekit.NewPrompt("You are a helpful assistant."),
         LLM:         model,
-        History:     client.NewConversationManager(),
-    })
+        History:     hastekit.NewFileHistory("./conversations"),
+    }, hastekit.WithRuntime(rt, broker))
 
     // Start application server
     log.Println("Application server starting on :8070")
-    http.ListenAndServe(":8070", client)
+    http.ListenAndServe(":8070", hastekit.NewHTTPHandler())
 }
 ```
 
@@ -174,48 +169,48 @@ import (
     "log"
     "os"
 
-    "github.com/hastekit/hastekit-sdk-go/pkg/gateway"
-    "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
     hastekit "github.com/hastekit/hastekit-sdk-go"
 )
 
 func main() {
-    client, err := hastekit.NewWithOptions(
-        hastekit.WithProviderConfigs(gateway.ProviderConfig{
-            ProviderName:  llm.ProviderNameOpenAI,
-            BaseURL:       "",
-            CustomHeaders: nil,
-            ApiKeys: []*gateway.APIKeyConfig{
+    client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
+        {
+            ProviderName: hastekit.ProviderOpenAI,
+            ApiKeys: []*hastekit.APIKeyConfig{
                 {
                     Name:   "Key 1",
                     APIKey: os.Getenv("OPENAI_API_KEY"),
                 },
             },
-        }),
-        hastekit.WithRestateConfig("http://localhost:8080"),
-        hastekit.WithRedisConfig("localhost:6379"),
-    )
+        },
+    })
+
+    model := client.Model("OpenAI/gpt-4o-mini")
+
+    rt, err := hastekit.NewRestateRuntime("0.0.0.0:9081", "localhost:6379")
+    if err != nil {
+        log.Fatal(err)
+    }
+    broker, err := hastekit.NewRedisStreamBroker("localhost:6379")
     if err != nil {
         log.Fatal(err)
     }
 
-    model := client.NewLLM(hastekit.LLMOptions{
-        Provider: llm.ProviderNameOpenAI,
-        Model:    "gpt-4o-mini",
-    })
-
     // Register the SAME agent with the SAME configuration
     agentName := "my-agent"
-    _ = client.NewRestateAgent(&hastekit.AgentOptions{
+    _ = hastekit.NewAgent(&hastekit.AgentConfig{
         Name:        agentName,
-        Instruction: client.Prompt("You are a helpful assistant."),
+        Instruction: hastekit.NewPrompt("You are a helpful assistant."),
         LLM:         model,
-        History:     client.NewConversationManager(),
-    })
+        History:     hastekit.NewFileHistory("./conversations"),
+    }, hastekit.WithRuntime(rt, broker))
 
     // Start only the Restate service
     log.Println("Restate service starting on :9081")
-    client.StartRestateService("0.0.0.0", "9081")
+    rt.Start()
+
+    // Block forever (the service runs in a background goroutine)
+    select {}
 }
 ```
 

@@ -13,7 +13,7 @@ There are three layers, from highest to lowest level:
 | Expose every registered agent to external AG-UI clients | `agui.NewHandler` (`pkg/agui`) |
 | Mount a single agent's run endpoint on your own mux | `agui.AgentHandler` (`pkg/agui`) |
 
-`*hastekit.SDK` satisfies the `agui.Registry` interface (`Agent(name)` + `AgentNames()`), so you pass the client directly to any of these.
+`*hastekit.AgentRegistry` satisfies the `agui.Registry` interface (`Agent(name)` + `AgentNames()`), so you pass one to any of these. Agents register into a package-global registry when you create them with `hastekit.NewAgent`, so a zero-value `&hastekit.AgentRegistry{}` already sees every agent.
 
 ## Embedded chat UI
 
@@ -26,36 +26,28 @@ import (
 	"log"
 	"os"
 
-	"github.com/hastekit/hastekit-sdk-go/pkg/agui/web"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
 	hastekit "github.com/hastekit/hastekit-sdk-go"
+	"github.com/hastekit/hastekit-sdk-go/pkg/agui/web"
 )
 
 func main() {
-	client, err := hastekit.NewWithOptions(
-		hastekit.WithProviderConfigs(gateway.ProviderConfig{
-			ProviderName: llm.ProviderNameOpenAI,
-			ApiKeys: []*gateway.APIKeyConfig{
+	client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
+		{
+			ProviderName: hastekit.ProviderOpenAI,
+			ApiKeys: []*hastekit.APIKeyConfig{
 				{Name: "Key 1", APIKey: os.Getenv("OPENAI_API_KEY")},
 			},
-		}),
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
+		},
+	})
 
-	client.NewAgent(&hastekit.AgentOptions{
+	hastekit.NewAgent(&hastekit.AgentConfig{
 		Name:        "Assistant",
-		Instruction: client.Prompt("You are a helpful assistant."),
-		LLM: client.NewLLM(hastekit.LLMOptions{
-			Provider: llm.ProviderNameOpenAI,
-			Model:    "gpt-4.1-mini",
-		}),
+		Instruction: hastekit.NewPrompt("You are a helpful assistant."),
+		LLM:         client.Model("OpenAI/gpt-4.1-mini"),
 	})
 
 	// Serves the chat UI and the AG-UI endpoints on :8080.
-	if err := web.Serve(":8080", client); err != nil {
+	if err := web.Serve(":8080", &hastekit.AgentRegistry{}); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -83,9 +75,9 @@ If you have your own frontend (CopilotKit's `HttpAgent`, raw `@ag-ui/client`, or
 ```go
 import "github.com/hastekit/hastekit-sdk-go/pkg/agui"
 
-// ... create the client and register agents ...
+// ... create the client and register agents with hastekit.NewAgent ...
 
-http.ListenAndServe(":8080", agui.NewHandler(client))
+http.ListenAndServe(":8080", agui.NewHandler(&hastekit.AgentRegistry{}))
 ```
 
 ### Routes

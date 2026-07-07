@@ -9,9 +9,9 @@ System instructions define the behavior and personality of an agent. The SDK pro
 The simplest way to provide a system instruction is using a plain string:
 
 ```go
-agent := client.NewAgent(&hastekit.AgentOptions{
+agent := hastekit.NewAgent(&hastekit.AgentConfig{
     Name:        "Assistant",
-    Instruction: client.Prompt("You are a helpful assistant."),
+    Instruction: hastekit.NewPrompt("You are a helpful assistant."),
     LLM:         model,
 })
 ```
@@ -30,9 +30,9 @@ contextData := map[string]any{
     "role": "developer",
 }
 
-agent := client.NewAgent(&hastekit.AgentOptions{
+agent := hastekit.NewAgent(&hastekit.AgentConfig{
     Name:        "Personalized Assistant",
-    Instruction: client.Prompt(
+    Instruction: hastekit.NewPrompt(
         "You are a helpful assistant. You are interacting with {{name}}, who is a {{role}}.",
     ),
     LLM: model,
@@ -59,9 +59,9 @@ customResolver := func(promptStr string, runContext map[string]any) (string, err
     // Your logic to resolve the prompt into the final system format
 }
 
-agent := client.NewAgent(&hastekit.AgentOptions{
+agent := hastekit.NewAgent(&hastekit.AgentConfig{
     Name:        "Dynamic Assistant",
-    Instruction: client.Prompt("Hello {{userName}}, current time is {{timestamp}}", prompts.WithResolver(customResolver)),
+    Instruction: hastekit.NewPrompt("Hello {{userName}}, current time is {{timestamp}}", prompts.WithResolver(customResolver)),
     LLM:         model,
 })
 ```
@@ -73,9 +73,9 @@ You can inject **skills** into the system prompt using `prompts.WithSkills`. Eac
 ```go
 import "github.com/hastekit/hastekit-sdk-go/pkg/agents/prompts"
 
-agent := client.NewAgent(&hastekit.AgentOptions{
+agent := hastekit.NewAgent(&hastekit.AgentConfig{
     Name: "Skilled Assistant",
-    Instruction: client.Prompt(
+    Instruction: hastekit.NewPrompt(
         "You are a helpful assistant.",
         prompts.WithSkills([]agents.Skill{
             {
@@ -99,12 +99,20 @@ The `agents.Skill` fields are loaded from a skill's `SKILL.md`:
 
 ## Remote Prompts
 
-You can load system instructions from the HasteKit Gateway server using `RemotePrompt`.
+You can load system instructions from the HasteKit Gateway server using a `hastekitgateway.Config`'s `NewPrompt`.
 
 ```go
-agent := client.NewAgent(&hastekit.AgentOptions{
+cfg := &hastekitgateway.Config{
+    Endpoint:    "https://api.hastekit.ai",
+    VirtualKey:  "vk_...",
+    OrgName:     "my-org",
+    ProjectName: "my-project",
+    HttpClient:  http.DefaultClient,
+}
+
+agent := hastekit.NewAgent(&hastekit.AgentConfig{
     Name:        "Remote Assistant",
-    Instruction: client.RemotePrompt("my-prompt-name", "production"),
+    Instruction: cfg.NewPrompt("my-prompt-name", "production"),
     LLM:         model,
 })
 ```
@@ -114,16 +122,16 @@ agent := client.NewAgent(&hastekit.AgentOptions{
 - **`name`**: The name of the prompt stored in the HasteKit Gateway server
 - **`alias`**: The prompt alias (`"production"` or `"latest"`)
 
-<Note>For this to work, you should have configured the `client` with the gateway's endpoint, organisation name, project name and an API key.</Note>
+<Note>For this to work, you should have configured the `hastekitgateway.Config` with the gateway's endpoint, organisation name, project name and an API key.</Note>
 
 ### Remote Prompt with Resolvers
 
 You can combine remote prompts with resolvers for dynamic content:
 
 ```go
-agent := client.NewAgent(&hastekit.AgentOptions{
+agent := hastekit.NewAgent(&hastekit.AgentConfig{
     Name:        "Versioned Assistant",
-    Instruction: client.RemotePrompt(
+    Instruction: cfg.NewPrompt(
         "assistant-prompt",
         "production",
         prompts.WithResolver(customResolver),
@@ -157,9 +165,9 @@ func (l *CustomLoader) LoadPrompt(ctx context.Context) (string, error) {
 }
 
 customLoader := &CustomLoader{}
-agent := client.NewAgent(&hastekit.AgentOptions{
+agent := hastekit.NewAgent(&hastekit.AgentConfig{
     Name:        "Custom Assistant",
-    Instruction: client.CustomPrompt(customLoader),
+    Instruction: hastekit.NewPromptWithLoader(customLoader),
     LLM:         model,
 })
 ```
@@ -178,56 +186,47 @@ import (
 
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents/history"
-	"github.com/hastekit/hastekit-sdk-go/pkg/agents/prompts"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
 	hastekit "github.com/hastekit/hastekit-sdk-go"
 )
 
 func main() {
-    client, err := hastekit.NewWithOptions(
-        hastekit.WithProviderConfigs(gateway.ProviderConfig{
-            ProviderName:  llm.ProviderNameOpenAI,
+    client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
+        {
+            ProviderName:  hastekit.ProviderOpenAI,
             BaseURL:       "",
             CustomHeaders: nil,
-            ApiKeys: []*gateway.APIKeyConfig{
+            ApiKeys: []*hastekit.APIKeyConfig{
                 {
                     Name:   "Key 1",
                     APIKey: os.Getenv("OPENAI_API_KEY"),
                 },
             },
-        }),
-    )
-	if err != nil {
-		log.Fatal(err)
-	}
+        },
+    })
 
-	model := client.NewLLM(hastekit.LLMOptions{
-		Provider: llm.ProviderNameOpenAI,
-		Model:    "gpt-4o-mini",
-	})
+	model := client.Model("OpenAI/gpt-4o-mini")
 
 	// Example 1: Simple string instruction
-	agent1 := client.NewAgent(&hastekit.AgentOptions{
+	agent1 := hastekit.NewAgent(&hastekit.AgentConfig{
 		Name:        "Simple Assistant",
-		Instruction: client.Prompt("You are a helpful assistant."),
+		Instruction: hastekit.NewPrompt("You are a helpful assistant."),
 		LLM:         model,
 	})
 
 	// Example 2: Template with variables
-	agent2 := client.NewAgent(&hastekit.AgentOptions{
+	agent2 := hastekit.NewAgent(&hastekit.AgentConfig{
 		Name:        "Personalized Assistant",
-		Instruction: client.Prompt(
+		Instruction: hastekit.NewPrompt(
 			"You are a helpful assistant for {{userName}}, who is a {{userRole}}.",
 		),
 		LLM: model,
 	})
 
-	// Example 3: Remote prompt (requires endpoint and projectName)
-	// agent3 := client.NewAgent(&hastekit.AgentOptions{
+	// Example 3: Remote prompt (requires a configured hastekitgateway.Config)
+	// agent3 := hastekit.NewAgent(&hastekit.AgentConfig{
 	//     Name:        "Remote Assistant",
-	//     Instruction: client.RemotePrompt("my-prompt", "production"),
+	//     Instruction: cfg.NewPrompt("my-prompt", "production"),
 	//     LLM:         model,
 	// })
 

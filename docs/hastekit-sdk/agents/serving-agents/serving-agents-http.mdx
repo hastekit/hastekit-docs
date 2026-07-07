@@ -2,42 +2,34 @@
 title: Serving Agents through HTTP
 ---
 
-Agents can be served as HTTP endpoints, allowing them to be invoked through standard HTTP requests. The SDK client implements `http.Handler`, making it compatible with Go's standard `net/http` package.
+Agents can be served as HTTP endpoints, allowing them to be invoked through standard HTTP requests. `hastekit.NewHTTPHandler()` returns an `http.Handler` that dispatches to any registered agent, making it compatible with Go's standard `net/http` package.
 
 ## Creating an HTTP Server
 
-Pass the SDK client directly to `http.ListenAndServe`:
+Register your agents with `hastekit.NewAgent`, then serve `hastekit.NewHTTPHandler()`:
 
 ```go
-client, err := hastekit.NewWithOptions(
-    hastekit.WithProviderConfigs(gateway.ProviderConfig{
-        ProviderName:  llm.ProviderNameOpenAI,
-        BaseURL:       "",
-        CustomHeaders: nil,
-        ApiKeys: []*gateway.APIKeyConfig{
+client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
+    {
+        ProviderName: hastekit.ProviderOpenAI,
+        ApiKeys: []*hastekit.APIKeyConfig{
             {
                 Name:   "Key 1",
                 APIKey: os.Getenv("OPENAI_API_KEY"),
             },
         },
-    }),
-)
-if err != nil {
-    log.Fatal(err)
-}
+    },
+})
 
-// Create agents
-client.NewAgent(&hastekit.AgentOptions{
+// Create agents — they register into a package-global registry
+hastekit.NewAgent(&hastekit.AgentConfig{
     Name:        "SampleAgent",
-    Instruction: client.Prompt("You are helpful assistant."),
-    LLM: client.NewLLM(hastekit.LLMOptions{
-        Provider: llm.ProviderNameOpenAI,
-        Model:    "gpt-4o-mini",
-    }),
+    Instruction: hastekit.NewPrompt("You are helpful assistant."),
+    LLM:         client.Model("OpenAI/gpt-4o-mini"),
 })
 
 // Start HTTP server
-http.ListenAndServe(":8070", client)
+http.ListenAndServe(":8070", hastekit.NewHTTPHandler())
 ```
 
 ## Invoking an Agent
@@ -114,48 +106,37 @@ type Message struct {
 package main
 
 import (
-	"log"
 	"net/http"
 	"os"
 
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
 	hastekit "github.com/hastekit/hastekit-sdk-go"
 )
 
 func main() {
-    client, err := hastekit.NewWithOptions(
-        hastekit.WithProviderConfigs(gateway.ProviderConfig{
-            ProviderName:  llm.ProviderNameOpenAI,
-            BaseURL:       "",
-            CustomHeaders: nil,
-            ApiKeys: []*gateway.APIKeyConfig{
-                {
-                    Name:   "Key 1",
-                    APIKey: os.Getenv("OPENAI_API_KEY"),
-                },
-            },
-        }),
-    )
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	model := client.NewLLM(hastekit.LLMOptions{
-		Provider: llm.ProviderNameOpenAI,
-		Model:    "gpt-4.1-mini",
+	client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
+		{
+			ProviderName: hastekit.ProviderOpenAI,
+			ApiKeys: []*hastekit.APIKeyConfig{
+				{
+					Name:   "Key 1",
+					APIKey: os.Getenv("OPENAI_API_KEY"),
+				},
+			},
+		},
 	})
 
-	history := client.NewConversationManager()
+	model := client.Model("OpenAI/gpt-4.1-mini")
+
+	history := hastekit.NewFileHistory("./conversations")
 	agentName := "SampleAgent"
-	_ = client.NewAgent(&hastekit.AgentOptions{
+	_ = hastekit.NewAgent(&hastekit.AgentConfig{
 		Name:        agentName,
-		Instruction: client.Prompt("You are helpful assistant."),
+		Instruction: hastekit.NewPrompt("You are helpful assistant."),
 		LLM:         model,
 		History:     history,
 	})
 
-	http.ListenAndServe(":8070", client)
+	http.ListenAndServe(":8070", hastekit.NewHTTPHandler())
 
 	// You can then invoke by hitting POST http://localhost:8070/?agent=SampleAgent with `agents.AgentInput` as your payload
 	/*

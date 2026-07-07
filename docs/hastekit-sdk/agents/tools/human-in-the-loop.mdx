@@ -82,9 +82,9 @@ if err != nil {
     log.Fatal(err)
 }
 
-agent := client.NewAgent(&hastekit.AgentOptions{
+agent := hastekit.NewAgent(&hastekit.AgentConfig{
     Name:        "Assistant",
-    Instruction: client.Prompt("You are a helpful assistant."),
+    Instruction: hastekit.NewPrompt("You are a helpful assistant."),
     LLM:         model,
     McpServers:  []agents.MCPToolset{mcpClient},
 })
@@ -96,30 +96,44 @@ When a tool requires approval, the agent execution pauses and returns with a `pa
 
 ### Agent Output
 
-`Execute()` (via the handle's `Result()`/`Wait()`) returns an `*agents.AgentOutput`. When approval is needed, its `Status` is `RunStatusPaused` and the pending tool calls are available in `PendingApprovals`:
+`Execute()` (via the handle's `Result()`/`Wait()`) returns an `*agents.AgentOutput`. When approval is needed, its `Status` is `RunStatusPaused` and the paused run exposes one `Interrupt` per pending tool call in `Interrupts`:
 
 ```go
 type AgentOutput struct {
-    RunID            string                          `json:"run_id"`
-    Status           agentstate.RunStatus            `json:"status"`            // RunStatusPaused when approval is required
-    Output           []responses.InputMessageUnion   `json:"output"`
-    PendingApprovals []responses.FunctionCallMessage `json:"pending_approvals"` // Tools awaiting approval
+    RunID      string                        `json:"run_id"`
+    Status     agentstate.RunStatus          `json:"status"`               // RunStatusPaused when approval is required
+    Output     []responses.InputMessageUnion `json:"output"`
+    Interrupts []responses.Interrupt         `json:"interrupts,omitempty"` // One per tool call awaiting approval
 }
 ```
 
-> Approval-required tools inside sub-agents (see [Agent as a tool](./agent-as-a-tool)) bubble up to the parent's `PendingApprovals`. The nested agent's pending approvals are propagated through `ToolCallResponse.PendingApprovals`, so the parent run pauses and surfaces them just like its own tools.
+Each `Interrupt` carries the intercepted call and the kind of gate:
+
+```go
+type Interrupt struct {
+    FunctionCallMessage responses.FunctionCallMessage `json:"function_call_message"` // .CallID identifies the call
+    Mode                responses.InterruptMode       `json:"mode"`                  // "approval" for approve/reject gates
+    IsNested            bool                          `json:"is_nested,omitempty"`
+}
+```
+
+> Approval-required tools inside sub-agents (see [Agent as a tool](./agent-as-a-tool)) bubble up to the parent's `Interrupts` with `IsNested: true`, so the parent run pauses and surfaces them just like its own tools.
 
 ### Resuming Execution
 
-To resume execution after user review, send a `FunctionCallApprovalResponseMessage` on the same thread. `Execute()` returns an `*AgentHandle`; the simplest way to wait for the resumed run is `handle.Result()`:
+To resume execution after user review, send a `FunctionCallInterruptResolutionMessage` on the same thread, resolving each call by ID with `InterruptActionApprove` or `InterruptActionReject`. `Execute()` returns an `*AgentHandle`; the simplest way to wait for the resumed run is `handle.Result()`:
 
 ```go
 // User approved the tool call
 approvalResponse := responses.InputMessageUnion{
-    OfFunctionCallApprovalResponse: &responses.FunctionCallApprovalResponseMessage{
-        ID:              uuid.NewString(),
-        ApprovedCallIds: []string{pendingToolCall.CallID},  // Approved tool call IDs
-        RejectedCallIds: []string{},                        // Rejected tool call IDs
+    OfFunctionCallInterruptResolution: &responses.FunctionCallInterruptResolutionMessage{
+        ID: uuid.NewString(),
+        Resolutions: []responses.InterruptResolution{
+            {
+                CallID: result.Interrupts[0].FunctionCallMessage.CallID,
+                Action: responses.InterruptActionApprove,
+            },
+        },
     },
 }
 
@@ -136,15 +150,19 @@ result, err := handle.Result()
 
 ### Handling Rejections
 
-When a tool call is rejected, the agent receives a message indicating the rejection and can respond appropriately:
+To reject a call, resolve it with `InterruptActionReject`. You can approve some calls and reject others in the same `Resolutions` slice:
 
 ```go
 // User rejected the tool call
 approvalResponse := responses.InputMessageUnion{
-    OfFunctionCallApprovalResponse: &responses.FunctionCallApprovalResponseMessage{
-        ID:              uuid.NewString(),
-        ApprovedCallIds: []string{},
-        RejectedCallIds: []string{pendingToolCall.CallID},
+    OfFunctionCallInterruptResolution: &responses.FunctionCallInterruptResolutionMessage{
+        ID: uuid.NewString(),
+        Resolutions: []responses.InterruptResolution{
+            {
+                CallID: result.Interrupts[0].FunctionCallMessage.CallID,
+                Action: responses.InterruptActionReject,
+            },
+        },
     },
 }
 ```
@@ -170,8 +188,6 @@ import (
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents/agentstate"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents/history"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
 	hastekit "github.com/hastekit/hastekit-sdk-go"
 	"github.com/hastekit/hastekit-sdk-go/pkg/utils"
@@ -259,35 +275,27 @@ func (t *DeleteUserTool) Execute(ctx context.Context, params *agents.ToolCall) (
 func main() {
 	ctx := context.Background()
 
-    client, err := hastekit.NewWithOptions(
-        hastekit.WithProviderConfigs(gateway.ProviderConfig{
-            ProviderName:  llm.ProviderNameOpenAI,
-            BaseURL:       "",
-            CustomHeaders: nil,
-            ApiKeys: []*gateway.APIKeyConfig{
+    client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
+        {
+            ProviderName: hastekit.ProviderOpenAI,
+            ApiKeys: []*hastekit.APIKeyConfig{
                 {
                     Name:   "Key 1",
                     APIKey: os.Getenv("OPENAI_API_KEY"),
                 },
             },
-        }),
-    )
-	if err != nil {
-		log.Fatal(err)
-	}
+        },
+    })
 
-	agent := client.NewAgent(&hastekit.AgentOptions{
+	agent := hastekit.NewAgent(&hastekit.AgentConfig{
 		Name:        "User Manager",
-		Instruction: client.Prompt("You help manage user accounts."),
-		LLM: client.NewLLM(hastekit.LLMOptions{
-			Provider: llm.ProviderNameOpenAI,
-			Model:    "gpt-4o-mini",
-		}),
-		Tools: []agents.Tool{
+		Instruction: hastekit.NewPrompt("You help manage user accounts."),
+		LLM:         client.Model("OpenAI/gpt-4o-mini"),
+		Tools: []hastekit.Tool{
 			NewGetUserTool(),
 			NewDeleteUserTool(),
 		},
-		History: client.NewConversationManager(),
+		History: hastekit.NewFileHistory("./conversations"),
 	})
 
 	// First execution - agent may request to delete a user
@@ -309,14 +317,18 @@ func main() {
 
 	// Check if approval is needed
 	if result.Status == agentstate.RunStatusPaused {
-		fmt.Println("Approval required for:", result.PendingApprovals)
+		fmt.Println("Approval required for:", result.Interrupts)
 
 		// Simulate user approval
 		approvalResponse := responses.InputMessageUnion{
-			OfFunctionCallApprovalResponse: &responses.FunctionCallApprovalResponseMessage{
-				ID:              uuid.NewString(),
-				ApprovedCallIds: []string{result.PendingApprovals[0].CallID},
-				RejectedCallIds: []string{},
+			OfFunctionCallInterruptResolution: &responses.FunctionCallInterruptResolutionMessage{
+				ID: uuid.NewString(),
+				Resolutions: []responses.InterruptResolution{
+					{
+						CallID: result.Interrupts[0].FunctionCallMessage.CallID,
+						Action: responses.InterruptActionApprove,
+					},
+				},
 			},
 		}
 

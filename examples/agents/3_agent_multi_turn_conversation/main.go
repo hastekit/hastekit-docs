@@ -11,38 +11,28 @@ import (
 	hastekit "github.com/hastekit/hastekit-sdk-go"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents/history"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
 )
 
 func main() {
-	client, err := hastekit.NewWithOptions(
-		hastekit.WithProviderConfigs(gateway.ProviderConfig{
-			ProviderName:  llm.ProviderNameOpenAI,
-			BaseURL:       "",
-			CustomHeaders: nil,
-			ApiKeys: []*gateway.APIKeyConfig{
+	client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
+		{
+			ProviderName: hastekit.ProviderOpenAI,
+			ApiKeys: []*hastekit.APIKeyConfig{
 				{
 					Name:   "Key 1",
 					APIKey: os.Getenv("OPENAI_API_KEY"),
 				},
 			},
-		}),
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	model := client.NewLLM(hastekit.LLMOptions{
-		Provider: llm.ProviderNameOpenAI,
-		Model:    "gpt-4.1-mini",
+		},
 	})
 
-	hist := client.NewConversationManager()
-	agent := agents.NewAgent(&agents.AgentOptions{
+	model := client.Model("OpenAI/gpt-4.1-mini")
+
+	hist := hastekit.NewFileHistory("./conversations")
+	agent := hastekit.NewAgent(&hastekit.AgentConfig{
 		Name:        "Hello world agent",
-		Instruction: client.Prompt("You are helpful assistant."),
+		Instruction: hastekit.NewPrompt("You are helpful assistant."),
 		LLM:         model,
 		History:     hist,
 	})
@@ -70,9 +60,9 @@ func main() {
 	fmt.Println(string(b))
 
 	// Agent itself is stateless - you can either re-create another agent or reuse the same agent instance, but ensure to pass the correct `ThreadID`
-	agent2 := client.NewAgent(&hastekit.AgentOptions{
+	agent2 := hastekit.NewAgent(&hastekit.AgentConfig{
 		Name:        "Hello world agent",
-		Instruction: client.Prompt("You are helpful assistant."),
+		Instruction: hastekit.NewPrompt("You are helpful assistant."),
 		LLM:         model,
 		History:     hist,
 	})

@@ -13,8 +13,6 @@ import (
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents/agentstate"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents/history"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
 	"github.com/hastekit/hastekit-sdk-go/pkg/utils"
 )
@@ -102,35 +100,27 @@ func (t *DeleteUserTool) Execute(ctx context.Context, params *agents.ToolCall) (
 func main() {
 	ctx := context.Background()
 
-	client, err := hastekit.NewWithOptions(
-		hastekit.WithProviderConfigs(gateway.ProviderConfig{
-			ProviderName:  llm.ProviderNameOpenAI,
-			BaseURL:       "",
-			CustomHeaders: nil,
-			ApiKeys: []*gateway.APIKeyConfig{
+	client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
+		{
+			ProviderName: hastekit.ProviderOpenAI,
+			ApiKeys: []*hastekit.APIKeyConfig{
 				{
 					Name:   "Key 1",
 					APIKey: os.Getenv("OPENAI_API_KEY"),
 				},
 			},
-		}),
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
+		},
+	})
 
-	agent := client.NewAgent(&hastekit.AgentOptions{
+	agent := hastekit.NewAgent(&hastekit.AgentConfig{
 		Name:        "User Manager",
-		Instruction: client.Prompt("You help manage user accounts."),
-		LLM: client.NewLLM(hastekit.LLMOptions{
-			Provider: llm.ProviderNameOpenAI,
-			Model:    "gpt-4o-mini",
-		}),
+		Instruction: hastekit.NewPrompt("You help manage user accounts."),
+		LLM:         client.Model("OpenAI/gpt-4o-mini"),
 		Tools: []agents.Tool{
 			NewGetUserTool(),
 			NewDeleteUserTool(),
 		},
-		History: client.NewConversationManager(),
+		History: hastekit.NewFileHistory("./conversations"),
 	})
 
 	threadID := uuid.New().String()
@@ -153,16 +143,21 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// If a tool needs human approval the run pauses. Resume by sending
-	// a FunctionCallApprovalResponseMessage on the same thread.
+	// If a tool needs human approval the run pauses with one Interrupt per
+	// pending tool call. Resume by sending a FunctionCallInterruptResolution
+	// on the same thread, approving or rejecting each call by ID.
 	if result.Status == agentstate.RunStatusPaused {
-		fmt.Println("Approval required for:", result.PendingApprovals)
+		fmt.Println("Approval required for:", result.Interrupts)
 
 		approvalResponse := responses.InputMessageUnion{
-			OfFunctionCallApprovalResponse: &responses.FunctionCallApprovalResponseMessage{
-				ID:              uuid.NewString(),
-				ApprovedCallIds: []string{result.PendingApprovals[0].CallID},
-				RejectedCallIds: []string{},
+			OfFunctionCallInterruptResolution: &responses.FunctionCallInterruptResolutionMessage{
+				ID: uuid.NewString(),
+				Resolutions: []responses.InterruptResolution{
+					{
+						CallID: result.Interrupts[0].FunctionCallMessage.CallID,
+						Action: responses.InterruptActionApprove,
+					},
+				},
 			},
 		}
 

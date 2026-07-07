@@ -20,9 +20,9 @@ import (
 )
 
 // Create a specialized agent
-subAgent := client.NewAgent(&hastekit.AgentOptions{
+subAgent := hastekit.NewAgent(&hastekit.AgentConfig{
     Name:        "User lookup agent",
-    Instruction: client.Prompt("You are a helpful assistant that looks up user information."),
+    Instruction: hastekit.NewPrompt("You are a helpful assistant that looks up user information."),
     LLM:         model,
 })
 
@@ -47,11 +47,11 @@ Once created, you can use the agent tool in another agent's tools list:
 
 ```go
 // Create a parent agent that uses the agent tool
-agent := client.NewAgent(&hastekit.AgentOptions{
+agent := hastekit.NewAgent(&hastekit.AgentConfig{
     Name:        "Main agent",
-    Instruction: client.Prompt("You are a helpful assistant. Use the get_user_name tool when needed."),
+    Instruction: hastekit.NewPrompt("You are a helpful assistant. Use the get_user_name tool when needed."),
     LLM:         model,
-    Tools:       []agents.Tool{agentTool},
+    Tools:       []hastekit.Tool{agentTool},
 })
 ```
 
@@ -73,41 +73,30 @@ import (
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents/history"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents/tools"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
-	"github.com/hastekit/hastekit-sdk-go/pkg/utils"
 )
 
 func main() {
-	// Initialize SDK client
-    client, err := hastekit.NewWithOptions(
-        hastekit.WithProviderConfigs(gateway.ProviderConfig{
-            ProviderName:  llm.ProviderNameOpenAI,
-            BaseURL:       "",
-            CustomHeaders: nil,
-            ApiKeys: []*gateway.APIKeyConfig{
+	// Initialize LLM client
+    client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
+        {
+            ProviderName: hastekit.ProviderOpenAI,
+            ApiKeys: []*hastekit.APIKeyConfig{
                 {
                     Name:   "Key 1",
                     APIKey: os.Getenv("OPENAI_API_KEY"),
                 },
             },
-        }),
-    )
-	if err != nil {
-		log.Fatal(err)
-	}
+        },
+    })
 
-	// Create LLM model
-	model := client.NewLLM(hastekit.LLMOptions{
-		Provider: llm.ProviderNameOpenAI,
-		Model:    "gpt-4o-mini",
-	})
+	// Bind a model
+	model := client.Model("OpenAI/gpt-4o-mini")
 
 	// Create a specialized agent that will act as a tool
-	subAgent := client.NewAgent(&hastekit.AgentOptions{
+	subAgent := hastekit.NewAgent(&hastekit.AgentConfig{
 		Name:        "Hello world agent",
-		Instruction: client.Prompt("You are helpful assistant."),
+		Instruction: hastekit.NewPrompt("You are helpful assistant."),
 		LLM:         model,
 	})
 
@@ -115,11 +104,11 @@ func main() {
 	agentTool := tools.NewAgentTool("get_user_name", "Returns the user's name", subAgent, tools.SubAgentContextModeNone)
 
 	// Create the main agent that uses the agent tool
-	agent := client.NewAgent(&hastekit.AgentOptions{
+	agent := hastekit.NewAgent(&hastekit.AgentConfig{
 		Name:        "Hello world agent",
-		Instruction: client.Prompt("You are helpful assistant."),
+		Instruction: hastekit.NewPrompt("You are helpful assistant."),
 		LLM:         model,
-		Tools:       []agents.Tool{agentTool},
+		Tools:       []hastekit.Tool{agentTool},
 	})
 
 	// Execute the main agent

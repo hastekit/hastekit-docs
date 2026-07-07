@@ -64,6 +64,39 @@ func (t *CustomTool) Execute(ctx context.Context, params *agents.ToolCall) (*age
 
 ---
 
+## The `hastekit.NewTool` Helper
+
+If you don't need the full control of `agents.BaseTool`, `hastekit.NewTool` turns any
+`func(ctx, In) (Out, error)` into a tool. The input JSON schema is derived from the
+argument struct, and arguments/results are marshalled for you:
+
+```go
+type UserArgs struct {
+    UserID string `json:"user_id" jsonschema_description:"The user ID to look up"`
+}
+
+type UserName struct {
+    Name string `json:"name"`
+}
+
+func getUserName(ctx context.Context, args UserArgs) (UserName, error) {
+    return UserName{Name: lookupUserName(args.UserID)}, nil
+}
+
+userTool := hastekit.NewTool(getUserName,
+    hastekit.WithName("get_user_name"), // optional; defaults to the function name
+    hastekit.WithDescription[UserArgs, UserName]("Returns the user's name"),
+)
+```
+
+> `WithDescription`, `WithNeedsApproval`, and `WithDeferred` take explicit
+> `[ArgsType, ReturnType]` type parameters; `WithName` does not.
+
+Both `agents.BaseTool`-based tools and `hastekit.NewTool` tools implement
+`hastekit.Tool` and can be mixed into the same `Tools` slice.
+
+---
+
 ## Basic Example
 
 Here's a simple example of an agent with a custom tool:
@@ -71,14 +104,11 @@ Here's a simple example of an agent with a custom tool:
 ```go
 func main() {
     // Create agent with tool
-    agent := client.NewAgent(&hastekit.AgentOptions{
+    agent := hastekit.NewAgent(&hastekit.AgentConfig{
         Name:        "Assistant",
-        Instruction: client.Prompt("You are a helpful assistant. Use the get_user_name tool to get the user's name and greet them."),
-        LLM:         client.NewLLM(hastekit.LLMOptions{
-            Provider: llm.ProviderNameOpenAI,
-            Model:    "gpt-4o-mini",
-        }),
-        Tools: []agents.Tool{
+        Instruction: hastekit.NewPrompt("You are a helpful assistant. Use the get_user_name tool to get the user's name and greet them."),
+        LLM:         client.Model("OpenAI/gpt-4o-mini"),
+        Tools: []hastekit.Tool{
             NewGetUserNameTool(),
         },
     })

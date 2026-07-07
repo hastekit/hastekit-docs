@@ -10,34 +10,32 @@ import (
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents/mcpclient"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents/tools"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
 )
 
 func main() {
-	client, err := hastekit.NewWithOptions(
-		hastekit.WithProviderConfigs(gateway.ProviderConfig{
-			ProviderName:  llm.ProviderNameOpenAI,
-			BaseURL:       "",
-			CustomHeaders: nil,
-			ApiKeys: []*gateway.APIKeyConfig{
+	client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
+		{
+			ProviderName: hastekit.ProviderOpenAI,
+			ApiKeys: []*hastekit.APIKeyConfig{
 				{
 					Name:   "Key 1",
 					APIKey: os.Getenv("OPENAI_API_KEY"),
 				},
 			},
-		}),
-		hastekit.WithRestateConfig("http://localhost:8081"),
-		hastekit.WithRedisConfig("localhost:6379"),
-	)
+		},
+	})
+
+	model := client.Model("OpenAI/gpt-4.1-mini")
+
+	// Restate service bind address + Redis for streaming
+	rt, err := hastekit.NewRestateRuntime("0.0.0.0:9081", "localhost:6379")
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	model := client.NewLLM(hastekit.LLMOptions{
-		Provider: llm.ProviderNameOpenAI,
-		Model:    "gpt-4.1-mini",
-	})
+	broker, err := hastekit.NewRedisStreamBroker("localhost:6379")
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	mcpClient, err := mcpclient.NewClient(context.Background(), "http://127.0.0.1:8000/mcp",
 		mcpclient.WithTransport("streamable-http"),
@@ -46,31 +44,30 @@ func main() {
 		log.Fatal(err)
 	}
 
-	history := client.NewConversationManager()
 	agentName := "SampleAgent"
-	_ = client.NewRestateAgent(&hastekit.AgentOptions{
+	_ = hastekit.NewAgent(&hastekit.AgentConfig{
 		Name:        agentName,
-		Instruction: client.Prompt("You are helpful assistant. You are interacting with the user named {{name}}"),
+		Instruction: hastekit.NewPrompt("You are helpful assistant. You are interacting with the user named {{name}}"),
 		LLM:         model,
-		History:     history,
+		History:     hastekit.NewFileHistory("./conversations"),
 		Tools: []agents.Tool{
 			tools.NewAgentTool(
 				"joke-generator-agent",
 				"Use to generate jokes",
-				client.NewRestateAgent(&hastekit.AgentOptions{
+				hastekit.NewAgent(&hastekit.AgentConfig{
 					Name:        "joke-generator",
-					Instruction: client.Prompt("You are helpful assistant."),
+					Instruction: hastekit.NewPrompt("You are helpful assistant."),
 					LLM:         model,
-					History:     client.NewConversationManager(),
-				}),
+					History:     hastekit.NewFileHistory("./conversations"),
+				}, hastekit.WithRuntime(rt, broker)),
 				tools.SubAgentContextModeNone,
 			),
 		},
 		McpServers: []agents.MCPToolset{mcpClient},
-	})
+	}, hastekit.WithRuntime(rt, broker))
 
-	go client.StartRestateService("0.0.0.0", "9081") // Do this on the restate service
-	err = http.ListenAndServe(":8070", client)       // Do this on the application that invokes the restate workflow
+	go rt.Start()                                                 // Do this on the restate service
+	err = http.ListenAndServe(":8070", hastekit.NewHTTPHandler()) // Do this on the application that invokes the restate workflow
 	if err != nil {
 		log.Fatal(err)
 	}

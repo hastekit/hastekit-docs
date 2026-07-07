@@ -8,45 +8,34 @@ import (
 
 	json "github.com/bytedance/sonic"
 	hastekit "github.com/hastekit/hastekit-sdk-go"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/embeddings"
 	"github.com/hastekit/hastekit-sdk-go/pkg/utils"
 )
 
 func main() {
-	client, err := hastekit.NewWithOptions(
-		hastekit.WithProviderConfigs([]gateway.ProviderConfig{
-			{
-				ProviderName:  llm.ProviderNameOpenAI,
-				BaseURL:       "",
-				CustomHeaders: nil,
-				ApiKeys: []*gateway.APIKeyConfig{
-					{
-						Name:   "Key 1",
-						APIKey: os.Getenv("OPENAI_API_KEY"),
-					},
+	client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
+		{
+			ProviderName: hastekit.ProviderOpenAI,
+			ApiKeys: []*hastekit.APIKeyConfig{
+				{
+					Name:   "Key 1",
+					APIKey: os.Getenv("OPENAI_API_KEY"),
 				},
 			},
-			{
-				ProviderName:  llm.ProviderNameGemini,
-				BaseURL:       "",
-				CustomHeaders: nil,
-				ApiKeys: []*gateway.APIKeyConfig{
-					{
-						Name:   "Key 1",
-						APIKey: os.Getenv("GEMINI_API_KEY"),
-					},
+		},
+		{
+			ProviderName: hastekit.ProviderGemini,
+			ApiKeys: []*hastekit.APIKeyConfig{
+				{
+					Name:   "Key 1",
+					APIKey: os.Getenv("GEMINI_API_KEY"),
 				},
 			},
-		}...),
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
+		},
+	})
 
-	resp, err := client.NewEmbedding(context.Background(), &embeddings.Request{
-		Model: "OpenAI/text-embedding-ada-002", // "Gemini/models/gemini-embedding-001",
+	model := client.Model("OpenAI/text-embedding-ada-002")
+	resp, err := model.NewEmbedding(context.Background(), &embeddings.Request{
 		Input: embeddings.InputUnion{
 			OfString: utils.Ptr("The food was delicious and the waiter..."),
 		},

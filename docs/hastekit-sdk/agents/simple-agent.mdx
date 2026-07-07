@@ -18,7 +18,7 @@ Unlike durable agents, simple agents execute in-process and don't persist state 
 
 ## Creating a Simple Agent
 
-To create a simple agent, use `client.NewAgent()` with `AgentOptions`:
+To create a simple agent, use `hastekit.NewAgent()` with `AgentConfig`:
 
 ```go
 import (
@@ -31,51 +31,43 @@ import (
     "github.com/hastekit/hastekit-sdk-go/pkg/utils"
     "github.com/hastekit/hastekit-sdk-go/pkg/agents"
     "github.com/hastekit/hastekit-sdk-go/pkg/agents/history"
-    "github.com/hastekit/hastekit-sdk-go/pkg/gateway"
-    "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
     "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
     hastekit "github.com/hastekit/hastekit-sdk-go"
 )
 
-// Initialize the SDK client
-client, err := hastekit.NewWithOptions(
-    hastekit.WithProviderConfigs(gateway.ProviderConfig{
-        ProviderName:  llm.ProviderNameOpenAI,
+// Configure an LLM client
+client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
+    {
+        ProviderName:  hastekit.ProviderOpenAI,
         BaseURL:       "",
         CustomHeaders: nil,
-        ApiKeys: []*gateway.APIKeyConfig{
+        ApiKeys: []*hastekit.APIKeyConfig{
             {
                 Name:   "Key 1",
                 APIKey: os.Getenv("OPENAI_API_KEY"),
             },
         },
-    }),
-)
-if err != nil {
-    log.Fatal(err)
-}
+    },
+})
 
 // Create the agent
-agent := client.NewAgent(&hastekit.AgentOptions{
+agent := hastekit.NewAgent(&hastekit.AgentConfig{
     Name:        "Hello world agent",
-    Instruction: client.Prompt("You are helpful assistant. You greet user with a light-joke"),
-    LLM: client.NewLLM(hastekit.LLMOptions{
-        Provider: llm.ProviderNameOpenAI,
-        Model:    "gpt-4o-mini",
-    }),
+    Instruction: hastekit.NewPrompt("You are helpful assistant. You greet user with a light-joke"),
+    LLM:         client.Model("OpenAI/gpt-4o-mini"),
     Parameters: responses.Parameters{
         Temperature: utils.Ptr(0.2),
     },
 })
 ```
 
-### AgentOptions Fields
+### AgentConfig Fields
 
 | Field | Type | Description |
 | :--- | :--- | :--- |
 | **Name** | `string` | A unique identifier for the agent |
-| **Instruction** | `agents.SystemPromptProvider` | System prompt defining agent behavior (use `client.Prompt()` for simple strings) |
-| **LLM** | `llm.Provider` | The LLM provider instance (created via `client.NewLLM()`) |
+| **Instruction** | `agents.SystemPromptProvider` | System prompt defining agent behavior (use `hastekit.NewPrompt()` for simple strings) |
+| **LLM** | `llm.Provider` | The LLM provider instance (bound via `client.Model("Provider/model")`) |
 | **Parameters** | `responses.Parameters` | Optional LLM parameters (temperature, max tokens, etc.) |
 | **Tools** | `[]agents.Tool` | Optional array of tools the agent can use |
 | **Handoffs** | `[]*agents.Handoff` | Optional sub-agents this agent can hand off to (see [Handoffs](/hastekit-sdk/agents/multi-agents/handoff)) |
@@ -83,7 +75,6 @@ agent := client.NewAgent(&hastekit.AgentOptions{
 | **History** | `*history.CommonConversationManager` | Optional conversation history manager |
 | **Output** | `map[string]any` | Optional JSON schema for structured output |
 | **McpServers** | `[]*mcpclient.MCPClient` | Optional MCP server clients |
-| **Runtime** | `agents.Runtime` | Optional durable execution runtime (see the [Durable Execution](/hastekit-sdk/agents/durable/restate) pages) |
 
 ## Executing an Agent
 
@@ -162,10 +153,10 @@ func (h *AgentHandle) Result() (*AgentOutput, error)
 
 ```go
 type AgentOutput struct {
-    RunID            string                          // Unique run identifier
-    Status           agentstate.RunStatus            // Execution status
-    Output           []responses.InputMessageUnion   // Agent's response messages
-    PendingApprovals []responses.FunctionCallMessage // Tool calls requiring approval
+    RunID      string                        // Unique run identifier
+    Status     agentstate.RunStatus          // Execution status
+    Output     []responses.InputMessageUnion // Agent's response messages
+    Interrupts []responses.Interrupt         // One per tool call awaiting approval (human-in-the-loop)
 }
 ```
 
@@ -184,40 +175,32 @@ import (
 
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents/history"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
 	hastekit "github.com/hastekit/hastekit-sdk-go"
 	"github.com/hastekit/hastekit-sdk-go/pkg/utils"
 )
 
 func main() {
-	// Initialize SDK client
-    client, err := hastekit.NewWithOptions(
-        hastekit.WithProviderConfigs(gateway.ProviderConfig{
-            ProviderName:  llm.ProviderNameOpenAI,
-            BaseURL:       "",
-            CustomHeaders: nil,
-            ApiKeys: []*gateway.APIKeyConfig{
-                {
-                    Name:   "Key 1",
-                    APIKey: os.Getenv("OPENAI_API_KEY"),
-                },
-            },
-        }),
-    )
-	if err != nil {
-		log.Fatal(err)
-	}
+	// Configure an LLM client
+	client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
+		{
+			ProviderName:  hastekit.ProviderOpenAI,
+			BaseURL:       "",
+			CustomHeaders: nil,
+			ApiKeys: []*hastekit.APIKeyConfig{
+				{
+					Name:   "Key 1",
+					APIKey: os.Getenv("OPENAI_API_KEY"),
+				},
+			},
+		},
+	})
 
 	// Create agent
-	agent := client.NewAgent(&hastekit.AgentOptions{
+	agent := hastekit.NewAgent(&hastekit.AgentConfig{
 		Name:        "Hello world agent",
-		Instruction: client.Prompt("You are helpful assistant. You greet user with a light-joke"),
-		LLM: client.NewLLM(hastekit.LLMOptions{
-			Provider: llm.ProviderNameOpenAI,
-			Model:    "gpt-4o-mini",
-		}),
+		Instruction: hastekit.NewPrompt("You are helpful assistant. You greet user with a light-joke"),
+		LLM:         client.Model("OpenAI/gpt-4o-mini"),
 		Parameters: responses.Parameters{
 			Temperature: utils.Ptr(0.2),
 		},

@@ -24,26 +24,20 @@ If all keys have the same weight (e.g., all set to `1` or not specified), the se
 
 ## Configuration Example
 
-When using the HasteKit SDK in direct mode, you can configure multiple keys by passing one or more `gateway.ProviderConfig` values to `hastekit.WithProviderConfigs`, assigning each `APIKeyConfig` a `Weight`.
+When using the HasteKit SDK in direct mode, you can configure multiple keys by passing a `[]hastekit.ProviderConfig` to `hastekit.NewLLMClient`, assigning each `APIKeyConfig` a `Weight`.
 
 ```go
 package main
 
 import (
-	"context"
-	"fmt"
-	"log"
-
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
 	hastekit "github.com/hastekit/hastekit-sdk-go"
 )
 
 func main() {
 	// Define multiple API keys for OpenAI with different weights
-	providerConfigs := []gateway.ProviderConfig{{
-		ProviderName: llm.ProviderNameOpenAI,
-		ApiKeys: []*gateway.APIKeyConfig{
+	providerConfigs := []hastekit.ProviderConfig{{
+		ProviderName: hastekit.ProviderOpenAI,
+		ApiKeys: []*hastekit.APIKeyConfig{
 			{
 				APIKey: "sk-openai-key-1",
 				Weight: 70, // This key will be used ~70% of the time
@@ -56,11 +50,6 @@ func main() {
 	}}
 
 	// Create the HasteKit client
-	client, err := hastekit.NewWithOptions(
-        hastekit.WithProviderConfigs(providerConfigs...),
-    )
-	if err != nil {
-		log.Fatalf("failed to create HasteKit client: %v", err)
-	}
+	client := hastekit.NewLLMClient(providerConfigs)
 }
 ```

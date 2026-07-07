@@ -9,8 +9,7 @@ HasteKit SDK supports generating text embeddings with various LLM providers like
 Generate embeddings for a single text input.
 
 ```go
-resp, err := client.NewEmbedding(context.Background(), &embeddings.Request{
-    Model: "Gemini/models/gemini-embedding-001",
+resp, err := model.NewEmbedding(context.Background(), &embeddings.Request{
     Input: embeddings.InputUnion{
         OfString: utils.Ptr("The food was delicious and the waiter..."),
     },
@@ -52,8 +51,7 @@ if resp.Usage != nil {
 Generate embeddings for multiple texts in a single request.
 
 ```go
-resp, err := client.NewEmbedding(context.Background(), &embeddings.Request{
-    Model: "Gemini/models/gemini-embedding-001",
+resp, err := model.NewEmbedding(context.Background(), &embeddings.Request{
     Input: embeddings.InputUnion{
         OfList: []string{
             "The food was delicious",

@@ -10,57 +10,47 @@ import (
 	hastekit "github.com/hastekit/hastekit-sdk-go"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents/history"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
 )
 
 func main() {
-	client, err := hastekit.NewWithOptions(
-		hastekit.WithProviderConfigs(gateway.ProviderConfig{
-			ProviderName:  llm.ProviderNameOpenAI,
-			BaseURL:       "",
-			CustomHeaders: nil,
-			ApiKeys: []*gateway.APIKeyConfig{
+	client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
+		{
+			ProviderName: hastekit.ProviderOpenAI,
+			ApiKeys: []*hastekit.APIKeyConfig{
 				{
 					Name:   "Key 1",
 					APIKey: os.Getenv("OPENAI_API_KEY"),
 				},
 			},
-		}),
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	model := client.NewLLM(hastekit.LLMOptions{
-		Provider: llm.ProviderNameOpenAI,
-		Model:    "gpt-4.1-mini",
+		},
 	})
 
-	agent1 := client.NewAgent(&hastekit.AgentOptions{
+	model := client.Model("OpenAI/gpt-4.1-mini")
+
+	agent1 := hastekit.NewAgent(&hastekit.AgentConfig{
 		Name:        "JokeAgent",
-		Instruction: client.Prompt("You are joke teller"),
+		Instruction: hastekit.NewPrompt("You are joke teller"),
 		LLM:         model,
-		History:     client.NewConversationManager(),
+		History:     hastekit.NewFileHistory("./conversations"),
 	})
 
-	agent2 := client.NewAgent(&hastekit.AgentOptions{
+	agent2 := hastekit.NewAgent(&hastekit.AgentConfig{
 		Name:        "FactAgent",
-		Instruction: client.Prompt("You are a fact teller"),
+		Instruction: hastekit.NewPrompt("You are a fact teller"),
 		LLM:         model,
-		History:     client.NewConversationManager(),
+		History:     hastekit.NewFileHistory("./conversations"),
 	})
 
-	routerAgent := client.NewAgent(&hastekit.AgentOptions{
+	routerAgent := hastekit.NewAgent(&hastekit.AgentConfig{
 		Name:        "RouterAgent",
-		Instruction: client.Prompt("You are router agent. You must not respond directly. Your role is only to delegate to other agents"),
+		Instruction: hastekit.NewPrompt("You are router agent. You must not respond directly. Your role is only to delegate to other agents"),
 		LLM:         model,
 		Handoffs: []*agents.Handoff{
 			agents.NewHandoff(agent1.Name, "Use this agent to generate jokes", agent1),
 			agents.NewHandoff(agent2.Name, "Use this agent to generate facts", agent2),
 		},
-		History: client.NewConversationManager(),
+		History: hastekit.NewFileHistory("./conversations"),
 	})
 
 	handle, err := routerAgent.Execute(context.Background(), &agents.AgentInput{
