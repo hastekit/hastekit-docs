@@ -1,5 +1,6 @@
 ---
 title: Introduction
+icon: circle-info
 description: Golang SDK for building LLM powered apps, AI agents, and orchestrating multi-agent workflows across multiple LLM providers.
 ---
 
@@ -11,13 +12,19 @@ A Golang SDK for developers who want fine-grained control over LLM interactions 
 
 <CardGroup cols={2}>
   <Card title="Multi-Provider Support" icon="shuffle">
-    Access to multiple providers through a unified API. Seamlessly switch between OpenAI, Anthropic, Gemini, XAI, and more.
+    Access to multiple providers through a unified API. Seamlessly switch between OpenAI, Anthropic, Gemini, xAI, Bedrock, and more.
   </Card>
   <Card title="Agent SDK" icon="robot">
     Build sophisticated AI agents with tools, MCP servers, conversation history, summarization, sub-agents, and skills.
   </Card>
+  <Card title="Skills" icon="book-open">
+    Give agents folders of instructions they read only when a task calls for them, instead of paying for them every turn.
+  </Card>
+  <Card title="Hooks" icon="filter">
+    Intercept tool calls and model calls in one place for auth, budgets, quotas, and audit.
+  </Card>
   <Card title="Human-in-the-loop" icon="person">
-    Integrate human feedback into agent workflows for review and approval.
+    Integrate human feedback into agent workflows for review, approval, and form-filling.
   </Card>
   <Card title="Durable Execution" icon="helmet-safety">
     Create durable agents that can pause, resume, and recover from failures. Powered by Temporal and Restate.
@@ -65,5 +72,28 @@ out, _ := handle.Result()
 <Card title="Get Started with the SDK →" icon="arrow-right" href="/hastekit-sdk/setting-up">
   Install the SDK and make your first LLM call in under 5 minutes.
 </Card>
+
+---
+
+### Supported Providers
+
+| Provider | Text | Streaming | Tool Calling | Vision | Embeddings | Image Gen | Image Edit | Speech | Transcription |
+|----------|:----:|:---------:|:------------:|:------:|:----------:|:---------:|:----------:|:------:|:-------------:|
+| **OpenAI** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Anthropic** | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **Gemini** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **xAI** | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅¹ | ❌ |
+| **Bedrock** | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| **ElevenLabs** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
+
+¹ Non-streaming only — xAI has no `NewStreamingSpeech`.
+
+**Text** is the [Responses API](/hastekit-sdk/responses/responses-api) (`NewResponses`), which is what agents use. OpenAI additionally implements the older Chat Completions API (`NewChatCompletion` / `NewStreamingChatCompletion`); no other provider does.
+
+`ProviderOllama` and `ProviderOpenRouter` are not in the table because their capabilities aren't the SDK's to state: both are served by the OpenAI-compatible client, so every method is wired up and each call is passed straight through. What actually answers depends on the endpoint and the model behind it. OpenRouter defaults to `https://openrouter.ai/api/v1`; Ollama needs an explicit `BaseURL` on its provider config.
+
+<Warning>
+A ❌ is not a graceful "unsupported" error. Unimplemented methods fall through to the embedded base provider, where the text and embedding methods **panic** and the media methods return `(nil, nil)` — so a call for a capability a provider doesn't have will either crash or hand back a silent nil. Check this table before reaching for a non-text method on a non-OpenAI provider.
+</Warning>
 
 ---

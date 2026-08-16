@@ -1,5 +1,6 @@
 ---
 title: Deferred Tools
+icon: hourglass-half
 description: Keep large tool catalogs out of the system prompt and let the agent load tool schemas on demand
 ---
 
@@ -53,8 +54,8 @@ If you build the tool with the [`hastekit.NewTool`](/hastekit-sdk/agents/tools/f
 ```go
 lookupTool := hastekit.NewTool(lookupUser,
 	hastekit.WithName("lookup_user"),
-	hastekit.WithDescription[LookupArgs, User]("Look up a user record by ID"),
-	hastekit.WithDeferred[LookupArgs, User](true), // keep out of the prompt until activated
+	hastekit.WithDescription("Look up a user record by ID"),
+	hastekit.WithDeferred(true), // keep out of the prompt until activated
 )
 ```
 
@@ -85,14 +86,25 @@ mcpClient, err := mcpclient.NewClient(context.Background(), "http://localhost:90
 
 Only the listed tools are deferred; the rest of the server's tools remain available in the prompt as usual.
 
+Pass `"*"` to defer every tool the server exposes — the right default for a server with a large or changing catalog, since you no longer have to keep the list in sync with the server:
+
+```go
+mcpClient, err := mcpclient.NewClient(context.Background(), "http://localhost:9001/sse",
+	mcpclient.WithTransport("streamable-http"),
+	mcpclient.WithDeferredTools("*"),
+)
+```
+
 ## The ToolSearch tool
 
 `ToolSearch` accepts two arguments:
 
 | Argument      | Type    | Description |
 |---------------|---------|-------------|
-| `query`       | string  | Required. Use `select:<tool_name>` to activate a specific tool by name. Comma-separate names to activate several at once (e.g. `select:lookup_user,delete_user`). |
-| `max_results` | integer | Optional. Maximum number of results to return (default 5). |
+| `query`       | string  | Required. Either `select:<tool_name>` to activate specific tools by name (comma-separate to activate several: `select:lookup_user,delete_user`), or plain keywords to search by. |
+| `max_results` | integer | Optional. Maximum number of results a keyword search returns (default 5). Ignored by `select:`. |
+
+A keyword query ranks deferred tools by how many of its terms appear in the tool's name or description — case-insensitive substring matching — and activates the best matches, up to `max_results`. A query that matches nothing answers `No matching deferred tools found for query: …` rather than silently activating nothing.
 
 When the agent activates a tool, the activation is recorded in the run state (`activated_deferred_tools`), so the tool's schema stays available for the remainder of the run.
 

@@ -1,0 +1,223 @@
+---
+title: Hooks
+icon: filter
+description: Intercept tool calls and model calls for auth, budgets, quotas, and audit
+---
+
+A hook wraps what the agent does, so cross-cutting concerns — auth, budgets, quotas, audit, approval policy — live in one place instead of inside every tool. Hooks can observe, or answer in place of the real call.
+
+There are two sides:
+
+| Interface | Wraps |
+| :--- | :--- |
+| `agents.ToolCallHook` | Every tool call the agent makes |
+| `agents.ModelCallHook` | Every call the agent makes to the model, one per loop iteration |
+
+`hastekit.Hook` is both. Implement only the half you care about by embedding the no-op other half — `agents.NoopToolCallHook` or `agents.NoopModelCallHook`.
+
+Attach hooks with `AgentConfig.Hooks`:
+
+```go
+agent := hastekit.NewAgent(&hastekit.AgentConfig{
+    Name:  "Assistant",
+    LLM:   client.Model("OpenAI/gpt-4o-mini"),
+    Tools: []hastekit.Tool{weatherTool},
+    Hooks: []agents.Hook{&credits{}, &policy{}},
+})
+```
+
+## Model call hooks
+
+The case this exists for is spending. A run calls the model once per loop iteration and each call costs money, so "may this run afford another call?" has to be asked before the call and the answer recorded after it.
+
+```go
+// A budget check that has no interest in tools.
+type credits struct {
+    agents.NoopToolCallHook // supplies the tool-call half
+}
+
+func (c *credits) GetName() string { return "credits" }
+
+func (c *credits) BeforeModelCall(ctx context.Context, call *agents.ModelCall) (agents.ModelCallHookResult, error) {
+    if balanceFor(call.RunContext) <= 0 {
+        // Answering is kinder than failing: the run ends with a message the
+        // user can read rather than an error they cannot.
+        return agents.HandleModelCall(
+            agents.ModelCallText("You're out of credits — top up to continue."),
+        ), nil
+    }
+    return agents.ContinueModelCall(), nil
+}
+
+func (c *credits) AfterModelCall(ctx context.Context, call *agents.ModelCall, res *agents.ModelCallResult) (agents.ModelCallHookResult, error) {
+    recordSpend(call.RunContext, res.Usage) // res.Usage is this one call
+    return agents.ContinueModelCall(), nil
+}
+```
+
+- `ContinueModelCall()` lets the call go to the provider.
+- `HandleModelCall(resp)` answers for the model — the provider is never contacted (before) or its reply is replaced (after).
+- `agents.ModelCallText(text)` builds that answer: one assistant message, no tool calls, so the loop takes it as the model's final word and the turn ends there.
+- Returning an error from either method **fails the run**. Reserve it for when there is nothing sensible to say.
+
+### What a model hook sees
+
+`BeforeModelCall` receives the shape of the call, not the prompt. That is what a budget check needs, and it keeps the conversation from crossing a durable boundary twice.
+
+```go
+type ModelCall struct {
+    AgentName  string
+    Namespace  string
+    ThreadID   string
+    SessionID  string
+    StreamID   string
+    RunID      string
+    RunContext map[string]any
+
+    Model         string          // what the request will be sent to
+    LoopIteration int             // the run's loop counter, as MaxLoops measures it
+    ContextTokens int             // how full the context window already is
+    Usage         responses.Usage // what the run has spent so far, across every call
+}
+```
+
+`ModelCallResult` carries `Usage` for the one call that just completed.
+
+<Note>`ContextTokens` uses the same reckoning as the summarizer: the last measured prompt plus an estimate of everything appended since. It is the best pre-call estimate of what this call will cost on input.</Note>
+
+## Tool call hooks
+
+The tool-call side has the same shape. A policy hook is a few lines:
+
+```go
+type policy struct {
+    agents.NoopModelCallHook // model-call half; this hook only guards tools
+}
+
+func (p *policy) GetName() string { return "policy" }
+
+func (p *policy) BeforeToolCall(ctx context.Context, call *agents.ToolCall) (agents.ToolCallHookResult, error) {
+    if !allowed(call.RunContext, call.Name) {
+        // Short-circuit: the tool never runs, and this stands in as its output.
+        return agents.HandleToolCall(
+            agents.ToolCallResult(call, "Denied by policy."),
+        ), nil
+    }
+    return agents.ContinueToolCall(), nil
+}
+
+func (p *policy) AfterToolCall(ctx context.Context, call *agents.ToolCall, resp *agents.ToolCallResponse) (agents.ToolCallHookResult, error) {
+    audit(call.Name, call.RunContext)
+    return agents.ContinueToolCall(), nil
+}
+```
+
+`call` is the whole request — the tool's name and the arguments the model chose (via the embedded `responses.FunctionCallMessage`), the thread and agent it belongs to, and `RunContext`. That is the pairing an access check needs: who is asking, and what they are asking for.
+
+<Tip>
+`ToolCall` carries the call, not the tool, so it has no annotations on it. To gate on [tool annotations](/hastekit-sdk/agents/tools/function-tools#tool-annotations), keep the tools your hook cares about on the hook itself and read `agents.AnnotationsOf(tool).IsDeclaredDestructive()`, matching by name against `call.Name`.
+</Tip>
+
+- `ContinueToolCall()` passes the call along — to the next hook, then to the tool.
+- `HandleToolCall(resp)` says the hook answered; the real call never happens (before) or its result is replaced (after).
+- `agents.ToolCallResult(call, output)` builds that answer. Use it rather than hand-building a response: it stamps the call's ids onto the result, and the loop pairs every result with its `function_call` by them.
+- Returning an error **does not fail the run** — the error's text becomes the call's result. An answer the model can read and work around is almost always more useful than a broken run.
+
+### What the tool-call side covers
+
+Tool hooks wrap every tool the agent calls: its own function tools, its [sub-agent tools](/hastekit-sdk/agents/tools/agent-as-a-tool), and every MCP server's. [Handoffs](/hastekit-sdk/agents/multi-agents/handoff) do not pass through them — `transfer_to_agent` calls out to nothing, and the target agent's own hooks govern what it then does.
+
+`AfterToolCall` does not run on a paused call. A pause has no result yet; the call comes back through the hooks when the run resumes.
+
+## Order of execution
+
+For one call: every `Before…` in the order the hooks were registered, until one settles the call — then the real call, unless one did — then every `After…` in the same order.
+
+## Notes
+
+- **`Handled` is explicit.** It's a flag rather than a nil check on the response, because "I answered, and the answer is nothing to say" differs from "carry on without me".
+- **Run context comes along.** `call.RunContext` is the per-run map you set on `AgentInput`, so per-tenant data (a JWT, an org id) is available without threading it through every tool.
+- **`GetName()` must be unique per agent and stable across deploys.** Durable runtimes name each hook's journaled step after it, so a renamed hook is a new step on replay — the same hazard as renaming a Temporal activity.
+- **Hooks run as their own durable steps.** Under [Restate](/hastekit-sdk/agents/durable/restate) or [Temporal](/hastekit-sdk/agents/durable/temporal) each hook call is journaled, so a check that talks to a billing service is not re-run on every replay.
+
+## Returning an interrupt from a hook
+
+A response carrying `Interrupts` pauses the run instead of answering it — which is how an unauthenticated caller is sent to a login URL from a hook rather than from inside every tool. See [Human in the Loop](/hastekit-sdk/agents/tools/human-in-the-loop) for the pause/resume flow.
+
+## Complete Example
+
+```go
+package main
+
+import (
+	"context"
+	"log"
+	"os"
+
+	hastekit "github.com/hastekit/hastekit-sdk-go"
+	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
+	"github.com/hastekit/hastekit-sdk-go/pkg/agents/history"
+	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
+)
+
+// auditor observes both sides and answers for neither.
+type auditor struct{}
+
+func (a *auditor) GetName() string { return "auditor" }
+
+func (a *auditor) BeforeToolCall(ctx context.Context, call *agents.ToolCall) (agents.ToolCallHookResult, error) {
+	log.Printf("tool %s called on thread %s", call.Name, call.ThreadID)
+	return agents.ContinueToolCall(), nil
+}
+
+func (a *auditor) AfterToolCall(ctx context.Context, call *agents.ToolCall, resp *agents.ToolCallResponse) (agents.ToolCallHookResult, error) {
+	return agents.ContinueToolCall(), nil
+}
+
+func (a *auditor) BeforeModelCall(ctx context.Context, call *agents.ModelCall) (agents.ModelCallHookResult, error) {
+	log.Printf("iteration %d, %d context tokens", call.LoopIteration, call.ContextTokens)
+	return agents.ContinueModelCall(), nil
+}
+
+func (a *auditor) AfterModelCall(ctx context.Context, call *agents.ModelCall, res *agents.ModelCallResult) (agents.ModelCallHookResult, error) {
+	log.Printf("call used %d tokens", res.Usage.TotalTokens)
+	return agents.ContinueModelCall(), nil
+}
+
+func main() {
+	client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
+		{
+			ProviderName: hastekit.ProviderOpenAI,
+			ApiKeys: []*hastekit.APIKeyConfig{
+				{Name: "Key 1", APIKey: os.Getenv("OPENAI_API_KEY")},
+			},
+		},
+	})
+
+	agent := hastekit.NewAgent(&hastekit.AgentConfig{
+		Name:        "Assistant",
+		Instruction: hastekit.NewPrompt("You are a helpful assistant."),
+		LLM:         client.Model("OpenAI/gpt-4o-mini"),
+		Hooks:       []agents.Hook{&auditor{}},
+	})
+
+	handle, err := agent.Execute(context.Background(), &agents.AgentInput{
+		Message: history.Message{
+			Messages: []responses.InputMessageUnion{
+				responses.UserMessage("Hello!"),
+			},
+		},
+		RunContext: map[string]any{"org_id": "acme"},
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	out, err := handle.Result()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Println(out.Output[0].OfOutputMessage.Content[0].OfOutputText.Text)
+}
+```

@@ -1,5 +1,6 @@
 ---
 title: Summarization
+icon: compress
 ---
 
 Conversation summarization helps manage long conversation histories by condensing older messages while preserving important context. This is essential for maintaining context in extended conversations without exceeding token limits or performance constraints.
@@ -52,11 +53,25 @@ summarizer := summariser.NewLLMHistorySummarizer(&summariser.LLMHistorySummarize
 
 ### How It Works
 
-1. When messages are loaded, the summarizer checks if the total token count exceeds the threshold
-2. If the threshold is exceeded and there are enough messages, it groups messages by run ID
+1. When messages are loaded, the summarizer checks whether the context occupancy exceeds `TokenThreshold`
+2. If it does and there are more than `KeepRecentCount` runs, messages are grouped into the runs that produced them
 3. It keeps the most recent `KeepRecentCount` runs intact
-4. Older runs are summarized into a single system message using the LLM
+4. Older runs are summarized into a single message using the LLM
 5. The summary replaces the old messages, preserving context while reducing token usage
+
+Summarization is skipped entirely when the thread has `KeepRecentCount` runs or fewer — there would be nothing left to summarize.
+
+### How the token count is measured
+
+`TokenThreshold` is compared against the run's **context occupancy**: the last prompt-token count the provider actually reported, plus an estimate of everything appended since. The estimate is deliberately rough — roughly 4 characters per token, with a flat nominal cost for images and attached files — because it only has to cover the messages added since the last usage report, and is replaced by an exact number as soon as the next one arrives.
+
+The estimate runs low on code and structured text, which errs toward summarizing sooner. That is the safe direction: the cost of a needless summary is one extra call, and the cost of a missed one is a rejected request.
+
+### Summarization is billed to the run
+
+Producing a summary costs real tokens, and those are added to the run's usage total — so a run's reported spend includes the work done to shrink it.
+
+They are deliberately **not** folded into the context-occupancy figure the summarizer keys off. A summarization request is its own instruction plus a flattened transcript, with none of the agent's tools or system prompt; counting it as context would hand the summarizer a reading of a conversation that isn't the one it is deciding about.
 
 ## Sliding Window Summarizer
 
@@ -74,14 +89,20 @@ summarizer := summariser.NewSlidingWindowHistorySummarizer(&summariser.SlidingWi
 
 ### Parameters
 
-- **`KeepCount`**: The number of recent conversation runs to retain. Older runs are discarded.
+- **`KeepCount`**: The number of recent conversation runs to retain. Older runs are discarded. Floored at `1`, so leaving it unset keeps the run in flight rather than discarding every turn.
 
 ### How It Works
 
-1. Messages are grouped by their run ID
+1. Messages are grouped into the runs that produced them
 2. If the number of runs exceeds `KeepCount`, only the most recent `KeepCount` runs are kept
 3. Older runs are discarded without creating a summary
 4. This approach is simple and cost-effective but loses older context completely
+
+Unlike the LLM summarizer, this one has no token threshold — it trims purely by run count, and needs no model call, so `SummaryResult.Usage` is nil.
+
+<Note>
+**Runs are contiguous blocks.** A run id that reappears later starts a new group rather than reopening the earlier one, so a message arriving out of order can't be filed under an unrelated run and cut the trimming boundary in the wrong place. Adjacent messages with no run id of their own still group together, which is the conservative reading: fewer runs means the keep window covers more, not less.
+</Note>
 
 ## Using Summarizers with Conversation Managers
 
@@ -116,6 +137,34 @@ agent := hastekit.NewAgent(&hastekit.AgentConfig{
     History:     cm,
 })
 ```
+
+## Writing your own summarizer
+
+Implement `history.HistorySummarizer`:
+
+```go
+type HistorySummarizer interface {
+	Summarize(ctx context.Context, msgIdToRunId map[string]string, messages []messages.Message, contextTokens int) (*SummaryResult, error)
+}
+```
+
+Return `nil, nil` when no summarization is needed. Otherwise return a `SummaryResult`:
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| **Summary** | `*messages.Message` | The summary message. Nil for summarizers that only discard, like the sliding window |
+| **MessagesToKeep** | `[]messages.Message` | The turns to keep verbatim after the summary |
+| **LastSummarizedRunID** | `string` | The last run the summary covers |
+| **SummaryID** | `string` | Unique id for the summary; generated if empty |
+| **Usage** | `*responses.Usage` | What producing the summary cost, for summarizers that call a model. Nil otherwise |
+
+<Warning>
+A summary boundary naming the run still being written is refused and cleared — the summary row is saved but stays inert on reload. Floor your keep window at one run so the boundary always stops short of the most recent.
+</Warning>
+
+## Reading a summarized thread back
+
+Once a thread has been summarized, the agent's own history load returns the summary in place of the turns it covers. That is right for the model and wrong for a UI. To render the thread as written, use `LoadTranscript` — see [Reading a thread back](/hastekit-sdk/agents/conversations/history#reading-a-thread-back).
 
 ## Complete Example: LLM Summarizer
 

@@ -1,5 +1,6 @@
 ---
 title: MCP Tools
+icon: plug
 ---
 
 MCP (Model Context Protocol) tools allow your agent to connect to external MCP servers and use their tools. This enables your agent to interact with various services and resources through standardized MCP tool interfaces.
@@ -63,6 +64,12 @@ mcpClient, err := mcpclient.NewClient(context.Background(), "http://localhost:90
 )
 ```
 
+Pass `"*"` to defer every tool the server exposes, which saves keeping a list in sync with a server whose catalog changes:
+
+```go
+mcpclient.WithDeferredTools("*")
+```
+
 See [Deferred Tools](/hastekit-sdk/agents/tools/deferred-tools) for how the activation flow works and when to defer a tool.
 
 ### Schema Caching
@@ -93,6 +100,108 @@ mcpClient, err := mcpclient.NewClient(context.Background(), "http://localhost:90
 		mcpclient.WithTransport("streamable-http"), // or "sse"
 	)
 ```
+
+On `streamable-http`, the client also opens the post-init server→client SSE stream. Some servers don't support that standalone `GET` stream, and the client then hangs waiting on a stream that never opens. Turn it off for those servers:
+
+```go
+mcpclient.WithDisableStandaloneSSE(true) // no effect on the "sse" transport
+```
+
+## Tool Annotations
+
+MCP tools carry whatever behavioural hints their server declared — read-only, destructive, idempotent, open-world — and the SDK converts them into the same `agents.ToolAnnotations` shape a local function tool uses. Nothing extra is needed to pick them up, and one permission policy can read both:
+
+```go
+a := agents.AnnotationsOf(tool)
+if a.IsDestructive() {
+    // gate it — see Hooks
+}
+```
+
+The MCP wire format carries `readOnlyHint` and `idempotentHint` as bare booleans, so an absent hint arrives as `false` — which is the spec's default for both. `destructiveHint` and `openWorldHint` stay unset when the server said nothing, leaving the conservative defaults (destructive, open world) to the `Is*` helpers.
+
+See [Tool Annotations](./function-tools#tool-annotations) for the full table and how to declare them on your own tools.
+
+<Warning>Hints are self-reported. Never let a hint from an untrusted MCP server widen what a tool is allowed to do.</Warning>
+
+## Progress Notifications
+
+When a tool call is streaming, the client attaches a progress token so the server can send `notifications/progress` for the duration of that call. Those notifications arrive on the run's chunk stream as `tool.progress` chunks, exactly like progress emitted by a [function tool](./function-tools#reporting-progress):
+
+```go
+for chunk := range handle.Chunks {
+    if chunk.OfToolProgress != nil {
+        p := chunk.OfToolProgress
+        fmt.Printf("%s: %.0f/%.0f %s\n", p.ToolName, p.Progress, p.Total, p.Message)
+    }
+}
+```
+
+`CallID` ties each update back to the in-flight call. `Total` is optional — `0` means unknown. Progress is a live side stream: under the durable runtimes it is published directly rather than journaled, so it is never replayed.
+
+## Elicitation
+
+An MCP server can ask the *user* for something mid-call rather than answering: a form to fill in, or a URL to visit. The SDK maps that onto the same pause the agent already uses for [human-in-the-loop approvals](./human-in-the-loop) — the run ends with an interrupt, and the answer arrives on a later request.
+
+The pause is surfaced as an `Interrupt` whose `Mode` says what is being asked:
+
+| Mode | Meaning |
+| :--- | :--- |
+| `responses.InterruptModeApproval` | A human approve/reject gate on a tool call |
+| `responses.InterruptModeForm` | The user fills a form described by a JSON schema |
+| `responses.InterruptModeURL` | The user must visit a URL (e.g. an OAuth connect flow) before the tool can proceed |
+
+```go
+type Interrupt struct {
+    FunctionCallMessage responses.FunctionCallMessage `json:"function_call_message"`
+    Mode                responses.InterruptMode       `json:"mode"`
+    Elicitations        []mcp.ElicitParams            `json:"elicitations,omitempty"`
+    IsNested            bool                          `json:"is_nested,omitempty"`
+}
+```
+
+For form and URL modes, `Elicitations` carries the server's own request — its message, and for a form the `RequestedSchema` describing the fields to collect.
+
+### Answering a form
+
+Resume the same way as an approval, but attach the filled form as the resolution's `Content`. It must match the `RequestedSchema` the pause advertised:
+
+```go
+filled, _ := sonic.Marshal(map[string]any{
+    "email":     "alice@example.com",
+    "team_size": 12,
+})
+
+resolution := responses.InputMessageUnion{
+    OfFunctionCallInterruptResolution: &responses.FunctionCallInterruptResolutionMessage{
+        ID: uuid.NewString(),
+        Resolutions: []responses.InterruptResolution{
+            {
+                CallID:  out.Interrupts[0].FunctionCallMessage.CallID,
+                Action:  responses.InterruptActionApprove,
+                Content: filled,
+            },
+        },
+    },
+}
+
+handle, err := agent.Execute(ctx, &agents.AgentInput{
+    Namespace:     "default",
+    ThreadID:      threadID,
+    PreviousRunID: out.RunID,
+    Message: history.Message{
+        Messages: []responses.InputMessageUnion{resolution},
+    },
+})
+```
+
+An approval carrying content becomes an MCP `accept`; a rejection becomes a `decline`, and its content is dropped rather than delivered — a rejected form has no answer to pass on.
+
+<Note>
+The request id and the server's own opaque state are carried across the pause in thread state, so the resuming call answers the server's original question rather than provoking a fresh one. That is what lets a server resume from where it left off instead of redoing the work that preceded the question.
+</Note>
+
+Only one input request per call is supported: one interrupt carries one answer, so a second question in the same call would have nowhere to put its reply.
 
 ## Complete Example
 

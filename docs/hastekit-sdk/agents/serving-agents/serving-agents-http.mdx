@@ -1,5 +1,6 @@
 ---
 title: Serving Agents through HTTP
+icon: server
 ---
 
 Agents can be served as HTTP endpoints, allowing them to be invoked through standard HTTP requests. `hastekit.NewHTTPHandler()` returns an `http.Handler` that dispatches to any registered agent, making it compatible with Go's standard `net/http` package.

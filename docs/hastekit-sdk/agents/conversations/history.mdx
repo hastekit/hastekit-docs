@@ -1,5 +1,6 @@
 ---
 title: History
+icon: clock-rotate-left
 ---
 
 Conversation history enables agents to maintain context across multiple interactions. By preserving previous messages, agents can reference earlier exchanges and build upon prior context, facilitating natural, context-aware conversations.
@@ -64,6 +65,49 @@ handle, err = agent.Execute(context.Background(), &agents.AgentInput{
 out, err = handle.Result()
 ```
 
+Passing `ThreadID` alone continues from the thread's tip.
+
+## Branching from an earlier turn
+
+To continue from a specific earlier run instead of the thread's tip — a retry, or an edit of an earlier message — set `PreviousRunID` to the `RunID` of the run you want to continue from:
+
+```go
+out, _ := handle.Result()
+
+handle, err = agent.Execute(ctx, &agents.AgentInput{
+    Namespace:     "user-123",
+    ThreadID:      threadID,
+    PreviousRunID: out.RunID, // continue from this run, not the thread tip
+    Message: history.Message{
+        Messages: []responses.InputMessageUnion{
+            responses.UserMessage("Actually, make it shorter."),
+        },
+    },
+})
+```
+
+## Reading a thread back
+
+To render a thread — a chat window, an audit view — use `LoadTranscript`:
+
+```go
+transcript, err := cm.LoadTranscript(ctx, "user-123", threadID)
+```
+
+It returns the thread as written: every turn, in order, with no summary standing in for any of them.
+
+<Warning>
+That is deliberately not what the agent reads for itself. The agent's own history load is summary-aware — once a thread has been summarized it returns the summary in place of the turns the summary covers, which is what keeps a long conversation inside the context window. Right for the model, wrong for a UI: a chat window hydrating from that view shows the user their own conversation with the early part replaced by a machine-written paragraph, and the turns are still on disk, so nothing signals that anything is missing.
+</Warning>
+
+Adapters opt in by implementing `history.TranscriptReader`; the built-in in-memory and file adapters both do. An adapter that doesn't falls back to the summary-aware load.
+
+```go
+type TranscriptReader interface {
+	LoadTranscript(ctx context.Context, namespace, threadID string) ([]ConversationMessage, error)
+}
+```
+
 ---
 
 ## Persistence
@@ -86,8 +130,8 @@ To implement custom persistence, implement the `ConversationPersistenceAdapter` 
 type ConversationPersistenceAdapter interface {
 	NewConversationID(ctx context.Context) string
 	NewRunID(ctx context.Context) string
-	LoadMessages(ctx context.Context, namespace string, threadID string, previousMessageID string) ([]history.ConversationMessage, error)
-	SaveMessages(ctx context.Context, namespace, msgId, previousMsgId, threadID string, conversationId string, messages []history.Message, meta map[string]any) error
+	LoadMessages(ctx context.Context, namespace string, threadID string, previousRunID string) ([]history.ConversationMessage, error)
+	SaveMessages(ctx context.Context, namespace, runId, previousRunId, threadID string, conversationId string, messages []history.Message, meta map[string]any) error
 	SaveSummary(ctx context.Context, namespace string, summary history.Summary) error
 }
 ```
@@ -100,11 +144,31 @@ cm := history.NewConversationManager(yourAdapter)
 
 When you use `hastekit.NewFileHistory("./conversations")`, the SDK wires a file-backed adapter that persists messages as JSON on disk.
 
-## Message Filtering & Attribution
+Optionally implement [`history.TranscriptReader`](#reading-a-thread-back) so a UI can read the thread as written, and `history.ThreadLister` so threads can be [enumerated](#listing-threads).
+
+## Options
+
+Both `history.NewConversationManager` and `hastekit.NewFileHistory` take `history.ConversationManagerOptions`:
+
+```go
+cm := hastekit.NewFileHistory("./conversations",
+	history.WithSummarizer(summarizer),
+	history.WithMessageAttribution(),
+)
+```
+
+| Option | Description |
+| :--- | :--- |
+| `WithSummarizer(s)` | Condense long threads — see [Summarization](/hastekit-sdk/agents/conversations/summarization) |
+| `WithMessageFilter(f)` | Transform message bundles before they are attributed and sent |
+| `WithMessageAttribution()` | Prefix other senders' turns with `(Agent)`/`(Human) <sender> said:`. Off by default |
+| `WithoutSteeringNotices()` | Suppress the note that follows a message which arrived mid-run. On by default |
+
+### Message Filtering
 
 Each stored message bundle (`messages.Message`) carries a `SenderID`, which lets the conversation manager attribute turns to a specific participant in multi-participant conversations.
 
-You can transform a run's message bundles before they are attributed and sent to the provider by supplying a `MessageFilter` via `history.WithMessageFilter`. A common use is rewriting each bundle's `SenderID` from an opaque id into a human-friendly name.
+You can transform a run's message bundles before they are attributed and sent to the provider by supplying a `MessageFilter`. A common use is rewriting each bundle's `SenderID` from an opaque id into a human-friendly name.
 
 ```go
 type MessageFilter interface {
@@ -117,7 +181,19 @@ cm := history.NewConversationManager(
 )
 ```
 
-The other available option is `history.WithSummarizer`, covered on the [Summarization](/hastekit-sdk/agents/conversations/summarization) page.
+### Attribution
+
+`WithMessageAttribution()` rewrites messages from senders other than the running agent with `(Agent) <sender> said:` / `(Human) <sender> said:` prefixes before they go to the provider. It is off by default, in which case bundles are flattened as-is.
+
+### Steering notices
+
+A message that reaches a run *after* it has started working — delivered with [`handle.EnqueueMessage`](/hastekit-sdk/agents/simple-agent#agenthandle), or POSTed to a thread already running over [AG-UI](/hastekit-sdk/agents/serving-agents/serving-agents-agui) — is followed by a short note saying so:
+
+> *[The message above arrived from the user while this run was already in progress... Treat it as their most recent instruction.]*
+
+Without it the two are the same message in the same position, and the model has no way to tell a correction shouted mid-task from the instruction it is already carrying out — so it tends to finish the original plan and address the interruption afterwards, if at all.
+
+The note is added to the outgoing message list only. It is never stored, so history keeps exactly the turn the user sent. Turn it off with `history.WithoutSteeringNotices()` only when something upstream already conveys the distinction, or when an agent's prompt depends on the exact message sequence.
 
 ## Listing Threads
 

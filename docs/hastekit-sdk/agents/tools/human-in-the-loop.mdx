@@ -1,5 +1,6 @@
 ---
 title: Human in the Loop
+icon: user-check
 ---
 
 Human-in-the-loop (HITL) allows you to require human approval before executing sensitive tool calls. When a tool marked as requiring approval is invoked by the agent, the execution pauses and waits for explicit user confirmation before proceeding.
@@ -67,7 +68,7 @@ func (t *DeleteUserTool) Execute(ctx context.Context, params *agents.ToolCall) (
 
 ## Configuring Approval for MCP Tools
 
-For MCP tools, use the `WithMcpApprovalRequiredTools` option when retrieving tools:
+For MCP tools, use the `mcpclient.WithApprovalRequiredTools` option when creating the client:
 
 ```go
 mcpClient, err := mcpclient.NewClient(context.Background(), "http://localhost:9001/sse",
@@ -112,10 +113,21 @@ Each `Interrupt` carries the intercepted call and the kind of gate:
 ```go
 type Interrupt struct {
     FunctionCallMessage responses.FunctionCallMessage `json:"function_call_message"` // .CallID identifies the call
-    Mode                responses.InterruptMode       `json:"mode"`                  // "approval" for approve/reject gates
+    Mode                responses.InterruptMode       `json:"mode"`                  // "approval", "form", or "url"
+    Elicitations        []mcp.ElicitParams            `json:"elicitations,omitempty"` // form/url payload
     IsNested            bool                          `json:"is_nested,omitempty"`
 }
 ```
+
+`Mode` discriminates the kind of pause, so one shape covers approval gates and MCP elicitations alike:
+
+| Mode | Meaning |
+| :--- | :--- |
+| `responses.InterruptModeApproval` | Approve/reject gate on a tool call — everything on this page |
+| `responses.InterruptModeForm` | An MCP server asked the user to fill a form |
+| `responses.InterruptModeURL` | An MCP server asked the user to visit a URL |
+
+See [MCP Tools → Elicitation](./mcp-tools#elicitation) for the form and URL flows.
 
 > Approval-required tools inside sub-agents (see [Agent as a tool](./agent-as-a-tool)) bubble up to the parent's `Interrupts` with `IsNested: true`, so the parent run pauses and surfaces them just like its own tools.
 
@@ -168,6 +180,22 @@ approvalResponse := responses.InputMessageUnion{
 ```
 
 The agent will receive the rejection as tool output: `"Request to call this tool has been declined"` and can adjust its response accordingly.
+
+### The resolution shape
+
+```go
+type InterruptResolution struct {
+    CallID  string          `json:"call_id"`
+    Action  string          `json:"action"`            // InterruptActionApprove / InterruptActionReject
+    Content json.RawMessage `json:"content,omitempty"` // data-carrying answers only
+}
+```
+
+`Content` is for interrupts that ask for data rather than a verdict — a submitted [MCP form elicitation](./mcp-tools#elicitation). Plain approvals leave it empty, and it is dropped on a rejection.
+
+## Pausing from a hook
+
+A [hook](/hastekit-sdk/agents/hooks) can pause a run too, by returning a `ToolCallResponse` carrying `Interrupts`. That is how an unauthenticated caller is sent to a login URL from one place rather than from inside every tool.
 
 ## Complete Example
 
@@ -334,8 +362,8 @@ func main() {
 
 		// Resume with approval
 		handle, err = agent.Execute(ctx, &agents.AgentInput{
-			Namespace:         "default",
-			PreviousMessageID: result.RunID,
+			Namespace:     "default",
+			PreviousRunID: result.RunID,
 			Message: history.Message{
 				Messages: []responses.InputMessageUnion{approvalResponse},
 			},

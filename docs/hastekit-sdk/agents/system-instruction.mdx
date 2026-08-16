@@ -1,5 +1,6 @@
 ---
 title: System Instruction
+icon: file-lines
 ---
 
 System instructions define the behavior and personality of an agent. The SDK provides flexible ways to create system instructions, from simple strings to dynamic templates loaded from remote sources.
@@ -16,24 +17,77 @@ agent := hastekit.NewAgent(&hastekit.AgentConfig{
 })
 ```
 
-## Template Variables
+## Prompt resolvers
 
-System instructions support template variables using Go template syntax. Variables are resolved at runtime using resolvers.
-
-### Simple Template Variables
-
-Use `{{variable}}` syntax in your instruction string, and provide a resolver to populate the values:
+The system prompt is built by a chain of resolvers, each handed what the last produced along with the run's dependencies:
 
 ```go
-contextData := map[string]any{
-    "name": "Alice",
-    "role": "developer",
-}
+type PromptResolverFn func(prompt string, deps *agents.Dependencies) (string, error)
+```
 
+`agents.Dependencies` carries what the agent contributes to its own prompt:
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| **RunContext** | `map[string]any` | The per-run map set on `AgentInput` |
+| **Handoffs** | `[]*agents.Handoff` | The agents this one can transfer to |
+| **DeferredTools** | `[]agents.DeferredToolInfo` | Name and description of each deferred tool |
+| **Skills** | `[]agents.Skill` | The skills the agent was given |
+| **SkillHint** | `string` | The provider's prose introducing them |
+
+<Warning>
+**A prompt starts with an empty chain and is used exactly as written** — nothing appended, no templating. If you want the standard behaviour, you must ask for it with `prompts.WithResolver(prompts.DefaultResolvers()...)`. A prompt that leaves out `ResolveSkills` produces an agent whose model never hears about its skills; one that leaves out `ResolveTemplate` leaves its `{{ placeholders }}` alone.
+</Warning>
+
+### The default chain
+
+`prompts.DefaultResolvers()` is the standard set, in this order:
+
+| Resolver | Appends |
+| :--- | :--- |
+| `ResolveSkills` | A `## Skills` section: the provider's hint, then each skill's name, description and location |
+| `ResolveHandoffs` | A `## Agents` section listing the handoff targets |
+| `ResolveDeferredTools` | A `## Deferred Tools` section listing each deferred tool's name and description |
+| `ResolveTemplate` | Fills `{{ placeholders }}` from `RunContext` — last, so a placeholder inside a skill description is resolved too |
+
+Each section is skipped when the agent has nothing to contribute to it.
+
+```go
+import "github.com/hastekit/hastekit-sdk-go/pkg/agents/prompts"
+
+agent := hastekit.NewAgent(&hastekit.AgentConfig{
+    Name: "Assistant",
+    Instruction: hastekit.NewPrompt(
+        "You are a helpful assistant.",
+        prompts.WithResolver(prompts.DefaultResolvers()...),
+    ),
+    LLM: model,
+})
+```
+
+### Custom resolvers
+
+Pass what you want, in the order you want; repeated `WithResolver` calls accumulate:
+
+```go
+hastekit.NewPrompt("You help maintain this project's releases.",
+    prompts.WithResolver(prompts.DefaultResolvers()...),
+    prompts.WithResolver(func(prompt string, deps *agents.Dependencies) (string, error) {
+        return prompt + "\n\n## House rules\n\nBe brief.", nil
+    }),
+)
+```
+
+## Template Variables
+
+Use `{{variable}}` syntax in your instruction string, include `prompts.ResolveTemplate` in the chain, and supply the values through the run context:
+
+```go
 agent := hastekit.NewAgent(&hastekit.AgentConfig{
     Name:        "Personalized Assistant",
     Instruction: hastekit.NewPrompt(
         "You are a helpful assistant. You are interacting with {{name}}, who is a {{role}}.",
+        prompts.WithResolver(prompts.ResolveTemplate),
     ),
     LLM: model,
 })
@@ -46,56 +100,29 @@ agent.Execute(context.Background(), &agents.AgentInput{
 })
 ```
 
-The template syntax `{{variable}}` is automatically converted to Go template format `{{ .variable }}` for resolution.
+The template syntax `{{variable}}` is automatically converted to Go template format `{{ .variable }}` for resolution. A run that carries no `RunContext` leaves the prompt alone, so a prompt that happens to contain braces is not a failure for runs that never meant to template it.
 
-### Custom Resolvers
-
-You can create custom resolvers functions for more complex template resolution logic. The resolver function will have access to the raw prompt and the run context.
-
-```go
-import "github.com/hastekit/hastekit-sdk-go/pkg/agents/prompts"
-
-customResolver := func(promptStr string, runContext map[string]any) (string, error) {
-    // Your logic to resolve the prompt into the final system format
-}
-
-agent := hastekit.NewAgent(&hastekit.AgentConfig{
-    Name:        "Dynamic Assistant",
-    Instruction: hastekit.NewPrompt("Hello {{userName}}, current time is {{timestamp}}", prompts.WithResolver(customResolver)),
-    LLM:         model,
-})
-```
+`prompts.DefaultResolver(prompt, data)` is the same templating on its own, for callers who want it outside a resolver chain.
 
 ## Skills
 
-You can inject **skills** into the system prompt using `prompts.WithSkills`. Each skill adds more specialised context, instructions and scripts that the agent can pull in when a task requires it.
+Skills are given to the agent through `AgentConfig.Skills`, not through the prompt — the agent lists them and wires up the tool that reads them. The prompt's only job is to include `prompts.ResolveSkills` so the catalogue is written into it.
 
 ```go
-import "github.com/hastekit/hastekit-sdk-go/pkg/agents/prompts"
+registry, err := hastekit.NewSkillRegistryFromDir("./skills")
 
 agent := hastekit.NewAgent(&hastekit.AgentConfig{
     Name: "Skilled Assistant",
     Instruction: hastekit.NewPrompt(
         "You are a helpful assistant.",
-        prompts.WithSkills([]agents.Skill{
-            {
-                Name:         "pdf-generation",
-                Description:  "Generate PDF documents from structured data.",
-                FileLocation: "skills/pdf-generation/SKILL.md",
-            },
-        }),
+        prompts.WithResolver(prompts.DefaultResolvers()...),
     ),
-    LLM: model,
+    Skills: registry,
+    LLM:    model,
 })
 ```
 
-The `agents.Skill` fields are loaded from a skill's `SKILL.md`:
-
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| **Name** | `string` | Skill name from the `SKILL.md` frontmatter |
-| **Description** | `string` | Skill description from the `SKILL.md` frontmatter |
-| **FileLocation** | `string` | Path to the `SKILL.md` file relative to sandbox-data |
+See [Skills](/hastekit-sdk/agents/skills) for the full picture.
 
 ## Remote Prompts
 
@@ -186,6 +213,7 @@ import (
 
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
 	"github.com/hastekit/hastekit-sdk-go/pkg/agents/history"
+	"github.com/hastekit/hastekit-sdk-go/pkg/agents/prompts"
 	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
 	hastekit "github.com/hastekit/hastekit-sdk-go"
 )
@@ -216,9 +244,10 @@ func main() {
 
 	// Example 2: Template with variables
 	agent2 := hastekit.NewAgent(&hastekit.AgentConfig{
-		Name:        "Personalized Assistant",
+		Name: "Personalized Assistant",
 		Instruction: hastekit.NewPrompt(
 			"You are a helpful assistant for {{userName}}, who is a {{userRole}}.",
+			prompts.WithResolver(prompts.DefaultResolvers()...),
 		),
 		LLM: model,
 	})
@@ -256,6 +285,7 @@ func main() {
 
 ## Notes
 
+- A prompt with no resolvers is used exactly as written — pass `prompts.WithResolver(prompts.DefaultResolvers()...)` for the standard behaviour
 - Template variables use the syntax `{{variable}}` which is automatically converted to Go template format
 - Remote prompts require the SDK client to be initialized with `endpoint`, organisation name and `projectName`
 - Custom prompt loaders must implement the `PromptLoader` interface with a `LoadPrompt(ctx context.Context) (string, error)` method

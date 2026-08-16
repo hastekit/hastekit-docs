@@ -1,5 +1,6 @@
 ---
 title: Serving Agents over AG-UI
+icon: window-maximize
 description: Expose agents over the AG-UI protocol and get a ready-made browser chat client for free
 ---
 
@@ -63,8 +64,10 @@ Open `http://localhost:8080`. The default UI lists registered agents, shows a si
 | `GET /basic.html` | Offline, zero-dependency fallback UI (no CDN) |
 | `GET /api/agui/agents` | Registered agent names |
 | `POST /api/agui/agents/{name}/run` | AG-UI run endpoint (SSE) |
+| `POST /api/agui/agents/{name}/stop` | Stop a run in flight |
 | `GET /api/agui/agents/{name}/threads` | Conversation list |
 | `GET /api/agui/agents/{name}/threads/{thread}/messages` | Thread history |
+| `GET /api/agui/agents/{name}/threads/{thread}/stream` | Rejoin a run in flight |
 
 The protocol endpoints are mounted under `/api/agui` (exported as `web.APIPrefix`), so external AG-UI clients can target them too — the embedded UIs are just two more consumers.
 
@@ -84,10 +87,14 @@ http.ListenAndServe(":8080", agui.NewHandler(&hastekit.AgentRegistry{}))
 
 | Method & Path | Description |
 | --- | --- |
-| `GET /agents` | List registered agent names |
+| `GET /agents` | List registered agent names, plus a `full_history` flag |
 | `POST /agents/{agent}/run` | Run the agent; SSE stream of AG-UI events from a `RunAgentInput` body |
+| `POST /agents/{agent}/stop` | Stop a run already streaming, by its stream id |
 | `GET /agents/{agent}/threads` | Stored conversation threads, newest first |
 | `GET /agents/{agent}/threads/{thread}/messages` | Thread history as AG-UI messages |
+| `GET /agents/{agent}/threads/{thread}/stream` | Attach to a run in flight without starting one |
+
+`GET /agents` answers `{"agents": [...], "full_history": false}`. The flag tells a client whether this server needs the whole conversation on every run. It normally does not — the agent loads the thread itself from `threadId` — so a client that reads it can post just the new turn instead of re-uploading a thread that grows every time.
 
 The threads endpoints power conversation pickers. Listing requires the agent's persistence adapter to implement `history.ThreadLister` (the SDK's in-memory and file adapters do); when it doesn't, the listing endpoint answers `501` so clients can hide the picker. See [Conversation History](/hastekit-sdk/agents/conversations/history) for persistence setup.
 
@@ -98,6 +105,8 @@ To mount one agent's run endpoint on an existing mux, use `agui.AgentHandler`, w
 ```go
 mux.Handle("POST /my-agent/run", agui.AgentHandler(agent))
 ```
+
+`AgentHandler` serves only the run endpoint — it has no route to carry a stop or a stream rejoin. Mount `NewHandler` for those, or call `agent.Stop(ctx, streamID)` from a route of your own.
 
 ## Request body
 
@@ -145,7 +154,22 @@ By default the handler extracts only the new trailing turn from `messages` and r
 
 ### Grounding context
 
-`context` entries are flattened into the run's `RunContext` so prompt templates can reference them. A `{description, value}` pair becomes `{{Context.<description>}}`, while `state` and `forwardedProps` are available as `{{State.x}}` and `{{ForwardedProps.y}}`.
+`context` entries reach the model two ways.
+
+They are flattened into the run's `RunContext` so prompt templates can reference them: a `{description, value}` pair becomes `{{Context.<description>}}`, while `state` and `forwardedProps` are available as `{{State.x}}` and `{{ForwardedProps.y}}`. Inbound `X-*` and `Authorization` request headers land under `{{Header.x}}` (with `-` replaced by `_`), so a per-tenant token on the request is reachable from the prompt and from [hooks](/hastekit-sdk/agents/hooks) without threading it through by hand.
+
+They are *also* appended to the user message as a `<context>…</context>` block, so the model sees them even when the prompt does not template them:
+
+```
+<context>
+current page: /billing/invoices
+selected invoice: INV-4021
+</context>
+```
+
+<Note>These injected blocks are stripped again when a thread is read back through the messages endpoint, so a conversation picker shows the user what they actually typed rather than the grounding the client attached.</Note>
+
+<Warning>Template placeholders are only substituted if the prompt's resolver chain includes `prompts.ResolveTemplate` — see [Prompt resolvers](/hastekit-sdk/agents/system-instruction#prompt-resolvers). The `<context>` block is appended either way.</Warning>
 
 ## Event stream
 
@@ -161,7 +185,21 @@ The run endpoint responds with `Content-Type: text/event-stream` and emits canon
 | State / messages | `STATE_SNAPSHOT`, `STATE_DELTA`, `MESSAGES_SNAPSHOT` |
 | Escape hatches | `RAW`, `CUSTOM` |
 
-Right after `RUN_STARTED`, the handler also emits a `CUSTOM` event carrying the broker `streamId`, `runId`, and `threadId` so a client can correlate the AG-UI run with the SDK's streaming surface.
+Right after `RUN_STARTED`, the handler also emits a `CUSTOM` event carrying the broker `streamId`, `runId`, and `threadId` so a client can correlate the AG-UI run with the SDK's streaming surface — and so it has the stream id needed to [stop the run](#stopping-a-run).
+
+### HasteKit CUSTOM events
+
+AG-UI has no native event for some of what the SDK streams, so those surface as `CUSTOM` events under `hastekit.*` names:
+
+| Name | Carries |
+| --- | --- |
+| `hastekit.stream_id` | The broker `streamId`, `runId` and `threadId` |
+| `hastekit.tool_progress` | A tool's mid-execution [progress update](/hastekit-sdk/agents/tools/function-tools#reporting-progress) — `callId`, `toolName`, `progress`, `total`, `message` |
+| `hastekit.on_interrupt` | The pending calls a paused run is waiting on |
+| `hastekit.file_generated` | A file the run produced |
+| `hastekit.annotation` | Citations and other output annotations |
+
+Reasoning is streamed with the canonical `REASONING_*` events; when a thread is read back through the messages endpoint it rehydrates as a message with role `reasoning` instead, carrying `encryptedValue` for provider-encrypted reasoning.
 
 ### Correlation headers
 
@@ -203,3 +241,72 @@ When an agent pauses on an [approval-gated tool](/hastekit-sdk/agents/tools/huma
 ```
 
 A flat `forwardedProps.hastekitApprovals` array with the same `{toolCallId, approved}` entries is also accepted for simpler clients. The handler maps these decisions onto the SDK's approval resume flow and continues the paused run.
+
+### What counts as approval
+
+The zero value of a bool is a rejection, and silently discarding a submitted form is the worst possible default, so a decision is read in this order:
+
+1. An explicit `action` verb wins. Both this SDK's `approve`/`reject` and MCP's elicitation verbs (`accept`/`decline`/`cancel`) are accepted, so a frontend can forward an MCP-shaped answer unchanged.
+2. An explicit `approved` boolean.
+3. Otherwise, a decision carrying `content` is a submission, and therefore an approval — a form arriving with no verdict field means the user filled it in and pressed submit.
+4. Otherwise, a rejection.
+
+### Form elicitations
+
+When the pause is an [MCP form elicitation](/hastekit-sdk/agents/tools/mcp-tools#elicitation) rather than a plain approval, attach the filled form as `content`:
+
+```json
+{
+  "threadId": "thread-1",
+  "messages": [],
+  "forwardedProps": {
+    "command": {
+      "resume": {
+        "decisions": [
+          {
+            "toolCallId": "call_xyz",
+            "action": "accept",
+            "content": { "email": "alice@example.com", "team_size": 12 }
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+Content rides through to the resuming tool. A rejected decision drops its content rather than delivering it — a declined form has no answer to pass on.
+
+## Stopping a run
+
+A run already streaming can't be stopped on its own connection — that connection is busy streaming — so stopping is a separate request keyed on the run's stream id (the `X-Stream-Id` response header, or the `streamId` `CUSTOM` event):
+
+```bash
+curl -X POST "http://localhost:8080/agents/Assistant/stop" \
+  -H "Content-Type: application/json" \
+  -d '{"streamId": "…"}'
+```
+
+`?streamId=…` as a query parameter works too. The endpoint answers `202 Accepted` once the stop is recorded; the run winds down and ends on its own SSE connection with `RUN_FINISHED`, which is where a client should watch for the outcome.
+
+The stop travels through the agent's broker, so with a shared broker (Redis) it does not have to reach the replica holding the SSE connection. The agent in the path selects whose broker to ask; it is not an ownership check — the stream id is the capability, and only the client that started the run has it.
+
+## Rejoining a run
+
+A thread streams on the same channel every turn, so a client that reloaded or navigated away can pick a run back up without having kept anything:
+
+```bash
+curl -N "http://localhost:8080/agents/Assistant/threads/thread-1/stream"
+```
+
+The broker replays what the run has emitted so far and then follows it live. Events carry the same ids as the run's own connection, because the run id comes off the replayed `run.created` chunk.
+
+A thread with no run in flight answers `204 No Content`, so a client can attach without checking first and without being left holding a stream nothing will ever publish to.
+
+## Steering a run in flight
+
+A turn POSTed for a thread that is *already running* folds into that run instead of starting a second one on the same channel. The server answers `204 No Content` — the caller gets no stream of its own, because the reply appears on the live run's stream, which it can already read or [rejoin](#rejoining-a-run).
+
+That is how a client steers: send the new turn and keep reading the stream it already has. The agent drains queued messages at iteration boundaries, and the mid-run arrival is marked for the model with a [steering notice](/hastekit-sdk/agents/conversations/history#steering-notices) so a correction shouted mid-task isn't mistaken for the instruction already being carried out.
+
+<Note>Folding requires a broker implementing `agents.RunClaimBroker`; the built-in memory and Redis brokers both do. With any other broker a concurrent POST starts its own run as before.</Note>

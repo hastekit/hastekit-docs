@@ -1,5 +1,6 @@
 ---
 title: Function Tools
+icon: code
 ---
 
 Tool calling agents can execute custom functions to interact with external systems, databases, APIs, or perform computations. The agent decides when to call tools based on the user's request and uses the results to provide better responses.
@@ -85,15 +86,115 @@ func getUserName(ctx context.Context, args UserArgs) (UserName, error) {
 
 userTool := hastekit.NewTool(getUserName,
     hastekit.WithName("get_user_name"), // optional; defaults to the function name
-    hastekit.WithDescription[UserArgs, UserName]("Returns the user's name"),
+    hastekit.WithDescription("Returns the user's name"),
 )
 ```
 
-> `WithDescription`, `WithNeedsApproval`, and `WithDeferred` take explicit
-> `[ArgsType, ReturnType]` type parameters; `WithName` does not.
+The available options are:
+
+| Option | Description |
+| :--- | :--- |
+| `WithName(string)` | Tool name. Defaults to the function's own name. |
+| `WithDescription(string)` | What the tool does, as the model sees it. |
+| `WithNeedsApproval(bool)` | Hold the call for human review — see [Human in the Loop](./human-in-the-loop). |
+| `WithDeferred(bool)` | Keep the schema out of the prompt until activated — see [Deferred Tools](./deferred-tools). |
+| `WithTitle`, `WithReadOnly`, `WithDestructive`, `WithIdempotent`, `WithOpenWorld`, `WithAnnotations` | Behavioural hints — see [Tool Annotations](#tool-annotations) below. |
 
 Both `agents.BaseTool`-based tools and `hastekit.NewTool` tools implement
 `hastekit.Tool` and can be mixed into the same `Tools` slice.
+
+---
+
+## Tool Annotations
+
+Tools can advertise what they do. The hints mirror [MCP's tool annotations](https://modelcontextprotocol.io/docs/concepts/tools), so hints read off an MCP server and hints declared on a local function tool are the same thing — one policy can read both.
+
+```go
+readTool := hastekit.NewTool(listUsers,
+    hastekit.WithName("list_users"),
+    hastekit.WithTitle("List users"), // human-readable, for UI
+    hastekit.WithReadOnly(true),
+)
+
+writeTool := hastekit.NewTool(deleteUser,
+    hastekit.WithName("delete_user"),
+    hastekit.WithDestructive(true),
+    hastekit.WithIdempotent(false),
+    hastekit.WithOpenWorld(false),
+)
+```
+
+On a `agents.BaseTool`-based tool, set the `Annotations` field directly:
+
+```go
+BaseTool: &agents.BaseTool{
+    Annotations: &agents.ToolAnnotations{
+        Title:        "List users",
+        ReadOnlyHint: utils.Ptr(true),
+    },
+    // ...
+}
+```
+
+MCP tools carry whatever their server declared; nothing extra is needed to pick them up.
+
+### Reading the hints back
+
+```go
+a := agents.AnnotationsOf(tool)
+if a.IsDestructive() {
+    // gate it — see Hooks
+}
+```
+
+`AnnotationsOf` returns nil for a tool that carries none, and the nil is usable: every `Is*` helper is nil-safe.
+
+| Field | Type | Helper | Default when unset |
+| :--- | :--- | :--- | :--- |
+| **Title** | `string` | — | `""` |
+| **ReadOnlyHint** | `*bool` | `IsReadOnly()` | `false` |
+| **DestructiveHint** | `*bool` | `IsDestructive()` | `true` |
+| **IdempotentHint** | `*bool` | `IsIdempotent()` | `false` |
+| **OpenWorldHint** | `*bool` | `IsOpenWorld()` | `true` |
+
+Every hint is a pointer, so "nothing was said" stays distinguishable from "false was said". Prefer the `Is*` helpers over reading the fields directly: they are nil-safe and apply MCP's defaults, which are deliberately conservative — an unset `DestructiveHint` reads as destructive, an unset `ReadOnlyHint` as not read-only. A read-only tool is never destructive and is always idempotent, whatever those hints say.
+
+`IsDeclaredDestructive()` is the variant that asks whether the tool actually *said* it may destroy state, rather than assuming the worst when nothing was said. It is usually the one a [hook](/hastekit-sdk/agents/hooks) gating tool calls wants: an unannotated tool has made no claim, and gating on the absence of a claim would put every tool written before annotations behind a prompt.
+
+<Warning>Hints are self-reported: they describe intent, not enforcement. Never let a hint from an untrusted MCP server widen what a tool is allowed to do.</Warning>
+
+---
+
+## Reporting Progress
+
+A long-running tool can emit progress updates that stream to the client on the same channel as the rest of the run. Call `params.ReportProgress` — it is nil-safe, so tools can call it unconditionally regardless of which runtime is executing them:
+
+```go
+func (t *ImportTool) Execute(ctx context.Context, params *agents.ToolCall) (*agents.ToolCallResponse, error) {
+    for i, row := range rows {
+        params.ReportProgress(ctx, agents.ToolProgress{
+            Progress: float64(i),
+            Total:    float64(len(rows)),
+            Message:  "importing rows",
+        })
+        // ...
+    }
+    // ...
+}
+```
+
+Updates arrive on the run's chunk stream as `tool.progress` chunks:
+
+```go
+for chunk := range handle.Chunks {
+    if chunk.OfToolProgress != nil {
+        p := chunk.OfToolProgress
+        fmt.Printf("%s: %.0f/%.0f %s\n", p.ToolName, p.Progress, p.Total, p.Message)
+    }
+}
+```
+
+`Progress` should increase monotonically across a call; `Total` is optional (`0` means unknown). The shape mirrors MCP's `notifications/progress`, so [MCP tools](./mcp-tools#progress-notifications) map their server-sent progress onto the same chunks.
 
 ---
 

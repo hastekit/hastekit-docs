@@ -1,0 +1,225 @@
+---
+title: Skills
+icon: book-open
+description: Folders of instructions the agent reads only when it needs them
+---
+
+A skill is a folder of instructions the agent pulls in on demand — a house style, a procedure, a checklist too long to keep in the system prompt every turn. The prompt carries only each skill's name and description; the full text costs context only on the turns the skill is actually used.
+
+## Writing a skill
+
+A skill is a folder containing a `SKILL.md` with YAML frontmatter. Any other files in the folder are bundled resources the skill can point the model at.
+
+```
+skills/
+└── changelog/
+    ├── SKILL.md
+    └── references/
+        └── style.md
+```
+
+```markdown SKILL.md
+---
+name: changelog
+description: Write a release changelog entry. Use whenever the user asks for release notes.
+---
+
+Group the changes under `Added`, `Changed`, `Fixed`, and `Removed`...
+The full house style is in `references/style.md`.
+```
+
+| Frontmatter | Required | Description |
+| :--- | :--- | :--- |
+| **name** | No | The skill's name. Defaults to the folder name when omitted. |
+| **description** | Yes | The only thing the model sees before deciding to read the skill, so a skill without one can never be picked. |
+
+## Giving skills to an agent
+
+Load a directory with `hastekit.NewSkillRegistryFromDir` and set it on `AgentConfig.Skills`:
+
+```go
+import (
+    hastekit "github.com/hastekit/hastekit-sdk-go"
+    "github.com/hastekit/hastekit-sdk-go/pkg/agents/prompts"
+)
+
+registry, err := hastekit.NewSkillRegistryFromDir("./skills")
+if err != nil {
+    log.Fatal(err)
+}
+
+agent := hastekit.NewAgent(&hastekit.AgentConfig{
+    Name: "Release_Agent",
+    Instruction: hastekit.NewPrompt(
+        "You help maintain this project's releases.",
+        prompts.WithResolver(prompts.DefaultResolvers()...), // ResolveSkills lists them
+    ),
+    Skills: registry,
+    LLM:    model,
+})
+```
+
+The agent does both halves itself: it lists the skills in the system prompt and adds the tool that reads them to its own `Tools`. There is no way to end up advertising a skill the model has no way to open.
+
+<Warning>
+A prompt runs only the resolvers it is given. `hastekit.NewPrompt("...")` with no options is used exactly as written — nothing appended — so a prompt that leaves out `prompts.ResolveSkills` produces an agent whose model never hears about its skills. See [System Instruction](/hastekit-sdk/agents/system-instruction#prompt-resolvers).
+</Warning>
+
+Pass several directories to draw from more than one library — a shared set plus this agent's own:
+
+```go
+registry, err := hastekit.NewSkillRegistryFromDir("./skills", "/etc/agent/skills")
+```
+
+Reading happens once, at construction. The registry is read-only afterwards and safe for concurrent use; to pick up edits on disk, build a new one.
+
+## The `read_skill` tool
+
+The prompt carries only each skill's name, description and location. To get the instructions themselves, the model calls `read_skill`:
+
+| Argument | Type | Description |
+| :--- | :--- | :--- |
+| **name** | `string` | Required. The skill to read, exactly as listed in `<available_skills>`. |
+| **file** | `string` | Optional. A bundled file to read instead of the instructions. |
+
+Reading a skill's instructions also returns an index of the files that skill bundles, so the model can follow up with `read_skill(name: "changelog", file: "references/style.md")` even when the `SKILL.md` never mentions them.
+
+The tool is annotated read-only, non-destructive, idempotent and closed-world (see [Tool Annotations](/hastekit-sdk/agents/tools/function-tools#tool-annotations)), so a permission policy can let it run unattended.
+
+## Shipping skills inside the binary
+
+Where the skills are part of the program rather than of its deployment, `go:embed` puts the whole tree in the binary — no folder to mount, copy, or keep in sync:
+
+```go
+import "embed"
+
+//go:embed skills
+var skillsFS embed.FS
+
+registry, err := hastekit.NewSkillRegistry(skillsFS)
+```
+
+Embedding the parent folder is enough: a skill is found wherever a `SKILL.md` sits, so there is no `fs.Sub` to get right. `NewSkillRegistry` takes any `fs.FS`, so this is also the hook for skills that come from somewhere else entirely.
+
+## Rules
+
+- **A folder holding a `SKILL.md` is one skill**, and everything below it belongs to that skill — so a `SKILL.md` bundled as an example or a template stays a bundled file rather than becoming a second, half-formed skill.
+- **The name comes from the frontmatter**, or from the folder when the frontmatter omits it.
+- **Loading fails loudly** on a skill with no description, on broken frontmatter, on a directory that isn't there, and on the same name defined twice. Skills decide how the agent behaves, so a bad one should stop startup rather than go quietly missing at runtime.
+- **Only files a skill actually bundles are reachable** through the tool. A path that tries to traverse out of the skill folder is refused, so one skill cannot read another or the rest of the filesystem the skills were read from.
+- **Skills work the same under Temporal and Restate.** The durable agent registers and wraps the reader tool along with the rest, so a `read_skill` call is journaled like any other tool call and replays from the journal rather than re-reading the folder.
+
+## Skills from somewhere else
+
+`AgentConfig.Skills` takes an `agents.SkillProvider` — a source that lists its skills, supplies the tool that reads them, and introduces them to the model:
+
+```go
+type SkillProvider interface {
+    Skills() []agents.Skill
+    SkillTool() agents.Tool // nil when the model already has a way to read them
+    SkillHint() string      // the prompt's prose: what they are, how to read one
+}
+```
+
+The agent asks the source for all three, which is what keeps the prompt and the tools in step. `SkillHint` is the whole of the section's prose and goes in verbatim — the resolver writes the `## Skills` heading and the catalogue, nothing else. Only the provider can write that hint honestly: a `SkillRegistry` names its own `read_skill` tool, while a host serving skills its own way names whatever the model actually has.
+
+A source that returns no tool is one the model can already reach. `agents.SkillList` lists such skills and adds nothing — for skills staged into a sandbox the agent already browses:
+
+```go
+Skills: agents.SkillList{{
+    Name:        "changelog",
+    Description: "Write a release changelog entry.",
+}},
+```
+
+`agents.SkillsWithHint` is the same, plus the prose — for a host that serves skill files through a tool of its own:
+
+```go
+Skills: agents.SkillsWithHint{
+    List: agents.SkillList{{
+        Name:         "changelog",
+        Description:  "Write a release changelog entry.",
+        FileLocation: "/skills/changelog/SKILL.md",
+    }},
+    Hint: "Skills are specialised instructions for particular kinds of work. " +
+        "Read one with the `read_file` tool at the location listed below.",
+},
+```
+
+Say nothing and the model gets the bare catalogue, which beats a prompt naming a tool the agent does not have.
+
+### The `agents.Skill` struct
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| **Name** | `string` | Skill name from the `SKILL.md` frontmatter, or the folder name |
+| **Description** | `string` | Skill description from the frontmatter |
+| **FileLocation** | `string` | Path to the `SKILL.md`, as a reader would type it. Defaults to `/skills/<name>/SKILL.md` in the prompt when empty |
+| **Resources** | `[]string` | The skill's other files, relative to the skill folder |
+
+## Complete Example
+
+```go
+package main
+
+import (
+	"context"
+	"log"
+	"os"
+
+	hastekit "github.com/hastekit/hastekit-sdk-go"
+	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
+	"github.com/hastekit/hastekit-sdk-go/pkg/agents/history"
+	"github.com/hastekit/hastekit-sdk-go/pkg/agents/prompts"
+	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
+)
+
+func main() {
+	client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
+		{
+			ProviderName: hastekit.ProviderOpenAI,
+			ApiKeys: []*hastekit.APIKeyConfig{
+				{Name: "Key 1", APIKey: os.Getenv("OPENAI_API_KEY")},
+			},
+		},
+	})
+
+	registry, err := hastekit.NewSkillRegistryFromDir("./skills")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	agent := hastekit.NewAgent(&hastekit.AgentConfig{
+		Name: "Release_Agent",
+		Instruction: hastekit.NewPrompt(
+			"You help maintain this project's releases.",
+			prompts.WithResolver(prompts.DefaultResolvers()...),
+		),
+		Skills: registry,
+		LLM:    client.Model("OpenAI/gpt-4o-mini"),
+	})
+
+	handle, err := agent.Execute(context.Background(), &agents.AgentInput{
+		Message: history.Message{
+			Messages: []responses.InputMessageUnion{
+				responses.UserMessage("Draft the release notes for v2.1.0."),
+			},
+		},
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	out, err := handle.Result()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Println(out.Output[0].OfOutputMessage.Content[0].OfOutputText.Text)
+}
+```
+
+## Next Steps
+
+- Compose the prompt yourself with [prompt resolvers](/hastekit-sdk/agents/system-instruction#prompt-resolvers)
+- Gate what a skill's tools may do with [Hooks](/hastekit-sdk/agents/hooks)

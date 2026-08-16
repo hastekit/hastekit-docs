@@ -1,5 +1,6 @@
 ---
 title: Managing Multiple Keys
+icon: key
 ---
 
 HasteKit supports managing multiple API keys for a single provider. This is useful for:
@@ -53,3 +54,27 @@ func main() {
 	client := hastekit.NewLLMClient(providerConfigs)
 }
 ```
+
+## Selecting a key per run
+
+Weighted selection picks a key for you. To pin a specific run to a specific credential instead — a per-tenant key, or a virtual key resolved from the inbound request — inject it into the context before invoking the agent:
+
+```go
+import "github.com/hastekit/hastekit-sdk-go/pkg/gateway"
+
+ctx := gateway.WithProviderConfigKey(context.Background(), "vk_...")
+
+handle, err := agent.Execute(ctx, &agents.AgentInput{
+    Message: history.Message{
+        Messages: []responses.InputMessageUnion{
+            responses.UserMessage("Hello!"),
+        },
+    },
+})
+```
+
+The LLM client reads it back with `gateway.ProviderConfigKeyFromContext` when resolving provider configuration, so the whole run — every loop iteration, every sub-agent — uses that credential. The key can be a virtual key or a direct provider API key.
+
+<Note>
+Under the durable runtimes a plain `context.Context` doesn't survive the workflow/activity boundary, so each runtime re-establishes this value on the far side — Temporal through a context propagator, Restate through the workflow input. Injecting it once before `Execute` is enough either way.
+</Note>

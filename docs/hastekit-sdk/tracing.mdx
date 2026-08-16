@@ -1,0 +1,73 @@
+---
+title: Tracing
+icon: chart-line
+description: Export agent and LLM traces to any OpenTelemetry backend
+---
+
+The SDK instruments agent runs, LLM calls, tool calls, prompt loading, and history operations with OpenTelemetry spans following the [GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/). Wire up a tracer provider once at startup and every agent traces itself.
+
+## Setting up a provider
+
+`telemetry.NewProvider` takes any OpenTelemetry `SpanExporter`, installs it as the global tracer provider, and returns a shutdown function:
+
+```go
+import (
+    "github.com/hastekit/hastekit-sdk-go/pkg/telemetry"
+    "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+)
+
+func main() {
+    exporter, err := otlptracehttp.New(context.Background(),
+        otlptracehttp.WithEndpoint("otel-collector:4318"),
+    )
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    shutdown := telemetry.NewProvider(exporter)
+    defer shutdown()
+
+    // ... create agents and run them ...
+}
+```
+
+Because it takes an exporter rather than an endpoint, any OTLP-compatible backend works — a collector, Jaeger, Honeycomb, Datadog, or your own `SpanExporter` implementation.
+
+<Note>
+`NewProvider` previously took `(endpoint, username, password)` and built a Langfuse exporter internally. It now takes a `trace.SpanExporter`; use `telemetry.NewLangFuseExporter` to get the old behaviour.
+</Note>
+
+The provider samples every span (`ParentBased(AlwaysSample())`), batches exports, and installs the W3C trace-context and baggage propagators so a trace started upstream carries through the agent run.
+
+Exporter and processor errors are surfaced through `slog` at warn level rather than OTel's default stderr logger, so a rejected export shows up in structured logs instead of being easy to miss.
+
+## Langfuse
+
+`NewLangFuseExporter` builds an OTLP exporter pointed at Langfuse's OTel endpoint, authenticated with your public/secret key pair:
+
+```go
+exporter, err := telemetry.NewLangFuseExporter(
+    "cloud.langfuse.com", // host:port, no scheme
+    os.Getenv("LANGFUSE_PUBLIC_KEY"),
+    os.Getenv("LANGFUSE_SECRET_KEY"),
+    true, // TLS
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+shutdown := telemetry.NewProvider(exporter)
+defer shutdown()
+```
+
+Pass `false` for the last argument to talk to a self-hosted Langfuse over plain HTTP.
+
+## Durable runtimes
+
+Under [Temporal](/hastekit-sdk/agents/durable/temporal) and [Restate](/hastekit-sdk/agents/durable/restate) a plain `context.Context` does not survive the workflow/activity boundary, so each runtime re-establishes trace context on the far side — Temporal through a context propagator, Restate through the workflow input. A run's spans stay in one trace across the boundary.
+
+Set the provider up on both the client process and the worker process; each exports its own spans.
+
+## Correlating a run
+
+The AG-UI [run lifecycle chunk](/hastekit-sdk/agents/serving-agents/serving-agents-agui) carries a `traceid`, so a trace can be looked up from a run in your UI.
