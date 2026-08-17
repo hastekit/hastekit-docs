@@ -15,7 +15,7 @@ import (
     "fmt"
     "log"
     "os"
-    "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/speech"
+    "github.com/hastekit/agent-sdk-go/pkg/gateway/llm/speech"
 )
 
 resp, err := model.NewSpeech(context.Background(), &speech.Request{
@@ -61,8 +61,8 @@ For real-time applications, the SDK supports streaming speech generation. This r
 import (
     "context"
     "fmt"
-    "github.com/hastekit/hastekit-sdk-go/pkg/utils"
-    "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/speech"
+    "github.com/hastekit/agent-sdk-go/pkg/utils"
+    "github.com/hastekit/agent-sdk-go/pkg/gateway/llm/speech"
 )
 
 stream, err := model.NewStreamingSpeech(context.Background(), &speech.Request{
@@ -152,9 +152,9 @@ import (
     "log"
     "os"
     
-    "github.com/hastekit/hastekit-sdk-go/pkg/utils"
-    "github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/speech"
-    hastekit "github.com/hastekit/hastekit-sdk-go"
+    "github.com/hastekit/agent-sdk-go/pkg/utils"
+    "github.com/hastekit/agent-sdk-go/pkg/gateway/llm/speech"
+    hastekit "github.com/hastekit/agent-sdk-go"
 )
 
 func main() {

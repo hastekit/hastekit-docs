@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"os"
 
-	hastekit "github.com/hastekit/hastekit-sdk-go"
-	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
-	"github.com/hastekit/hastekit-sdk-go/pkg/agents/tools"
+	hastekit "github.com/hastekit/agent-sdk-go"
+	"github.com/hastekit/agent-sdk-go/pkg/agents"
+	"github.com/hastekit/agent-sdk-go/pkg/agents/tools"
 	"github.com/joho/godotenv"
 )
 

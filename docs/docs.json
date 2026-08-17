@@ -18,8 +18,8 @@
     "navbar": {
       "links": [
         {
-          "label": "hastekit/hastekit-sdk-go",
-          "href": "http://github.com/hastekit/hastekit-sdk-go",
+          "label": "hastekit/agent-sdk-go",
+          "href": "https://github.com/hastekit/agent-sdk-go",
           "icon": "github"
         }
       ]

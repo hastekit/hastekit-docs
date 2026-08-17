@@ -27,8 +27,8 @@ import (
 	"log"
 	"os"
 
-	hastekit "github.com/hastekit/hastekit-sdk-go"
-	"github.com/hastekit/hastekit-sdk-go/pkg/agui/web"
+	hastekit "github.com/hastekit/agent-sdk-go"
+	"github.com/hastekit/agent-sdk-go/pkg/agui/web"
 )
 
 func main() {
@@ -76,7 +76,7 @@ The protocol endpoints are mounted under `/api/agui` (exported as `web.APIPrefix
 If you have your own frontend (CopilotKit's `HttpAgent`, raw `@ag-ui/client`, or a custom SSE consumer), serve just the protocol with `agui.NewHandler`:
 
 ```go
-import "github.com/hastekit/hastekit-sdk-go/pkg/agui"
+import "github.com/hastekit/agent-sdk-go/pkg/agui"
 
 // ... create the client and register agents with hastekit.NewAgent ...
 

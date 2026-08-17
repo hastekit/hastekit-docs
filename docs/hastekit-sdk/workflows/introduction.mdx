@@ -9,7 +9,7 @@ The `pkg/workflow` package is a code-first engine for orchestrating multi-step l
 Unlike [durable agents](/hastekit-sdk/agents/durable/temporal), a workflow is deterministic — you control every node and every transition — which makes it a good fit for pipelines, approval flows, fan-out/fan-in processing, and any orchestration you want to be replayable and inspectable.
 
 ```go
-import "github.com/hastekit/hastekit-sdk-go/pkg/workflow"
+import "github.com/hastekit/agent-sdk-go/pkg/workflow"
 ```
 
 ## Core concepts
@@ -37,7 +37,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/hastekit/hastekit-sdk-go/pkg/workflow"
+	"github.com/hastekit/agent-sdk-go/pkg/workflow"
 )
 
 // GreetNode reads "name" from the run context and emits a greeting.

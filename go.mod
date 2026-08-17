@@ -5,7 +5,7 @@ go 1.25.3
 require (
 	github.com/bytedance/sonic v1.15.1
 	github.com/google/uuid v1.6.0
-	github.com/hastekit/hastekit-sdk-go v0.0.2-0.20260707194410-6c39011e1c11
+	github.com/hastekit/agent-sdk-go v0.0.2-0.20260707194410-6c39011e1c11
 	github.com/joho/godotenv v1.5.1
 	go.opentelemetry.io/otel v1.44.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.44.0

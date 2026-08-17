@@ -84,7 +84,7 @@ The **router** — `func(in *Input) string` — runs after the node completes an
 For simple comparisons inside a router, the `workflow/expr` helper evaluates a minimal boolean expression:
 
 ```go
-import "github.com/hastekit/hastekit-sdk-go/pkg/workflow/expr"
+import "github.com/hastekit/agent-sdk-go/pkg/workflow/expr"
 
 ok, err := expr.EvalBool("5 >= 3") // true
 ```

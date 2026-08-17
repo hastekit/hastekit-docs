@@ -22,9 +22,9 @@ The LLM summarizer uses an LLM to create intelligent summaries of conversation h
 
 ```go
 import (
-    "github.com/hastekit/hastekit-sdk-go/pkg/agents/history/summariser"
-    "github.com/hastekit/hastekit-sdk-go/pkg/agents/history"
-    "github.com/hastekit/hastekit-sdk-go/pkg/agents/prompts"
+    "github.com/hastekit/agent-sdk-go/pkg/agents/history/summariser"
+    "github.com/hastekit/agent-sdk-go/pkg/agents/history"
+    "github.com/hastekit/agent-sdk-go/pkg/agents/prompts"
 )
 
 // Create a summarizer LLM (can be different from the agent's LLM)
@@ -80,7 +80,7 @@ The sliding window summarizer keeps only the most recent N conversation runs and
 ### Configuration
 
 ```go
-import "github.com/hastekit/hastekit-sdk-go/pkg/agents/history/summariser"
+import "github.com/hastekit/agent-sdk-go/pkg/agents/history/summariser"
 
 summarizer := summariser.NewSlidingWindowHistorySummarizer(&summariser.SlidingWindowHistorySummarizerOptions{
     KeepCount: 10, // Keep only the last 10 conversation runs
@@ -110,8 +110,8 @@ To use a summarizer, pass it to the conversation manager using `history.WithSumm
 
 ```go
 import (
-    "github.com/hastekit/hastekit-sdk-go/pkg/agents/history"
-    "github.com/hastekit/hastekit-sdk-go/pkg/agents/history/summariser"
+    "github.com/hastekit/agent-sdk-go/pkg/agents/history"
+    "github.com/hastekit/agent-sdk-go/pkg/agents/history/summariser"
 )
 
 // Create a summarizer
@@ -178,11 +178,11 @@ import (
 	"log"
 	"os"
 
-	hastekit "github.com/hastekit/hastekit-sdk-go"
-	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
-	"github.com/hastekit/hastekit-sdk-go/pkg/agents/history"
-	"github.com/hastekit/hastekit-sdk-go/pkg/agents/history/summariser"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
+	hastekit "github.com/hastekit/agent-sdk-go"
+	"github.com/hastekit/agent-sdk-go/pkg/agents"
+	"github.com/hastekit/agent-sdk-go/pkg/agents/history"
+	"github.com/hastekit/agent-sdk-go/pkg/agents/history/summariser"
+	"github.com/hastekit/agent-sdk-go/pkg/gateway/llm/responses"
 )
 
 func main() {
@@ -268,11 +268,11 @@ import (
 	"log"
 	"os"
 
-	hastekit "github.com/hastekit/hastekit-sdk-go"
-	"github.com/hastekit/hastekit-sdk-go/pkg/agents"
-	"github.com/hastekit/hastekit-sdk-go/pkg/agents/history"
-	"github.com/hastekit/hastekit-sdk-go/pkg/agents/history/summariser"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/responses"
+	hastekit "github.com/hastekit/agent-sdk-go"
+	"github.com/hastekit/agent-sdk-go/pkg/agents"
+	"github.com/hastekit/agent-sdk-go/pkg/agents/history"
+	"github.com/hastekit/agent-sdk-go/pkg/agents/history/summariser"
+	"github.com/hastekit/agent-sdk-go/pkg/gateway/llm/responses"
 )
 
 func main() {

@@ -7,9 +7,9 @@ import (
 	"os"
 
 	json "github.com/bytedance/sonic"
-	hastekit "github.com/hastekit/hastekit-sdk-go"
-	"github.com/hastekit/hastekit-sdk-go/pkg/gateway/llm/embeddings"
-	"github.com/hastekit/hastekit-sdk-go/pkg/utils"
+	hastekit "github.com/hastekit/agent-sdk-go"
+	"github.com/hastekit/agent-sdk-go/pkg/gateway/llm/embeddings"
+	"github.com/hastekit/agent-sdk-go/pkg/utils"
 )
 
 func main() {
