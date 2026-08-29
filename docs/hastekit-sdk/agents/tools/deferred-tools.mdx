@@ -78,7 +78,7 @@ agent := hastekit.NewAgent(&hastekit.AgentConfig{
 For [MCP servers](/hastekit-sdk/agents/tools/mcp-tools), pass the tool names you want deferred to `mcpclient.WithDeferredTools`. This is especially useful for servers that expose a large number of tools.
 
 ```go
-mcpClient, err := mcpclient.NewClient(context.Background(), "http://localhost:9001/sse",
+mcpClient, err := mcpclient.NewClient(context.Background(), "users", "http://localhost:9001/sse",
 	mcpclient.WithTransport("sse"),
 	mcpclient.WithDeferredTools("list_users", "delete_user"),
 )
@@ -89,7 +89,7 @@ Only the listed tools are deferred; the rest of the server's tools remain availa
 Pass `"*"` to defer every tool the server exposes — the right default for a server with a large or changing catalog, since you no longer have to keep the list in sync with the server:
 
 ```go
-mcpClient, err := mcpclient.NewClient(context.Background(), "http://localhost:9001/sse",
+mcpClient, err := mcpclient.NewClient(context.Background(), "users", "http://localhost:9001/sse",
 	mcpclient.WithTransport("streamable-http"),
 	mcpclient.WithDeferredTools("*"),
 )

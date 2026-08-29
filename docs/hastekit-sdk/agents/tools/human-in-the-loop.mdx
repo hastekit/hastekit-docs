@@ -71,7 +71,7 @@ func (t *DeleteUserTool) Execute(ctx context.Context, params *agents.ToolCall) (
 For MCP tools, use the `mcpclient.WithApprovalRequiredTools` option when creating the client:
 
 ```go
-mcpClient, err := mcpclient.NewClient(context.Background(), "http://localhost:9001/sse",
+mcpClient, err := mcpclient.NewClient(context.Background(), "users", "http://localhost:9001/sse",
 		mcpclient.WithTransport("sse"),
 		mcpclient.WithHeaders(map[string]string{
 			"token": "your-token",

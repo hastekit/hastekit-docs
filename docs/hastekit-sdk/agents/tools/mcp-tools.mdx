@@ -7,7 +7,7 @@ MCP (Model Context Protocol) tools allow your agent to connect to external MCP s
 
 ## Connecting to an MCP Server
 
-To use MCP tools, you first need to create an MCP client using the `mcpclient.NewClient` function.:
+To use MCP tools, you first need to create an MCP client using the `mcpclient.NewClient` function:
 
 ```go
 import (
@@ -15,7 +15,7 @@ import (
     "github.com/hastekit/agent-sdk-go/pkg/agents/mcpclient"
 )
 
-mcpClient, err := mcpclient.NewClient(context.Background(), "http://localhost:9001/sse",
+mcpClient, err := mcpclient.NewClient(context.Background(), "users", "http://localhost:9001/sse",
     mcpclient.WithTransport("sse"),
 )
 if err != nil {
@@ -26,39 +26,172 @@ if err != nil {
 ### Parameters
 
 - **`ctx`**: The context for the connection
-- **`endpoint`**: The SSE endpoint URL of the MCP server (e.g., `"http://localhost:9001/sse"`)
+- **`name`**: The connector's name. Required — see below.
+- **`endpoint`**: The endpoint URL of the MCP server (e.g., `"http://localhost:9001/sse"`). Leave it empty for a stdio server, which is reached by `WithCommand` rather than by URL.
+
+### Naming a connector
+
+Every connector needs a name, and it has to be unique within your process. It is not a label: the SDK uses it as the connector's identity in four places.
+
+- It is what the agent tells the model when a connector is unavailable — "calendar — not authorized; the user has to reconnect it".
+- It is the key its tool schemas are cached under.
+- It is what a [`CredentialProvider`](#access-tokens) is asked about when resolving a token.
+- Under [Temporal](/hastekit-sdk/agents/durable/temporal), it is what the connector's activities are registered as. Two connectors sharing a name collide there before anything else notices.
+
+Pick something stable and readable — `"calendar"`, `"jira"`, `"internal-search"` — and keep it the same across deploys. Changing it invalidates that connector's cached schemas and, under Temporal, renames its activities.
+
+<Note>
+The name is the connector's identity, not the server's address. If you repoint a connector at a different URL under the same name, call `InvalidateToolCache` — otherwise the old server's tool list is served until its cache entry expires.
+</Note>
 
 ## Custom Headers
 
 You can also configure the MCP Client to send custom HTTP headers while interacting with the MCP server.
 
 ```go
-mcpClient, err := mcpclient.NewClient(context.Background(), "http://localhost:9001/sse",
+mcpClient, err := mcpclient.NewClient(context.Background(), "users", "http://localhost:9001/sse",
     mcpclient.WithTransport("sse"),
-	mcpclient.WithHeaders(map[string]string{
+    mcpclient.WithHeaders(map[string]string{
         "token": "your-token",
     }),
 )
 ```
 
-### Filtering Tools
+Header values are templated against the run context, so a per-run credential can reach the server that needs it:
+
+```go
+mcpclient.WithHeaders(map[string]string{
+    "Authorization": "Bearer {{user_jwt}}",
+})
+```
+
+That is enough when the run already carries the token. When it has to be fetched, minted, or refreshed, use a [credential provider](#access-tokens) instead.
+
+## Access Tokens
+
+A `CredentialProvider` is for the tokens a header cannot carry: ones that live in a store, are minted per user, or expire partway through a long run.
+
+```go
+import "golang.org/x/oauth2"
+
+type CredentialProvider interface {
+    Resolve(ctx context.Context, connector mcpclient.Connector, runContext map[string]any) (*mcpclient.Credential, error)
+}
+
+type Credential struct {
+    TokenSource oauth2.TokenSource // nil means "no auth"
+    Principal   string             // who these credentials are for
+}
+```
+
+Wire it up with `WithCredentialProvider`:
+
+```go
+mcpClient, err := mcpclient.NewClient(ctx, "calendar", "https://calendar.example.com/mcp",
+    mcpclient.WithTransport("streamable-http"),
+    mcpclient.WithCredentialProvider(myTokenStore),
+)
+```
+
+A minimal provider looks like this — it reads whoever the run is for out of the run context, loads that user's token for that connector, and says both:
+
+```go
+func (s *tokenStore) Resolve(
+    ctx context.Context,
+    connector mcpclient.Connector,
+    runContext map[string]any,
+) (*mcpclient.Credential, error) {
+    userID, _ := runContext["user_id"].(string)
+    if userID == "" {
+        return nil, nil // nothing to say about this run
+    }
+
+    token, err := s.load(ctx, userID, connector.Name)
+    if err != nil {
+        return nil, err
+    }
+
+    return &mcpclient.Credential{
+        TokenSource: token,
+        Principal:   userID,
+    }, nil
+}
+```
+
+### When it is called, and with what
+
+`Resolve` runs once per tool call and once per tool listing, so one provider serves every connector an agent has and can return a different credential per user. It is told which connector it is being asked about:
+
+| Field | What it is |
+| :--- | :--- |
+| `Connector.Name` | The name you gave `NewClient` |
+| `Connector.Endpoint` | The server's URL, for a store keyed by resource URI |
+
+Returning `nil`, or a `Credential` with no `TokenSource`, means "no auth" and is not an error — a provider that only handles some of an agent's connectors says nothing about the rest.
+
+### Refresh across a pause
+
+The `TokenSource` you return is asked for a token on **every HTTP request** the connection makes, not once when it is opened. That is what lets an `oauth2.ReuseTokenSource` refresh underneath a run that paused for a human and resumed an hour later: the resumed call presents a token minted after the pause, not before it.
+
+```go
+return &mcpclient.Credential{
+    // Refreshes ~10s before expiry, on whichever request happens to need it.
+    TokenSource: oauth2.ReuseTokenSource(nil, s.refresher(userID, connector.Name)),
+    Principal:   userID,
+}, nil
+```
+
+<Note>
+The SDK does not run the OAuth flow. It resolves and presents tokens; obtaining and refreshing them — the consent redirect, the callback, the refresh-token grant — belongs to your application. See [Failures](#failures) for how the agent is told when a token no longer works.
+</Note>
+
+### Principal
+
+`Principal` is who the credentials are for — normally a user id, or something like `"tenant:user"` where one id is not enough on its own. It has two jobs:
+
+- **Connection pooling.** A live MCP session is bound, server-side, to the identity that opened it. The pool keys on the principal so one user is never handed a session another authenticated. **A `Credential` with no `Principal` is not pooled at all** — every call opens its own connection, which is correct but costs an extra round trip per call.
+- **Schema caching.** When a server marks its tool list `private` — meaning it varies by who asked — the cached schemas are keyed per principal, so an admin's tool list is never served to anyone else.
+
+It must stay the same across a token refresh, or every rotation would strand the pooled connection. It is used as a map key and never sent anywhere, but it does end up in pool and cache keys, so it should not be a secret.
+
+<Warning>
+Do not derive the principal from the access token's `sub` claim. Access tokens are opaque to clients and frequently not JWTs at all, and under a client-credentials grant `sub` is the client rather than the user — which would collapse every user onto one pool key. Your provider already has the value: it just used it to look the token up.
+</Warning>
+
+### Interaction with headers
+
+A token from a `CredentialProvider` overwrites a configured `Authorization` header; all other headers are left alone. So you can keep using `WithHeaders` for routing or tracing headers alongside a provider.
+
+Token sources apply to the HTTP transports only. A stdio server started with `WithCommand` is a child process with no request to put a header on — pass its credentials through `WithEnv` instead.
+
+### Failures
+
+If the token cannot be produced, or the server answers `401`/`403`, the SDK classifies it as an authorization failure rather than a generic outage. The connector drops out of the run with a reason, and the agent's prompt says so:
+
+```
+- calendar — not authorized; the user has to reconnect it
+```
+
+The run continues without that connector's tools rather than failing. See [Unavailable connectors](#unavailable-connectors) below.
+
+## Filtering Tools
 
 You can optionally restrict which tools are exposed to the agent using the `WithToolFilter(...)` option. Only the named tools are surfaced; all others are dropped.
 
 ```go
 // Only use specific tools
-mcpClient, err := mcpclient.NewClient(context.Background(), "http://localhost:9001/sse",
+mcpClient, err := mcpclient.NewClient(context.Background(), "users", "http://localhost:9001/sse",
     mcpclient.WithTransport("sse"),
 		mcpclient.WithToolFilter("list_users"),
 	)
 ```
 
-### Deferred (Lazy-Loaded) Tools
+## Deferred (Lazy-Loaded) Tools
 
 Use `WithDeferredTools(...)` to mark tools as deferred. Deferred tools are not added to the LLM's tool list upfront; instead they are discovered and activated on demand via the `ToolSearch` meta-tool. This keeps the prompt small when an MCP server exposes a large number of tools.
 
 ```go
-mcpClient, err := mcpclient.NewClient(context.Background(), "http://localhost:9001/sse",
+mcpClient, err := mcpclient.NewClient(context.Background(), "users", "http://localhost:9001/sse",
     mcpclient.WithTransport("sse"),
     mcpclient.WithDeferredTools("rarely_used_tool"),
 )
@@ -72,31 +205,45 @@ mcpclient.WithDeferredTools("*")
 
 See [Deferred Tools](/hastekit-sdk/agents/tools/deferred-tools) for how the activation flow works and when to defer a tool.
 
-### Schema Caching
+## Schema Caching
 
 By default, the client connects to the MCP server to fetch tool schemas on every `ListTools` call. You can cache schemas to avoid repeated round-trips:
 
-- `WithCacheTTL(ttl time.Duration)` sets how long cached schemas remain valid.
 - `WithSchemaCache(cache SchemaCache)` injects a `SchemaCache` implementation. When set, `ListTools()` checks the cache before connecting to the MCP server. Back it with Redis (or a similar shared store) to share cached schemas across multiple pods.
+- `WithCacheTTL(ttl time.Duration)` bounds how long a cached listing is held.
+
+Servers on MCP `2026-07-28` and later return their own caching directives with `tools/list`, and the SDK follows them:
+
+| The server says | What happens |
+| :--- | :--- |
+| `ttlMs` | How long the listing stays fresh. `WithCacheTTL` caps it when you set both. |
+| `cacheScope: "public"` | The listing is the same for everyone, so one entry serves every user. |
+| `cacheScope: "private"` | The listing varies by who asked, so it is cached per [`Principal`](#principal). |
+
+A server that says nothing — anything older than `2026-07-28` — is treated as **private**, so its listing is never shared between users. `WithCacheTTL` is the only lifetime such a server has; without it, entries are held until something invalidates them.
+
+Cached entries hold the server's listing exactly as it gave it, so `WithToolFilter` and `WithToolPrefix` are applied on the way out. Several clients that differ only in filter or prefix read one entry.
 
 ```go
-mcpClient, err := mcpclient.NewClient(context.Background(), "http://localhost:9001/sse",
-    mcpclient.WithTransport("sse"),
-		mcpclient.WithCacheTTL(5*time.Minute),
-		mcpclient.WithSchemaCache(myRedisSchemaCache),
-	)
+mcpClient, err := mcpclient.NewClient(ctx, "users", "http://localhost:9001/sse",
+    mcpclient.WithTransport("streamable-http"),
+    mcpclient.WithCacheTTL(5*time.Minute),
+    mcpclient.WithSchemaCache(myRedisSchemaCache),
+)
 ```
 
-### Approval-Required Tools
+Call `InvalidateToolCache(ctx, runContext)` to drop a connector's cached schemas early — after a permission change, or after repointing the connector at a different server.
+
+## Approval-Required Tools
 
 Use `WithApprovalRequiredTools(...)` to mark specific MCP tools as requiring human approval before they run. See the [Human in the Loop](./human-in-the-loop) page for the full approval flow.
 
-### Transport
+## Transport
 
 You can set the transport to be used for the connection. Supported transports are `SSE` and `Streamable HTTP`. If not specified it defaults to `SSE`
 
 ```go
-mcpClient, err := mcpclient.NewClient(context.Background(), "http://localhost:9001/sse",
+mcpClient, err := mcpclient.NewClient(context.Background(), "users", "http://localhost:9001/sse",
 		mcpclient.WithTransport("streamable-http"), // or "sse"
 	)
 ```
@@ -106,6 +253,55 @@ On `streamable-http`, the client also opens the post-init server→client SSE st
 ```go
 mcpclient.WithDisableStandaloneSSE(true) // no effect on the "sse" transport
 ```
+
+## Unavailable connectors
+
+A connector that cannot be listed does not fail the run. Its tools are left out, and the agent is told which connector is missing and why — a model that knows a connector is unreachable says so, where one that simply finds a tool missing invents an explanation or answers as though it had called it.
+
+Each configured connector comes back as a `ConnectorStatus`, whether it connected or not:
+
+```go
+// package agents
+type ConnectorStatus struct {
+    Name      string // the name you gave NewClient
+    Connected bool
+    ToolCount int    // what it contributed, after filtering
+    Kind      ToolsetErrorKind // "auth" or "unavailable", when it did not connect
+    Detail    string
+}
+```
+
+These reach your prompt provider on `Dependencies.Connectors`. Render them with the `ResolveConnectors` resolver, which is part of `prompts.DefaultResolvers()`:
+
+```go
+hastekit.NewAgent(&hastekit.AgentConfig{
+    Instruction: prompts.New("You are a helpful assistant.",
+        prompts.WithResolver(prompts.DefaultResolvers()...),
+    ),
+    McpServers: []agents.MCPToolset{calendar, jira},
+})
+```
+
+The agent then sees:
+
+```
+## MCP Connectors
+Each connector below is an MCP server this agent is configured with. A connector
+that is not connected has contributed none of its tools to this run: do not call
+them, do not guess at what they would have returned, and say which connector is
+unavailable if the user asks for something that needs it.
+<mcp-connectors>
+  <connector><name>calendar</name><status>connected</status><tools>12</tools></connector>
+  <connector><name>jira</name><status>not connected</status>
+    <reason>not authorized; the user has to reconnect it before its tools can be used</reason></connector>
+</mcp-connectors>
+```
+
+An authorization failure reads differently from an outage on purpose: one is something the user can act on, the other is not.
+
+<Note>
+The section is rendered by a resolver, so a prompt built without `ResolveConnectors` gets none of it. If you assemble your own resolver chain, include it — otherwise a connector can drop out of a run silently.
+</Note>
 
 ## Tool Annotations
 
@@ -245,7 +441,7 @@ func main() {
     conv := hastekit.NewFileHistory("./conversations")
 
     // Connect to MCP server
-    mcpClient, err := mcpclient.NewClient(context.Background(), "http://localhost:9001/sse",
+    mcpClient, err := mcpclient.NewClient(context.Background(), "users", "http://localhost:9001/sse",
 		mcpclient.WithHeaders(map[string]string{
 			"token": "your-token",
 		}),
