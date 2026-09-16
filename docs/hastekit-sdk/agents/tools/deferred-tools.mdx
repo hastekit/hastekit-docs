@@ -1,124 +1,20 @@
 ---
-title: Deferred Tools
-icon: hourglass-half
-description: Keep large tool catalogs out of the system prompt and let the agent load tool schemas on demand
+title: "Deferred tool discovery"
+description: "Reduce initial tool-schema size while retaining discoverable tools."
 ---
 
-Every tool you attach to an agent has its schema sent to the model on every turn, whether the agent uses it or not. With dozens of function tools and MCP servers, those definitions eat prompt tokens and can degrade tool-call accuracy. **Deferred tools** solve this: a deferred tool's schema stays out of the request until the agent explicitly asks for it.
+Deferred tools are available to the agent but their complete schemas are withheld until the model discovers them. This reduces the initial tool list for agents with many optional capabilities.
 
-## How it works
+## Mark a tool as deferred
 
-When an agent has one or more deferred tools, the SDK changes what the model sees:
+Add `hastekit.WithDeferred(true)` to a function tool's constructor. For MCP, pass `mcpclient.WithDeferredTools("search_issues", "list_projects")`; use the original server names, even when the connector has a prefix.
 
-1. Deferred tool schemas are **not** included in the request's `tools` list.
-2. A single meta-tool, **`ToolSearch`**, is automatically added so the agent can discover and activate deferred tools.
-3. The system instruction gains a `## Deferred Tools` section listing each deferred tool's **name** and **description** (but not its full schema), so the model knows what exists.
-4. When the agent calls `ToolSearch` to activate a tool, that tool's full schema is appended to the request on subsequent turns and the agent can call it normally.
+Enable `prompts.ResolveDeferredTools`, or the standard resolver chain, on the system prompt. The agent adds its tool-search mechanism when deferred tools are present; the resolver explains that mechanism to the model.
 
-The discovery step costs an extra LLM turn up front, but the agent stops paying for schemas it never uses — so you can attach large tool catalogs without bloating the context window.
+## Execution behavior
 
-<Note>The `ToolSearch` tool is injected automatically whenever at least one deferred tool is present. You do not register it yourself.</Note>
+The model discovers relevant tools, obtains their full schemas, and calls them normally. Deferral is not background execution, lazy authentication, or an access-control boundary. The application still configures the tools and connectors, and MCP discovery may still contact the server.
 
-## Marking a function tool as deferred
+Use it for large tool catalogs where most runs need only a subset. Keep a small, frequently used tool set visible directly. Do not defer a tool merely to hide a sensitive capability: filter it out or enforce authorization in middleware instead.
 
-A tool is deferred when its `agents.BaseTool` has `Deferred: true`. Everything else about the tool stays the same.
-
-```go
-func NewLookupTool() *CustomTool {
-	return &CustomTool{
-		BaseTool: &agents.BaseTool{
-			Deferred: true, // keep this tool out of the prompt until activated
-			ToolUnion: responses.ToolUnion{
-				OfFunction: &responses.FunctionTool{
-					Name:        "lookup_user",
-					Description: utils.Ptr("Look up a user record by ID"),
-					Parameters: map[string]any{
-						"type": "object",
-						"properties": map[string]any{
-							"user_id": map[string]any{
-								"type":        "string",
-								"description": "The user ID to look up",
-							},
-						},
-						"required": []string{"user_id"},
-					},
-				},
-			},
-		},
-	}
-}
-```
-
-If you build the tool with the [`hastekit.NewTool`](/hastekit-sdk/agents/tools/function-tools) helper instead, mark it deferred with the `hastekit.WithDeferred` option:
-
-```go
-lookupTool := hastekit.NewTool(lookupUser,
-	hastekit.WithName("lookup_user"),
-	hastekit.WithDescription("Look up a user record by ID"),
-	hastekit.WithDeferred(true), // keep out of the prompt until activated
-)
-```
-
-Attach it like any other tool — the SDK detects the deferred flag and wires up `ToolSearch` for you:
-
-```go
-agent := hastekit.NewAgent(&hastekit.AgentConfig{
-	Name:        "Assistant",
-	Instruction: hastekit.NewPrompt("You are a helpful assistant."),
-	LLM:         model,
-	Tools: []hastekit.Tool{
-		NewLookupTool(), // deferred — discovered via ToolSearch
-		NewWeatherTool(), // regular — always in the prompt
-	},
-})
-```
-
-## Marking MCP tools as deferred
-
-For [MCP servers](/hastekit-sdk/agents/tools/mcp-tools), pass the tool names you want deferred to `mcpclient.WithDeferredTools`. This is especially useful for servers that expose a large number of tools.
-
-```go
-mcpClient, err := mcpclient.NewClient(context.Background(), "users", "http://localhost:9001/sse",
-	mcpclient.WithTransport("sse"),
-	mcpclient.WithDeferredTools("list_users", "delete_user"),
-)
-```
-
-Only the listed tools are deferred; the rest of the server's tools remain available in the prompt as usual.
-
-Pass `"*"` to defer every tool the server exposes — the right default for a server with a large or changing catalog, since you no longer have to keep the list in sync with the server:
-
-```go
-mcpClient, err := mcpclient.NewClient(context.Background(), "users", "http://localhost:9001/sse",
-	mcpclient.WithTransport("streamable-http"),
-	mcpclient.WithDeferredTools("*"),
-)
-```
-
-## The ToolSearch tool
-
-`ToolSearch` accepts two arguments:
-
-| Argument      | Type    | Description |
-|---------------|---------|-------------|
-| `query`       | string  | Required. Either `select:<tool_name>` to activate specific tools by name (comma-separate to activate several: `select:lookup_user,delete_user`), or plain keywords to search by. |
-| `max_results` | integer | Optional. Maximum number of results a keyword search returns (default 5). Ignored by `select:`. |
-
-A keyword query ranks deferred tools by how many of its terms appear in the tool's name or description — case-insensitive substring matching — and activates the best matches, up to `max_results`. A query that matches nothing answers `No matching deferred tools found for query: …` rather than silently activating nothing.
-
-When the agent activates a tool, the activation is recorded in the run state (`activated_deferred_tools`), so the tool's schema stays available for the remainder of the run.
-
-## When to defer a tool
-
-- **Large catalogs** — once you get past ~20 tools, schemas start crowding the prompt and hurting tool-call accuracy.
-- **Specialty tools** — tools that only matter in narrow cases (e.g. an issue-transition tool that's only relevant once the user mentions tickets).
-- **Heavy schemas** — tools with deeply nested inputs or long enums cost the most tokens to keep loaded.
-
-## When not to defer
-
-- **Always-needed tools** — if the agent uses a tool on most runs, deferring just adds a round-trip every time.
-- **Tools the agent should consider proactively** — discovery only happens when the agent thinks to search. If it doesn't know a tool exists, it won't look for it.
-
-## Deferral and approval are independent
-
-`Deferred` and `RequiresApproval` are separate flags. A tool can be deferred (kept out of the prompt), [approval-gated](/hastekit-sdk/agents/tools/human-in-the-loop) (held for human review when called), both, or neither.
+A deferred tool can also require approval. Discovering its schema does not grant approval to execute it.

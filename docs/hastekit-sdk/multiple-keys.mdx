@@ -1,80 +1,49 @@
 ---
-title: Managing Multiple Keys
-icon: key
+title: "Providers, keys, and retries"
+description: "Configure direct provider access and explicit resilience policies."
 ---
 
-HasteKit supports managing multiple API keys for a single provider. This is useful for:
-- **Load Balancing:** Distribute requests across multiple API keys to avoid rate limits.
-- **Redundancy:** Ensure high availability by having fallback keys.
-- **Cost Management:** Allocate traffic based on usage quotas or costs associated with different keys.
+`hastekit.NewLLMClient` takes provider configuration and optional provider middleware. A bound model uses a `Provider/model` identifier, such as `OpenAI/gpt-4.1-mini`. Construct clients and bound models at startup and reuse them.
 
-## Weighted Random Selection
+## Configure credentials
 
-When multiple API keys with weights are configured for a provider, HasteKit uses **weighted random selection** to choose which key to use for each request.
-
-Each API key must be assigned a `Weight`. The probability of a key being selected is proportional to its weight relative to the sum of all weights for that provider.
-
-### How it Works
-
-1.  HasteKit retrieves all the configured API keys for the requested provider.
-2.  It extracts the `Weight` from each `APIKeyConfig`.
-3.  If multiple keys exist, it performs a weighted random selection.
-4.  The request is then executed using the selected API key.
-
-If all keys have the same weight (e.g., all set to `1` or not specified), the selection becomes uniformly random.
-
-## Configuration Example
-
-When using the HasteKit SDK in direct mode, you can configure multiple keys by passing a `[]hastekit.ProviderConfig` to `hastekit.NewLLMClient`, assigning each `APIKeyConfig` a `Weight`.
+Load keys from your application's secret source. With two environment variables set:
 
 ```go
-package main
-
-import (
-	hastekit "github.com/hastekit/agent-sdk-go"
-)
-
-func main() {
-	// Define multiple API keys for OpenAI with different weights
-	providerConfigs := []hastekit.ProviderConfig{{
-		ProviderName: hastekit.ProviderOpenAI,
-		ApiKeys: []*hastekit.APIKeyConfig{
-			{
-				APIKey: "sk-openai-key-1",
-				Weight: 70, // This key will be used ~70% of the time
-			},
-			{
-				APIKey: "sk-openai-key-2",
-				Weight: 30, // This key will be used ~30% of the time
-			},
-		},
-	}}
-
-	// Create the HasteKit client
-	client := hastekit.NewLLMClient(providerConfigs)
-}
-```
-
-## Selecting a key per run
-
-Weighted selection picks a key for you. To pin a specific run to a specific credential instead — a per-tenant key, or a virtual key resolved from the inbound request — inject it into the context before invoking the agent:
-
-```go
-import "github.com/hastekit/agent-sdk-go/pkg/gateway"
-
-ctx := gateway.WithProviderConfigKey(context.Background(), "vk_...")
-
-handle, err := agent.Execute(ctx, &agents.AgentInput{
-    Message: history.Message{
-        Messages: []responses.InputMessageUnion{
-            responses.UserMessage("Hello!"),
-        },
+client := hastekit.NewLLMClient([]hastekit.ProviderConfig{{
+    ProviderName: hastekit.ProviderOpenAI,
+    ApiKeys: []*hastekit.APIKeyConfig{
+        {Name: "primary", APIKey: os.Getenv("OPENAI_PRIMARY_KEY"), Weight: 70},
+        {Name: "secondary", APIKey: os.Getenv("OPENAI_SECONDARY_KEY"), Weight: 30},
     },
-})
+}})
+model := client.Model("OpenAI/gpt-4.1-mini")
+_ = model
 ```
 
-The LLM client reads it back with `gateway.ProviderConfigKeyFromContext` when resolving provider configuration, so the whole run — every loop iteration, every sub-agent — uses that credential. The key can be a virtual key or a direct provider API key.
+Multiple keys are selected randomly in proportion to their weights. Use non-negative weights. When all weights are zero, selection is uniform. Selection alone does not guarantee quota enforcement, health checking, or failover; do not treat `RateLimits`, `Enabled`, or `IsDefault` fields as an enforcement policy in the direct SDK configuration store.
 
-<Note>
-Under the durable runtimes a plain `context.Context` doesn't survive the workflow/activity boundary, so each runtime re-establishes this value on the far side — Temporal through a context propagator, Restate through the workflow input. Injecting it once before `Execute` is enough either way.
-</Note>
+`ProviderConfig.BaseURL` and `CustomHeaders` customize provider routing. Use the exact provider name constants rather than guessing capitalization. The SDK has adapters for OpenAI, Anthropic, Gemini, Bedrock, xAI, OpenRouter, Ollama, DeepSeek, Moonshot, Z.ai, Sarvam, and ElevenLabs, but supported methods and model features differ.
+
+## Configure retries and fallback
+
+Import `github.com/hastekit/agent-sdk-go/pkg/gateway/middleware`. Given `providerConfigs` containing every target provider:
+
+```go
+client := hastekit.NewLLMClient(providerConfigs, hastekit.WithMiddleware(
+    middleware.NewFallbackModels("Anthropic/your-fallback-model"),
+    middleware.NewRetry(middleware.RetryConfig{MaxAttempts: 3}),
+))
+```
+
+Middleware is ordered outermost first. With fallback outside retry, each provider gets its retry budget before the chain moves to another target. Neither retries nor fallback are installed unless configured.
+
+`RetryConfig.MaxAttempts` includes the initial call. Streaming retries/fallback can occur only before the caller receives its first chunk; once output has been delivered, a later failure ends that stream rather than mixing two attempts.
+
+A model inherits its client's middleware by default. Passing `WithMiddleware(...)` to `client.Model` replaces the whole chain for that model. `WithoutMiddleware()` removes the configurable chain. Bind such models once rather than rebuilding their internal configuration on every request.
+
+## Per-run configuration keys
+
+`gateway.WithProviderConfigKey` passes a key to a configured `ConfigStore`. A remote or custom store may use it for credential lookup, and the agent durable runtimes propagate it across execution boundaries.
+
+The direct in-memory store used by `hastekit.NewLLMClient` ignores that lookup key and selects from its configured keys. It does **not** implement virtual keys or pin a specific per-run credential through this context value. Use a suitable custom/remote configuration store, or separately configured clients, for tenant-specific credentials.

@@ -1,281 +1,54 @@
 ---
-title: Restate
-icon: arrows-rotate
+title: "Restate agents"
+description: "Configure shared state and explicitly manage durable worker lifetime."
 ---
 
-Durable agent execution ensures that your agents can survive process crashes, restarts, or failures without losing progress. Using [Restate](https://restate.dev), each step of the agent's execution (LLM calls, tool executions) is checkpointed, allowing the agent to resume from exactly where it left off after a failure.
+A durable agent keeps orchestration in Restate’s journal so completed steps can be recovered across worker failures. External calls can still repeat if their execution is retried; durable orchestration does not make arbitrary side effects exactly once.
 
-## Why Durable Execution?
+## Required infrastructure
 
-Traditional agents run in-memory. If your process crashes during:
-- A long-running LLM call
-- An external API request in a tool
-- A multi-step conversation with many tool calls
+Use a running Restate server, a shared stream broker such as Redis, and persistence reachable by every worker that can handle a conversation. File history and memory brokers are not distributed stores.
 
-...all progress is lost, and the entire execution must restart from scratch.
+## Construct before serving
 
-With durable execution:
-- **Checkpoint Every Step**: Each LLM call and tool execution is automatically saved
-- **Automatic Recovery**: After a crash, the agent resumes from the last checkpoint
-- **Exactly-Once Guarantees**: Tool executions are never duplicated, even after retries
-- **Long-Running Workflows**: Agents can run for hours or days without risk
-
-## Prerequisites
-
-1. **Restate Server**: You need a running Restate server. Follow the [Restate installation guide](https://docs.restate.dev/get_started/quickstart) to set one up.
-
-## Creating a Durable Agent
-
-To make an agent durable, create a Restate runtime with `hastekit.NewRestateRuntime` and attach it to the agent with `hastekit.WithRuntime`:
+This setup assumes `ctx` is cancelled at service shutdown, `model` is configured, and `sharedHistory` is your application's conversation manager:
 
 ```go
-package main
-
-import (
-    "log"
-    "net/http"
-    "os"
-
-    hastekit "github.com/hastekit/agent-sdk-go"
-)
-
-func main() {
-    client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
-        {
-            ProviderName: hastekit.ProviderOpenAI,
-            ApiKeys: []*hastekit.APIKeyConfig{
-                {
-                    Name:   "Key 1",
-                    APIKey: os.Getenv("OPENAI_API_KEY"),
-                },
-            },
-        },
-    })
-
-    model := client.Model("OpenAI/gpt-4o-mini")
-
-    // Create a Restate runtime: (Restate service address, Redis endpoint)
-    rt, err := hastekit.NewRestateRuntime("0.0.0.0:9081", "localhost:6379")
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    broker, err := hastekit.NewRedisStreamBroker("localhost:6379")
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    // Create a durable agent by attaching the runtime
-    agentName := "SampleAgent"
-    agent := hastekit.NewAgent(&hastekit.AgentConfig{
-        Name:        agentName,
-        Instruction: hastekit.NewPrompt("You are helpful assistant."),
-        LLM:         model,
-        History:     hastekit.NewFileHistory("./conversations"),
-    }, hastekit.WithRuntime(rt, broker))
-}
+broker, err := hastekit.NewRedisStreamBroker("localhost:6379", "", 0)
+if err != nil { return err }
+runtime, err := hastekit.NewRestateRuntime("http://localhost:8080", broker)
+if err != nil { return err }
+defer runtime.Close()
+agent, err := hastekit.NewAgent(&hastekit.AgentConfig{
+    Name: "assistant", LLM: model,
+    Instruction: hastekit.NewPrompt("Help the user."),
+    History: sharedHistory,
+}, hastekit.WithRuntime(runtime))
+if err != nil { return err }
+_ = agent
+return runtime.Serve(ctx, ":9080")
 ```
 
-## Deployment Options
+`NewAgent` registers its resolved configuration with the supplied runtime. `WithRuntime` accepts only the runtime; its broker comes from `Runtime.StreamBroker()`. Register every participating agent before calling `Serve`.
 
-There are two ways to deploy durable agents:
+The runtime constructor returns an error and does not start workers in the background. `Serve` blocks until cancellation or failure. In a service hosting HTTP and workers together, supervise both and propagate startup errors; do not discard a `Serve` error in an unobserved goroutine.
 
-### Option 1: Single Process (Development/Testing)
+## Restate ingress and service address
 
-Run both the Restate service handler and the application code in the same process. This is simpler but less resilient since both components share the same process lifecycle.
+The constructor's endpoint is the Restate **ingress** used by callers. The `Serve` address is where your Go service listens for Restate invocations. They are different endpoints.
 
-```go
-func main() {
-    // ... client, runtime, and agent setup from above ...
+Start the service and register its reachable deployment URL with your Restate server before invoking it. `Serve` binds the agent workflow and background-task service using the SDK runtime implementation; it does not perform deployment registration with Restate for you.
 
-    // Start the Restate service in a goroutine
-    rt.Start()
+The service uses unencrypted HTTP/2 on its listen address. Configure network exposure and proxy support accordingly. `Close` stops the service lifecycle; supplied broker/history resources remain caller-owned.
 
-    // Start HTTP server for invoking the workflow
-    http.ListenAndServe(":8070", hastekit.NewHTTPHandler())
-}
-```
+## Invoke and observe
 
-With this setup:
-- The Restate service runs on `http://localhost:9081`
-- Your application server runs on `http://localhost:8070`
-- Both are in the same process
+Call the same `agent.Run` or `agent.Execute` APIs as local agents. A caller-only process can use the lower-level invocation runtime while worker configurations live in the service process. The high-level constructor is convenient when one process owns configuration and worker startup.
 
-**Note**: If this process crashes, both components restart together. True durability requires separation (Option 2).
+Both callers and workers must connect to the same broker for event delivery and stop signaling. Omitting the broker is an error; there is no implicit memory broker for a configured durable runtime.
 
-### Option 2: Separate Processes (Production)
+## Cancellation and retries
 
-For production deployments, run the Restate service and application in separate processes. This provides true fault isolation—if your application crashes, the Restate service continues running and can recover the workflow.
+Use `Run` with a request context for caller-bound execution, or a streaming handle and `Stop` for a detached run. Stop flags travel through the shared broker to active operations. Middleware runs inside the durable activity/step and can repeat with it.
 
-#### Application Process
-
-```go
-// application/main.go
-package main
-
-import (
-    "log"
-    "net/http"
-    "os"
-
-    hastekit "github.com/hastekit/agent-sdk-go"
-)
-
-func main() {
-    client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
-        {
-            ProviderName: hastekit.ProviderOpenAI,
-            ApiKeys: []*hastekit.APIKeyConfig{
-                {
-                    Name:   "Key 1",
-                    APIKey: os.Getenv("OPENAI_API_KEY"),
-                },
-            },
-        },
-    })
-
-    model := client.Model("OpenAI/gpt-4o-mini")
-
-    rt, err := hastekit.NewRestateRuntime("0.0.0.0:9081", "localhost:6379")
-    if err != nil {
-        log.Fatal(err)
-    }
-    broker, err := hastekit.NewRedisStreamBroker("localhost:6379")
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    // Register the agent with the runtime attached (but don't start the service here)
-    agentName := "my-agent"
-    _ = hastekit.NewAgent(&hastekit.AgentConfig{
-        Name:        agentName,
-        Instruction: hastekit.NewPrompt("You are a helpful assistant."),
-        LLM:         model,
-        History:     hastekit.NewFileHistory("./conversations"),
-    }, hastekit.WithRuntime(rt, broker))
-
-    // Start application server
-    log.Println("Application server starting on :8070")
-    http.ListenAndServe(":8070", hastekit.NewHTTPHandler())
-}
-```
-
-#### Restate Service Process
-
-```go
-// restate-service/main.go
-package main
-
-import (
-    "log"
-    "os"
-
-    hastekit "github.com/hastekit/agent-sdk-go"
-)
-
-func main() {
-    client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
-        {
-            ProviderName: hastekit.ProviderOpenAI,
-            ApiKeys: []*hastekit.APIKeyConfig{
-                {
-                    Name:   "Key 1",
-                    APIKey: os.Getenv("OPENAI_API_KEY"),
-                },
-            },
-        },
-    })
-
-    model := client.Model("OpenAI/gpt-4o-mini")
-
-    rt, err := hastekit.NewRestateRuntime("0.0.0.0:9081", "localhost:6379")
-    if err != nil {
-        log.Fatal(err)
-    }
-    broker, err := hastekit.NewRedisStreamBroker("localhost:6379")
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    // Register the SAME agent with the SAME configuration
-    agentName := "my-agent"
-    _ = hastekit.NewAgent(&hastekit.AgentConfig{
-        Name:        agentName,
-        Instruction: hastekit.NewPrompt("You are a helpful assistant."),
-        LLM:         model,
-        History:     hastekit.NewFileHistory("./conversations"),
-    }, hastekit.WithRuntime(rt, broker))
-
-    // Start only the Restate service
-    log.Println("Restate service starting on :9081")
-    rt.Start()
-
-    // Block forever (the service runs in a background goroutine)
-    select {}
-}
-```
-
-**Important**: Both processes must register the agent with the **exact same name and configuration**. This ensures the Restate service can execute the agent with the correct setup.
-
-#### Running the Services
-
-```bash
-# Terminal 1: Start the Restate service
-cd restate-service
-go run main.go
-
-# Terminal 2: Start the application
-cd application
-go run main.go
-```
-
-## Registering the Deployment with Restate Server
-
-After starting your Restate service (on port 9081), you must register it with the Restate server so it can discover and invoke your agent workflows.
-
-### Using the Restate CLI
-
-```bash
-# Install Restate CLI (if not already installed)
-npm install -g @restatedev/restate
-
-# Register the deployment
-restate deployments register http://localhost:9081
-```
-
-### Using the Admin API
-
-```bash
-curl localhost:9070/deployments --json '{"uri": "http://localhost:9081"}'
-```
-
-### Using the Restate UI
-
-Navigate to your Restate server's UI (typically `http://localhost:9070`) and register the deployment through the web interface.
-
-**Note**: If running Restate in Docker, replace `localhost` with `host.docker.internal`:
-
-```bash
-restate deployments register http://host.docker.internal:9081
-```
-
-### Automatic Registration
-
-For production environments, consider automating deployment registration:
-
-- **Kubernetes**: Use the [Restate Kubernetes Operator](https://github.com/restatedev/restate-operator) for automatic registration and lifecycle management
-- **CI/CD Pipeline**: Add deployment registration as a step in your CI/CD pipeline
-- **FaaS Platforms**: AWS Lambda, Vercel, and other FaaS platforms automatically handle versioning through version-specific ARNs/URLs
-
-See the [Restate deployment documentation](https://docs.restate.dev/services/versioning#registering-a-deployment) for more details.
-
-## Example: Complete Durable Agent
-
-See the complete working example in the repository: [`examples/agents/8_restate_agent/main.go`](https://github.com/hastekit/hastekit-docs/blob/master/examples/agents/8_restate_agent/main.go)
-
-## Learn More
-
-- [Restate Documentation](https://docs.restate.dev)
-- [Restate Service Versioning](https://docs.restate.dev/services/versioning)
-- [Restate Kubernetes Operator](https://github.com/restatedev/restate-operator)
-- [Durable Execution Concepts](https://docs.restate.dev/concepts/durable_execution)
+Pass only serializable state across execution boundaries. Keep database clients, MCP connectors, tools, and other dependencies on the worker, and pass per-run values through supported input/context mechanisms. Configure tracing in both the caller and worker processes.

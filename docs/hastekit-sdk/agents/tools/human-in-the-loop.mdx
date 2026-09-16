@@ -1,383 +1,63 @@
 ---
-title: Human in the Loop
-icon: user-check
+title: "Approvals and human input"
+description: "Pause an agent and resume the exact pending tool call."
 ---
 
-Human-in-the-loop (HITL) allows you to require human approval before executing sensitive tool calls. When a tool marked as requiring approval is invoked by the agent, the execution pauses and waits for explicit user confirmation before proceeding.
+An interruption is a successful suspension of an agent run, not an execution error. A paused result carries `Interrupts`, identifying the calls waiting for approval or input. Persist conversation history so the next invocation can recover those pending calls.
 
-## How It Works
+## Require approval
 
-1. **Tool invocation**: The agent decides to call a tool that requires approval
-2. **Execution pauses**: The run transitions to an `await_approval` state
-3. **User reviews**: The pending tool call is presented to the user for review
-4. **User responds**: The user approves or rejects the tool call
-5. **Execution resumes**: The agent continues with the approved tools or handles rejections
+For a typed function tool, pass `hastekit.WithNeedsApproval(true)`. For a custom tool, set `BaseTool.RequiresApproval`. For MCP tools, use `mcpclient.WithApprovalRequiredTools`.
 
-## Configuring Approval for Custom Tools
+The agent asks for approval before executing the action. Unrelated calls that do not require approval may already have completed. Rejecting a pending call does not undo those actions.
 
-To require approval for a custom function tool, embed `agents.BaseTool` and set `RequiresApproval: true`:
+## Resume from Go
+
+This function resumes every interrupt in `paused` with an approval. In an application, build the resolutions from actual user decisions rather than approving automatically:
 
 ```go
-type DeleteUserTool struct {
-    *agents.BaseTool
-}
-
-func NewDeleteUserTool() *DeleteUserTool {
-    return &DeleteUserTool{
-        BaseTool: &agents.BaseTool{
-            RequiresApproval: true,  // Requires human approval
-            ToolUnion: responses.ToolUnion{
-                OfFunction: &responses.FunctionTool{
-                    Name:        "delete_user",
-                    Description: utils.Ptr("Permanently deletes a user account"),
-                    Parameters: map[string]any{
-                        "type": "object",
-                        "properties": map[string]any{
-                            "user_id": map[string]any{
-                                "type":        "string",
-                                "description": "The ID of the user to delete",
-                            },
-                        },
-                        "required": []string{"user_id"},
-                    },
-                },
-            },
-        },
-    }
-}
-
-func (t *DeleteUserTool) Execute(ctx context.Context, params *agents.ToolCall) (*agents.ToolCallResponse, error) {
-    // This only runs after human approval
-    args := map[string]interface{}{}
-    json.Unmarshal([]byte(params.Arguments), &args)
-    
-    userID := args["user_id"].(string)
-    err := deleteUser(userID)
-    
-    return &agents.ToolCallResponse{
-        FunctionCallOutputMessage: &responses.FunctionCallOutputMessage{
-            ID:     params.ID,
-            CallID: params.CallID,
-            Output: responses.FunctionCallOutputContentUnion{
-                OfString: utils.Ptr(fmt.Sprintf("User %s deleted successfully", userID)),
-            },
-        },
-    }, err
-}
-```
-
-## Configuring Approval for MCP Tools
-
-For MCP tools, use the `mcpclient.WithApprovalRequiredTools` option when creating the client:
-
-```go
-mcpClient, err := mcpclient.NewClient(context.Background(), "users", "http://localhost:9001/sse",
-		mcpclient.WithTransport("sse"),
-		mcpclient.WithHeaders(map[string]string{
-			"token": "your-token",
-		}),
-		mcpclient.WithToolFilter("list_users"),
-		mcpclient.WithApprovalRequiredTools("list_users"),
-	)
-if err != nil {
-    log.Fatal(err)
-}
-
-agent := hastekit.NewAgent(&hastekit.AgentConfig{
-    Name:        "Assistant",
-    Instruction: hastekit.NewPrompt("You are a helpful assistant."),
-    LLM:         model,
-    McpServers:  []agents.MCPToolset{mcpClient},
-})
-```
-
-## Handling Approval in Your Application
-
-When a tool requires approval, the agent execution pauses and returns with a `paused` status. The pending tool calls are available in the run state.
-
-### Agent Output
-
-`Execute()` (via the handle's `Result()`/`Wait()`) returns an `*agents.AgentOutput`. When approval is needed, its `Status` is `RunStatusPaused` and the paused run exposes one `Interrupt` per pending tool call in `Interrupts`:
-
-```go
-type AgentOutput struct {
-    RunID      string                        `json:"run_id"`
-    Status     agentstate.RunStatus          `json:"status"`               // RunStatusPaused when approval is required
-    Output     []responses.InputMessageUnion `json:"output"`
-    Interrupts []responses.Interrupt         `json:"interrupts,omitempty"` // One per tool call awaiting approval
-}
-```
-
-Each `Interrupt` carries the intercepted call and the kind of gate:
-
-```go
-type Interrupt struct {
-    FunctionCallMessage responses.FunctionCallMessage `json:"function_call_message"` // .CallID identifies the call
-    Mode                responses.InterruptMode       `json:"mode"`                  // "approval", "form", or "url"
-    Elicitations        []mcp.ElicitParams            `json:"elicitations,omitempty"` // form/url payload
-    IsNested            bool                          `json:"is_nested,omitempty"`
-}
-```
-
-`Mode` discriminates the kind of pause, so one shape covers approval gates and MCP elicitations alike:
-
-| Mode | Meaning |
-| :--- | :--- |
-| `responses.InterruptModeApproval` | Approve/reject gate on a tool call — everything on this page |
-| `responses.InterruptModeForm` | An MCP server asked the user to fill a form |
-| `responses.InterruptModeURL` | An MCP server asked the user to visit a URL |
-
-See [MCP Tools → Elicitation](./mcp-tools#elicitation) for the form and URL flows.
-
-> Approval-required tools inside sub-agents (see [Agent as a tool](./agent-as-a-tool)) bubble up to the parent's `Interrupts` with `IsNested: true`, so the parent run pauses and surfaces them just like its own tools.
-
-### Resuming Execution
-
-To resume execution after user review, send a `FunctionCallInterruptResolutionMessage` on the same thread, resolving each call by ID with `InterruptActionApprove` or `InterruptActionReject`. `Execute()` returns an `*AgentHandle`; the simplest way to wait for the resumed run is `handle.Result()`:
-
-```go
-// User approved the tool call
-approvalResponse := responses.InputMessageUnion{
-    OfFunctionCallInterruptResolution: &responses.FunctionCallInterruptResolutionMessage{
-        ID: uuid.NewString(),
-        Resolutions: []responses.InterruptResolution{
-            {
-                CallID: result.Interrupts[0].FunctionCallMessage.CallID,
-                Action: responses.InterruptActionApprove,
-            },
-        },
-    },
-}
-
-handle, err := agent.Execute(ctx, &agents.AgentInput{
-    Message: history.Message{
-        Messages: []responses.InputMessageUnion{approvalResponse},
-    },
-})
-if err != nil {
-    log.Fatal(err)
-}
-result, err := handle.Result()
-```
-
-### Handling Rejections
-
-To reject a call, resolve it with `InterruptActionReject`. You can approve some calls and reject others in the same `Resolutions` slice:
-
-```go
-// User rejected the tool call
-approvalResponse := responses.InputMessageUnion{
-    OfFunctionCallInterruptResolution: &responses.FunctionCallInterruptResolutionMessage{
-        ID: uuid.NewString(),
-        Resolutions: []responses.InterruptResolution{
-            {
-                CallID: result.Interrupts[0].FunctionCallMessage.CallID,
-                Action: responses.InterruptActionReject,
-            },
-        },
-    },
-}
-```
-
-The agent will receive the rejection as tool output: `"Request to call this tool has been declined"` and can adjust its response accordingly.
-
-### The resolution shape
-
-```go
-type InterruptResolution struct {
-    CallID  string          `json:"call_id"`
-    Action  string          `json:"action"`            // InterruptActionApprove / InterruptActionReject
-    Content json.RawMessage `json:"content,omitempty"` // data-carrying answers only
-}
-```
-
-`Content` is for interrupts that ask for data rather than a verdict — a submitted [MCP form elicitation](./mcp-tools#elicitation). Plain approvals leave it empty, and it is dropped on a rejection.
-
-## Pausing from a hook
-
-A [hook](/hastekit-sdk/agents/hooks) can pause a run too, by returning a `ToolCallResponse` carrying `Interrupts`. That is how an unauthenticated caller is sent to a login URL from one place rather than from inside every tool.
-
-## Complete Example
-
-Here's a complete example with a mix of immediate and approval-required tools:
-
-```go
-package main
+package approval
 
 import (
-	"context"
-	"encoding/json"
-	"fmt"
-	"log"
-	"os"
-
-	"github.com/bytedance/sonic"
-	"github.com/google/uuid"
-	"github.com/hastekit/agent-sdk-go/pkg/agents"
-	"github.com/hastekit/agent-sdk-go/pkg/agents/agentstate"
-	"github.com/hastekit/agent-sdk-go/pkg/agents/history"
-	"github.com/hastekit/agent-sdk-go/pkg/gateway/llm/responses"
-	hastekit "github.com/hastekit/agent-sdk-go"
-	"github.com/hastekit/agent-sdk-go/pkg/utils"
+    "context"
+    "fmt"
+    hastekit "github.com/hastekit/agent-sdk-go"
+    "github.com/hastekit/agent-sdk-go/pkg/agents/history"
+    "github.com/hastekit/agent-sdk-go/pkg/gateway/llm/responses"
 )
 
-// GetUserTool - runs immediately (no approval needed)
-type GetUserTool struct {
-	*agents.BaseTool
-}
-
-func NewGetUserTool() *GetUserTool {
-	return &GetUserTool{
-		BaseTool: &agents.BaseTool{
-			RequiresApproval: false,
-			ToolUnion: responses.ToolUnion{
-				OfFunction: &responses.FunctionTool{
-					Name:        "get_user",
-					Description: utils.Ptr("Gets user information"),
-					Parameters: map[string]any{
-						"type": "object",
-						"properties": map[string]any{
-							"user_id": map[string]any{"type": "string"},
-						},
-						"required": []string{"user_id"},
-					},
-				},
-			},
-		},
-	}
-}
-
-func (t *GetUserTool) Execute(ctx context.Context, params *agents.ToolCall) (*agents.ToolCallResponse, error) {
-	return &agents.ToolCallResponse{
-		FunctionCallOutputMessage: &responses.FunctionCallOutputMessage{
-			ID:     params.ID,
-			CallID: params.CallID,
-			Output: responses.FunctionCallOutputContentUnion{
-				OfString: utils.Ptr(`{"name": "John Doe", "email": "john@example.com"}`),
-			},
-		},
-	}, nil
-}
-
-// DeleteUserTool - requires approval
-type DeleteUserTool struct {
-	*agents.BaseTool
-}
-
-func NewDeleteUserTool() *DeleteUserTool {
-	return &DeleteUserTool{
-		BaseTool: &agents.BaseTool{
-			RequiresApproval: true, // Human approval required
-			ToolUnion: responses.ToolUnion{
-				OfFunction: &responses.FunctionTool{
-					Name:        "delete_user",
-					Description: utils.Ptr("Permanently deletes a user account"),
-					Parameters: map[string]any{
-						"type": "object",
-						"properties": map[string]any{
-							"user_id": map[string]any{"type": "string"},
-						},
-						"required": []string{"user_id"},
-					},
-				},
-			},
-		},
-	}
-}
-
-func (t *DeleteUserTool) Execute(ctx context.Context, params *agents.ToolCall) (*agents.ToolCallResponse, error) {
-	args := map[string]any{}
-	json.Unmarshal([]byte(params.Arguments), &args)
-
-	return &agents.ToolCallResponse{
-		FunctionCallOutputMessage: &responses.FunctionCallOutputMessage{
-			ID:     params.ID,
-			CallID: params.CallID,
-			Output: responses.FunctionCallOutputContentUnion{
-				OfString: utils.Ptr(fmt.Sprintf("User %s has been deleted", args["user_id"])),
-			},
-		},
-	}, nil
-}
-
-func main() {
-	ctx := context.Background()
-
-    client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
-        {
-            ProviderName: hastekit.ProviderOpenAI,
-            ApiKeys: []*hastekit.APIKeyConfig{
-                {
-                    Name:   "Key 1",
-                    APIKey: os.Getenv("OPENAI_API_KEY"),
-                },
+func Resume(ctx context.Context, agent *hastekit.Agent, namespace, threadID string, paused *hastekit.Result) (*hastekit.Result, error) {
+    if paused == nil || len(paused.Interrupts) == 0 { return nil, fmt.Errorf("no pending interrupts") }
+    resolutions := make([]responses.InterruptResolution, 0, len(paused.Interrupts))
+    for _, interrupt := range paused.Interrupts {
+        resolutions = append(resolutions, responses.InterruptResolution{
+            CallID: interrupt.FunctionCallMessage.CallID,
+            Action: responses.InterruptActionApprove,
+        })
+    }
+    return agent.Run(ctx, &hastekit.Input{
+        Namespace: namespace,
+        ThreadID: threadID,
+        PreviousRunID: paused.RunID,
+        Message: history.Message{Messages: []responses.InputMessageUnion{{
+            OfFunctionCallInterruptResolution: &responses.FunctionCallInterruptResolutionMessage{
+                Resolutions: resolutions,
             },
-        },
+        }}},
     })
-
-	agent := hastekit.NewAgent(&hastekit.AgentConfig{
-		Name:        "User Manager",
-		Instruction: hastekit.NewPrompt("You help manage user accounts."),
-		LLM:         client.Model("OpenAI/gpt-4o-mini"),
-		Tools: []hastekit.Tool{
-			NewGetUserTool(),
-			NewDeleteUserTool(),
-		},
-		History: hastekit.NewFileHistory("./conversations"),
-	})
-
-	// First execution - agent may request to delete a user
-	handle, err := agent.Execute(ctx, &agents.AgentInput{
-		Namespace: "default",
-		Message: history.Message{
-            Messages: []responses.InputMessageUnion{
-			    responses.UserMessage("Delete user 123"),
-			},
-		},
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-	result, err := handle.Result()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Check if approval is needed
-	if result.Status == agentstate.RunStatusPaused {
-		fmt.Println("Approval required for:", result.Interrupts)
-
-		// Simulate user approval
-		approvalResponse := responses.InputMessageUnion{
-			OfFunctionCallInterruptResolution: &responses.FunctionCallInterruptResolutionMessage{
-				ID: uuid.NewString(),
-				Resolutions: []responses.InterruptResolution{
-					{
-						CallID: result.Interrupts[0].FunctionCallMessage.CallID,
-						Action: responses.InterruptActionApprove,
-					},
-				},
-			},
-		}
-
-		// Resume with approval
-		handle, err = agent.Execute(ctx, &agents.AgentInput{
-			Namespace:     "default",
-			PreviousRunID: result.RunID,
-			Message: history.Message{
-				Messages: []responses.InputMessageUnion{approvalResponse},
-			},
-		})
-		if err != nil {
-			log.Fatal(err)
-		}
-		result, err = handle.Result()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-
-	buf, _ := sonic.Marshal(result.Output)
-	fmt.Println("Final result:", string(buf))
 }
 ```
+
+Use `InterruptActionReject` for rejection. For forms, include the submitted values in `InterruptResolution.Content`, following the interrupt's schema. Match the exact call ID and the original namespace/thread. Inspect the resumed result again: it can pause for another decision.
+
+## Custom interruptions
+
+A custom tool can return an interruption and serialized `StateUpdates` describing how to continue. On re-entry, inspect `ToolCall.ShouldResume`, `State`, and `ResumeMessages`. Do not repeat the already-completed side effect when processing a resolution.
+
+Agent-as-tool, MCP elicitation, and workflow-as-tool integrations use this continuation mechanism. `workflow.Pause` belongs to workflow nodes; it is not the return protocol for a general agent tool.
+
+## UI and persistence
+
+The [embedded AG-UI client](/hastekit-sdk/agents/serving-agents/serving-agents-agui) renders approval/form interruptions and submits resolutions. Your HTTP layer must authenticate the user and authorize access to the resolved namespace.
+
+A paused local agent can resume after restart when its conversation state is persisted and the same tools remain available. This does not make arbitrary code executing before the pause crash-safe. Use a durable runtime and idempotent external operations when retries or worker failures must be handled.

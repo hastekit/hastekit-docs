@@ -1,0 +1,36 @@
+---
+title: "Migration notes"
+description: "Replace older setup, hooks, execution, and namespace APIs."
+---
+
+These notes describe differences visible in older SDK examples. Check the module version in your application before applying them; the current documentation targets the current SDK source.
+
+| Older pattern | Current API |
+|---|---|
+| Assuming `NewAgent` cannot fail | Handle `(*Agent, error)`, or use `MustNewAgent` for static configuration |
+| `Model` / `Instructions` on `AgentConfig` | `LLM` and `Instruction: hastekit.NewPrompt(...)` |
+| Separate `Start` / `Stream` calls | `Run` for a result; `Execute` for a streaming handle |
+| Cancelling an `Execute` context to stop the run | Use `handle.Stop`; context cancellation disconnects its subscription |
+| Before/after model and tool hooks | `agents.NoopMiddleware` plus `Wrap*` methods |
+| Reading tool annotations through a separate helper | `tool.GetToolDescriptor().Annotations` |
+| Opening file history without checking an error | `OpenFileHistory` / `NewFileHistory` return a manager and error |
+| Implicit durable worker startup | Construct the runtime, create agents with `WithRuntime`, then call `Serve` |
+| Passing runtime and broker to `WithRuntime` | Pass the runtime only; it exposes its configured broker |
+| Relying on a durable runtime's default memory broker | Supply an explicit shared broker |
+| `agui.WithNamespace` | `agui.WithNamespaceResolver`; omitted/blank resolves to `default` |
+| Assuming all history arrives in one messages response | Follow `nextCursor` / `hasMore` through complete-turn pages |
+| Rejoining SSE without an event cursor | Send the last processed `Last-Event-ID` for incremental replay |
+
+## Keep identifiers distinct
+
+`RunID` identifies an execution, `ThreadID` identifies a conversation, and `StreamID` identifies a broker stream. AG-UI can accept an omitted run ID and report the resolved one in its response headers. Do not use a stream cursor as a history-pagination cursor.
+
+The history branch field is `PreviousRunID`, not `PreviousMessageID`. Preserve namespace and thread identity when resuming an interruption.
+
+## Persisted attachments
+
+The current message shape uses `file_id: "attachment://..."` for SDK-owned references. Older data using a `file_ref` object needs a deliberate conversion preserving the attachment ID and version. Do not rewrite ordinary provider file IDs into attachment references.
+
+## Public scope
+
+Skills, connectors, and compiled workflows are configured by the application. A persistent dynamic registry, runtime enable/disable controls, and agent-authored workflow registration tools are not yet part of the SDK. Treat them as future application architecture rather than APIs available in these examples.

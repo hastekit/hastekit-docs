@@ -1,107 +1,31 @@
 ---
-title: Embeddings
-icon: vector-square
+title: "Embeddings"
+description: "Generate vectors for one string or a batch and retain their model identity."
 ---
 
-HasteKit SDK supports generating text embeddings with various LLM providers like OpenAI and Gemini.
+Call `NewEmbedding` on a model bound to an embedding-capable provider. Import `github.com/hastekit/agent-sdk-go/pkg/gateway/llm/embeddings`.
 
-## Generate embeddings
-
-Generate embeddings for a single text input.
+Given `client` and `ctx`:
 
 ```go
-resp, err := model.NewEmbedding(context.Background(), &embeddings.Request{
-    Input: embeddings.InputUnion{
-        OfString: utils.Ptr("The food was delicious and the waiter..."),
-    },
+model := client.Model("OpenAI/text-embedding-3-small")
+response, err := model.NewEmbedding(ctx, &embeddings.Request{
+    Input: embeddings.InputUnion{OfList: []string{"First document", "Second document"}},
 })
-if err != nil {
-    log.Fatal(err)
+if err != nil { return err }
+for _, item := range response.Data {
+    fmt.Println(item.Index, len(item.Embedding.OfFloat))
 }
 ```
 
-## Response
+For one string, use `Input.OfString`. Set only one input-union branch. Use each response entry's `Index` to associate vectors with inputs.
 
-The response contains an array of embedding data. Each embedding is a vector of floats (or base64 encoded string).
+## Dimensions and encoding
 
-```go
-for _, data := range resp.Data {
-    // Access float embeddings
-    if data.Embedding.OfFloat != nil {
-        fmt.Println("Embedding vector:", data.Embedding.OfFloat)
-        fmt.Println("Dimensions:", len(data.Embedding.OfFloat))
-    }
-    
-    // Access base64 encoded embeddings
-    if data.Embedding.OfBase64 != nil {
-        fmt.Println("Base64 embedding:", *data.Embedding.OfBase64)
-    }
-}
+`Dimensions` requests a dimension count where the model supports it. `EncodingFormat` can request floating-point values or base64 where supported. Inspect `Embedding.OfFloat` or `Embedding.OfBase64` accordingly; do not treat an empty float slice as proof of an empty embedding.
 
-// Access usage information
-if resp.Usage != nil {
-    fmt.Println("Prompt tokens:", resp.Usage.PromptTokens)
-    fmt.Println("Total tokens:", resp.Usage.TotalTokens)
-}
-```
+Store model identity, dimensions, and preprocessing choices with an index. Query vectors must be compatible with the document vectors. Changing models or dimensions generally requires rebuilding the affected index rather than mixing vectors.
 
----
+## Batching and limits
 
-## Batch Embeddings
-
-Generate embeddings for multiple texts in a single request.
-
-```go
-resp, err := model.NewEmbedding(context.Background(), &embeddings.Request{
-    Input: embeddings.InputUnion{
-        OfList: []string{
-            "The food was delicious",
-            "The service was excellent",
-            "Great atmosphere",
-        },
-    },
-})
-if err != nil {
-    log.Fatal(err)
-}
-
-// Each input text gets its own embedding at the corresponding index
-for _, data := range resp.Data {
-    fmt.Printf("Index %d: %d dimensions\n", data.Index, len(data.Embedding.OfFloat))
-}
-```
-
-## Request Configuration
-
-| Parameter | Type | Description |
-| :--- | :--- | :--- |
-| **Input** | `InputUnion` | The text input (single string or list of strings). |
-| **Dimensions** | `*int` | Number of dimensions for the output embeddings. |
-| **EncodingFormat** | `*string` | Format for embeddings: `"float"` or `"base64"`. |
-| **ExtraFields** | `map[string]any` | Optional. Provider-specific extra fields merged into the request payload. |
-
-## Response Structure
-
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| **Object** | `string` | Object type identifier. |
-| **Model** | `string` | The model used for generating embeddings. |
-| **Data** | `[]EmbeddingData` | Array of embedding results. |
-| **Usage** | `*Usage` | Token usage statistics. |
-
-### EmbeddingData
-
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| **Object** | `string` | Object type identifier for the embedding entry. |
-| **Index** | `int` | Index of the input text this embedding corresponds to. |
-| **Embedding** | `EmbeddingDataUnion` | The embedding vector (float array or base64 string). |
-
-## Supported Providers
-
-| Provider | Embeddings |
-| :--- | :---: |
-| **OpenAI** | ✅ |
-| **Gemini** | ✅ |
-| **Anthropic** | ❌ |
-
+Batch within provider input and request-size limits, and handle per-request failures before writing index entries. The SDK does not automatically chunk documents, choose a vector database, or manage your retrieval policy. Usage is available when the provider reports it.

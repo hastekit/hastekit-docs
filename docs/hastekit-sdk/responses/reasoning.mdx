@@ -1,66 +1,32 @@
 ---
-title: Reasoning
-icon: brain
+title: "Reasoning controls"
+description: "Configure reasoning effort without assuming every model exposes the same controls."
 ---
 
-Reasoning models (like OpenAI's `o3` and `o4` series) perform internal chain-of-thought processing before generating a final answer. The HasteKit SDK allows you to configure reasoning parameters and access these reasoning steps. Non-reasoning models (such as `gpt-4o`) do not emit reasoning summaries.
+`responses.Parameters.Reasoning` holds model-specific reasoning settings. The selected adapter translates supported values into its provider's request.
 
-## Enabling Reasoning
-
-To use reasoning features, you typically need to use a compatible model and configure the `Reasoning` parameters in your request.
-
-The `ReasoningParam` struct supports the following fields:
-
-- **`Summary`** (`*string`): Reasoning summary level: `"auto"`, `"concise"`, or `"detailed"`.
-- **`Effort`** (`*string`): Reasoning effort level: `"none"`, `"low"`, `"medium"`, `"high"`, or `"xhigh"`.
-- **`BudgetTokens`** (`*int`): Maximum tokens to allocate for reasoning steps. Used by Anthropic and Gemini; not used for OpenAI.
+Given `model` and `ctx`:
 
 ```go
-resp, err := model.NewResponses(ctx, &responses.Request{
-    Input: responses.InputUnion{
-        OfString: utils.Ptr("If 2+4=6, what would be 22+44=?"),
-    },
+response, err := model.NewResponses(ctx, &responses.Request{
+    Input: responses.InputUnion{OfString: utils.Ptr("Compare these two designs and explain the tradeoffs.")},
     Parameters: responses.Parameters{
         Reasoning: &responses.ReasoningParam{
-            Summary: utils.Ptr("detailed"),
-            Effort:  utils.Ptr("medium"),
-        },
-		Include: []responses.Includable{
-            responses.IncludableReasoningEncryptedContent,
+            Effort: utils.Ptr("medium"),
+            Summary: utils.Ptr("auto"),
         },
     },
 })
+if err != nil { return err }
+_ = response
 ```
 
-### Reasoning Output
+`Effort`, `Summary`, and `BudgetTokens` do not have universal meanings or accepted values. `BudgetTokens` is used by adapters that support an explicit reasoning budget. Choose settings supported by the actual provider/model rather than treating the Go struct as a capability list.
 
-Reasoning steps are returned as distinct output items, separate from the final text response. You can access them like this:
+## Read returned reasoning
 
-```go
-resp, err := model.NewResponses(ctx, request)
-if err != nil {
-    panic(err)
-}
+Reasoning items are separate from assistant text. A provider may return a summary, opaque/encrypted continuation content, or no reasoning output. A summary is not access to the model's full private reasoning.
 
-for _, output := range resp.Output {
-    if output.OfReasoning != nil {
-        fmt.Println("Reasoning Steps:")
-        for _, s := range output.OfReasoning.Summary {
-            fmt.Printf("- %s\n", s.Text)
-        }
-    }
-}
-```
+When manually continuing a conversation, preserve returned reasoning items using the typed message conversion. Request `IncludableReasoningEncryptedContent` only for providers that support it. Do not turn encrypted continuation content into user-visible text.
 
-### Streaming Reasoning
-
-When streaming, reasoning steps are emitted as chunks. You can detect when a reasoning item is completed.
-
-```go
-acc := ""
-for chunk := range stream {
-    if chunk.ChunkType() == "response.reasoning_summary_text.delta" {
-		acc += chunk.OfReasoningSummaryTextDelta.Delta
-    }
-}
-```
+Higher effort can increase latency and token consumption. Bound total output and request lifetime separately, and inspect provider-reported usage when available.

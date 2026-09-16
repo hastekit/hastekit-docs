@@ -1,274 +1,54 @@
 ---
-title: Temporal
-icon: stopwatch
+title: "Temporal agents"
+description: "Configure shared state and explicitly manage durable worker lifetime."
 ---
 
-Durable agent execution ensures that your agents can survive process crashes, restarts, or failures without losing progress. Using [Temporal](https://temporal.io), each step of the agent's execution (LLM calls, tool executions) is checkpointed, allowing the agent to resume from exactly where it left off after a failure.
+A durable agent keeps orchestration in Temporal history so completed steps can be recovered across worker failures. External calls can still repeat if their execution is retried; durable orchestration does not make arbitrary side effects exactly once.
 
-## Why Durable Execution?
+## Required infrastructure
 
-Traditional agents run in-memory. If your process crashes during:
-- A long-running LLM call
-- An external API request in a tool
-- A multi-step conversation with many tool calls
+Use a running Temporal service, a shared stream broker such as Redis, and persistence reachable by every worker that can handle a conversation. File history and memory brokers are not distributed stores.
 
-...all progress is lost, and the entire execution must restart from scratch.
+## Construct before serving
 
-With durable execution:
-- **Checkpoint Every Step**: Each LLM call and tool execution is automatically saved
-- **Automatic Recovery**: After a crash, the agent resumes from the last checkpoint
-- **Exactly-Once Guarantees**: Tool executions are never duplicated, even after retries
-- **Long-Running Workflows**: Agents can run for hours or days without risk
-
-## Prerequisites
-
-1. **Temporal Server**: You need a running Temporal server. Follow the [Temporal installation guide](https://docs.temporal.io/self-hosted-guide/quick-start) to set one up.
-
-2. **Redis Server**: Temporal agents require Redis for streaming support. Install and run Redis locally or use a hosted Redis service.
-
-## Creating a Durable Agent
-
-To make an agent durable with Temporal, create a Temporal runtime with `hastekit.NewTemporalRuntime` and attach it to the agent with `hastekit.WithRuntime`:
+This setup assumes `ctx` is cancelled at service shutdown, `model` is configured, and `sharedHistory` is your application's conversation manager:
 
 ```go
-package main
-
-import (
-    "log"
-    "net/http"
-    "os"
-
-    hastekit "github.com/hastekit/agent-sdk-go"
-)
-
-func main() {
-    client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
-        {
-            ProviderName: hastekit.ProviderOpenAI,
-            ApiKeys: []*hastekit.APIKeyConfig{
-                {
-                    Name:   "Key 1",
-                    APIKey: os.Getenv("OPENAI_API_KEY"),
-                },
-            },
-        },
-    })
-
-    model := client.Model("OpenAI/gpt-4o-mini")
-
-    // Create a Temporal runtime: (Temporal server endpoint, Redis endpoint)
-    rt, err := hastekit.NewTemporalRuntime("0.0.0.0:7233", "localhost:6379")
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    broker, err := hastekit.NewRedisStreamBroker("localhost:6379")
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    // Create a durable agent by attaching the runtime
-    agentName := "SampleAgent"
-    agent := hastekit.NewAgent(&hastekit.AgentConfig{
-        Name:        agentName,
-        Instruction: hastekit.NewPrompt("You are helpful assistant."),
-        LLM:         model,
-        History:     hastekit.NewFileHistory("./conversations"),
-    }, hastekit.WithRuntime(rt, broker))
-}
+broker, err := hastekit.NewRedisStreamBroker("localhost:6379", "", 0)
+if err != nil { return err }
+runtime, err := hastekit.NewTemporalRuntime("localhost:7233", broker)
+if err != nil { return err }
+defer runtime.Close()
+agent, err := hastekit.NewAgent(&hastekit.AgentConfig{
+    Name: "assistant", LLM: model,
+    Instruction: hastekit.NewPrompt("Help the user."),
+    History: sharedHistory,
+}, hastekit.WithRuntime(runtime))
+if err != nil { return err }
+_ = agent
+return runtime.Serve(ctx)
 ```
 
-## Deployment Options
+`NewAgent` registers its resolved configuration with the supplied runtime. `WithRuntime` accepts only the runtime; its broker comes from `Runtime.StreamBroker()`. Register every participating agent before calling `Serve`.
 
-There are two ways to deploy durable agents:
+The runtime constructor returns an error and does not start workers in the background. `Serve` blocks until cancellation or failure. In a service hosting HTTP and workers together, supervise both and propagate startup errors; do not discard a `Serve` error in an unobserved goroutine.
 
-### Option 1: Single Process (Development/Testing)
+## Temporal workers
 
-Run both the Temporal worker and the application code in the same process. This is simpler but less resilient since both components share the same process lifecycle.
+The high-level runtime polls `AgentWorkflowTaskQueue`. `Serve` registers workflow/activity implementations for the configured agents on that queue. Keep worker deployments consistent with the histories they may replay. Changing workflow behavior needs a compatible deployment/versioning strategy.
 
-```go
-func main() {
-    // ... client, runtime, and agent setup from above ...
+`Close` stops the worker and closes the Temporal client owned by this runtime. Caller-supplied history and broker resources remain caller-owned.
 
-    // Start the Temporal worker in a goroutine
-    rt.Start()
+This API runs **agents**. For explicit `pkg/workflow` graphs, use the separate [Temporal workflow executor](/hastekit-sdk/workflows/temporal).
 
-    // Start HTTP server for invoking the workflow
-    http.ListenAndServe(":8070", hastekit.NewHTTPHandler())
-}
-```
+## Invoke and observe
 
-With this setup:
-- The Temporal worker connects to the Temporal server at `0.0.0.0:7233`
-- Your application server runs on `http://localhost:8070`
-- Both are in the same process
+Call the same `agent.Run` or `agent.Execute` APIs as local agents. A caller-only process can use the lower-level invocation runtime while worker configurations live in the service process. The high-level constructor is convenient when one process owns configuration and worker startup.
 
-**Note**: If this process crashes, both components restart together. True durability requires separation (Option 2).
+Both callers and workers must connect to the same broker for event delivery and stop signaling. Omitting the broker is an error; there is no implicit memory broker for a configured durable runtime.
 
-### Option 2: Separate Processes (Production)
+## Cancellation and retries
 
-For production deployments, run the Temporal worker and application in separate processes. This provides true fault isolation—if your application crashes, the Temporal worker continues running and can recover the workflow.
+Use `Run` with a request context for caller-bound execution, or a streaming handle and `Stop` for a detached run. Stop flags travel through the shared broker to active operations. Middleware runs inside the durable activity/step and can repeat with it.
 
-#### Application Process
-
-```go
-// application/main.go
-package main
-
-import (
-    "log"
-    "net/http"
-    "os"
-
-    hastekit "github.com/hastekit/agent-sdk-go"
-)
-
-func main() {
-    client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
-        {
-            ProviderName: hastekit.ProviderOpenAI,
-            ApiKeys: []*hastekit.APIKeyConfig{
-                {
-                    Name:   "Key 1",
-                    APIKey: os.Getenv("OPENAI_API_KEY"),
-                },
-            },
-        },
-    })
-
-    model := client.Model("OpenAI/gpt-4o-mini")
-
-    rt, err := hastekit.NewTemporalRuntime("0.0.0.0:7233", "localhost:6379")
-    if err != nil {
-        log.Fatal(err)
-    }
-    broker, err := hastekit.NewRedisStreamBroker("localhost:6379")
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    // Register the agent with the runtime attached (but don't start the worker here)
-    agentName := "my-agent"
-    _ = hastekit.NewAgent(&hastekit.AgentConfig{
-        Name:        agentName,
-        Instruction: hastekit.NewPrompt("You are a helpful assistant."),
-        LLM:         model,
-        History:     hastekit.NewFileHistory("./conversations"),
-    }, hastekit.WithRuntime(rt, broker))
-
-    // Start application server (no Temporal worker here)
-    log.Println("Application server starting on :8070")
-    http.ListenAndServe(":8070", hastekit.NewHTTPHandler())
-}
-```
-
-#### Temporal Worker Process
-
-```go
-// temporal-worker/main.go
-package main
-
-import (
-    "log"
-    "os"
-
-    hastekit "github.com/hastekit/agent-sdk-go"
-)
-
-func main() {
-    client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
-        {
-            ProviderName: hastekit.ProviderOpenAI,
-            ApiKeys: []*hastekit.APIKeyConfig{
-                {
-                    Name:   "Key 1",
-                    APIKey: os.Getenv("OPENAI_API_KEY"),
-                },
-            },
-        },
-    })
-
-    model := client.Model("OpenAI/gpt-4o-mini")
-
-    rt, err := hastekit.NewTemporalRuntime("0.0.0.0:7233", "localhost:6379")
-    if err != nil {
-        log.Fatal(err)
-    }
-    broker, err := hastekit.NewRedisStreamBroker("localhost:6379")
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    // Register the SAME agent with the SAME configuration
-    agentName := "my-agent"
-    _ = hastekit.NewAgent(&hastekit.AgentConfig{
-        Name:        agentName,
-        Instruction: hastekit.NewPrompt("You are a helpful assistant."),
-        LLM:         model,
-        History:     hastekit.NewFileHistory("./conversations"),
-    }, hastekit.WithRuntime(rt, broker))
-
-    // Start only the Temporal worker
-    log.Println("Temporal worker starting...")
-    rt.Start()
-
-    // Block forever (worker runs in background goroutine)
-    select {}
-}
-```
-
-**Important**: Both processes must register the agent with the **exact same name and configuration**. This ensures the Temporal worker can execute the agent with the correct setup.
-
-#### Running the Services
-
-```bash
-# Terminal 1: Start the Temporal worker
-cd temporal-worker
-go run main.go
-
-# Terminal 2: Start the application
-cd application
-go run main.go
-```
-
-## Starting the Temporal Server
-
-If you don't have a Temporal server running, you can start one locally using Docker:
-
-```bash
-# Using Temporal CLI (recommended for development)
-temporal server start-dev
-
-# Or using Docker Compose
-git clone https://github.com/temporalio/docker-compose.git
-cd docker-compose
-docker compose up
-```
-
-The Temporal server will be available at:
-- **gRPC endpoint**: `localhost:7233` (for workers and clients)
-- **Web UI**: `http://localhost:8233` (for monitoring workflows)
-
-## Starting Redis
-
-Redis is required for streaming support in Temporal agents:
-
-```bash
-# Using Docker
-docker run -d --name redis -p 6379:6379 redis
-
-# Or using Homebrew on macOS
-brew install redis
-brew services start redis
-```
-
-## Example: Complete Durable Agent
-
-See the complete working example in the repository: [`examples/agents/9_temporal_agent/main.go`](https://github.com/hastekit/hastekit-docs/blob/master/examples/agents/9_temporal_agent/main.go)
-
-## Learn More
-
-- [Temporal Documentation](https://docs.temporal.io)
-- [Temporal Go SDK](https://docs.temporal.io/dev-guide/go)
-- [Temporal Self-Hosted Guide](https://docs.temporal.io/self-hosted-guide)
-- [Temporal Web UI](https://docs.temporal.io/web-ui)
+Pass only serializable state across execution boundaries. Keep database clients, MCP connectors, tools, and other dependencies on the worker, and pass per-run values through supported input/context mechanisms. Configure tracing in both the caller and worker processes.

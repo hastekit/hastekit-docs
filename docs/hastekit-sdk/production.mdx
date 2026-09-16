@@ -1,0 +1,50 @@
+---
+title: "Production deployment"
+description: "Choose storage, lifecycle, execution, and observability boundaries deliberately."
+---
+
+A production deployment needs explicit ownership of persistence, credentials, execution lifetime, and HTTP access. The SDK supplies building blocks; it does not provision a database, authenticate your users, or configure a reverse proxy.
+
+## Select the execution model
+
+| Requirement | Use |
+|---|---|
+| Request-bound local work | `agent.Run` with a deadline |
+| Streaming that survives an HTTP disconnect | `agent.Execute` or AG-UI, plus an explicit stop path |
+| Recovery across worker failures | Temporal or Restate with compatible deployments |
+| Fixed application routing | A compiled Go/YAML workflow |
+| Long waits in a graph | The Temporal graph executor's durable timers |
+
+Do not equate persisted conversation history with durable execution of arbitrary tool code. Checkpoints and runtime histories record boundaries; external actions need idempotency when those boundaries can retry.
+
+## Persist the right state
+
+Use shared database persistence for agents spread across processes. Implement native transcript pagination to avoid loading entire histories for every UI page. Save tool state and run metadata, not only text.
+
+Memory brokers cannot deliver events or stops across processes. Use a shared broker for distributed callers and workers, and configure retention to cover expected reconnection windows. Expired stream replay is distinct from persisted conversation history.
+
+Use shared attachment storage wherever workers need to resolve media. The independent workflow HTTP handler's checkpoints are in memory per handler; build application-owned persisted checkpoint APIs if that is not sufficient.
+
+## Establish identity at the boundary
+
+Authenticate before invoking agents or resolving namespaces. Derive namespace and privileged run context from trusted identity. Restrict registered-agent access separately if not every user may invoke every agent.
+
+Treat tool arguments, retrieved pages, model output, uploaded files, and approval requests as data requiring application validation. Enforce permissions at tool execution, not only in prompts or behavioral annotations. Keep credentials out of model-visible output and minimize their presence in serialized state.
+
+## Bound resource use
+
+Configure request deadlines, output limits, loop/step caps, upload sizes, tool concurrency, and provider retry budgets. A model token budget does not bound an external API call, and an SSE idle timeout does not stop detached work.
+
+For HTTP, enforce body limits and disable stream buffering where needed. Avoid short write timeouts on long-lived SSE endpoints. Test client disconnects, stop requests, expired cursors, duplicate submissions, paused-run recovery, and worker failures.
+
+## Own startup and shutdown
+
+Create shared clients, history, stores, brokers, and telemetry once. Register agent/workflow definitions before starting workers. Supervise server and worker failures instead of discarding background goroutine errors.
+
+On shutdown, stop accepting new work, stop/drain workers and requests according to your policy, then close caller-owned resources and flush telemetry. Do not close shared history or attachment stores while a detached run can still use them.
+
+## Upgrade deliberately
+
+Pin module versions and retain representative persisted state in compatibility tests. Graph or tool changes can invalidate checkpoints; Temporal workflow changes can invalidate replay. Version incompatible definitions and keep the old implementation available until its in-flight work is resolved.
+
+Use the [migration guide](/hastekit-sdk/migration) for the public API names used throughout these docs.

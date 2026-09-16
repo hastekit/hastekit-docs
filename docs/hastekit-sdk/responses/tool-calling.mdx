@@ -1,123 +1,44 @@
 ---
-title: Tool Calling
-icon: wrench
+title: "Direct function calling"
+description: "Declare schemas and return matching results when you own the tool loop."
 ---
 
-Tool calling or function calling allows LLMs to interact with external systems by requesting the execution of specific functions. The HasteKit SDK provides a unified interface for defining tools and handling tool call requests from various LLM providers.
+Direct model requests advertise functions but do not execute them. Your application must inspect returned calls, validate and authorize arguments, perform the operation, append the result, and call the model again. For SDK-managed execution, use [agent function tools](/hastekit-sdk/agents/tools/function-tools).
 
-## Defining Tools
+## Advertise a function
 
-Tools are defined as part of the `responses.Request` struct using the `Tools` field.
+Add a schema to `responses.Request.Tools`:
 
 ```go
-// Define a function tool
-getWeatherTool := responses.ToolUnion{
-    OfFunction: &responses.FunctionTool{
-        Name:        "get_current_weather",
-        Description: utils.Ptr("Get the current weather in a given location"),
-        Parameters: map[string]any{
-            "type": "object",
-            "properties": map[string]any{
-                "location": map[string]any{
-                    "type":        "string",
-                    "description": "The city and state, e.g. San Francisco, CA",
-                },
-                "unit": map[string]any{
-                    "type": "string",
-                    "enum": []string{"celsius", "fahrenheit"},
-                },
-            },
-            "required": []string{"location"},
-        },
+tool := responses.ToolUnion{OfFunction: &responses.FunctionTool{
+    Name: "lookup_order",
+    Description: utils.Ptr("Read the current status of an order."),
+    Parameters: map[string]any{
+        "type": "object",
+        "properties": map[string]any{"order_id": map[string]any{"type": "string"}},
+        "required": []string{"order_id"},
+        "additionalProperties": false,
     },
-}
+}}
 ```
 
----
+## Process the call
 
-## Making a Request with Tools
+A returned `OutputMessageUnion.OfFunctionCall` carries `Name`, `Arguments` as a JSON string, and `CallID`. Dispatch only recognized functions. Check arguments against your application rules and the caller's permissions before touching an external system.
 
-Include the defined tools in your request to the model.
+Append the model's output items to the next input using `AsInput`, then append one matching `OfFunctionCallOutput` per call. Given `call` as the returned function call and `output` as the serialized application result:
 
 ```go
-resp, err := model.NewResponses(ctx, &responses.Request{
-    Input: responses.InputUnion{
-        OfString: utils.Ptr("What's the weather like in Paris?"),
-    },
-    Tools: []responses.ToolUnion{getWeatherTool},
-})
+message := responses.InputMessageUnion{OfFunctionCallOutput: &responses.FunctionCallOutputMessage{
+    CallID: call.CallID,
+    Output: responses.FunctionCallOutputContentUnion{OfString: utils.Ptr(output)},
+}}
 ```
 
-### Handling Tool Calls
+Use the model's call ID, not a newly generated value. Retain all output items required for continuation, including reasoning. Continue until the model returns a final answer or your application's loop budget is exhausted.
 
-You can iterate through the `Output` list to find any requested tool calls.
+## Failure behavior
 
-```go
-for _, output := range resp.Output {
-    // Check if the output item is a function call
-    if output.OfFunctionCall != nil {
-        fnCall := output.OfFunctionCall
-        fmt.Printf("Model requested tool: %s\n", fnCall.Name)
-        fmt.Printf("Arguments: %s\n", fnCall.Arguments)
-        
-        // Execute your local logic here...
-    }
-}
-```
+Decide which failures can be returned to the model as tool results and which must stop the run. Avoid returning credentials, stack traces, or privileged internal data in tool output. Bound tool concurrency, execution time, and the number of model/tool rounds yourself.
 
-### Streaming Tool Calls
-
-The following example demonstrates how to detect and process a tool call request from a streaming response.
-
-```go
-import (
-    "fmt"
-    "github.com/hastekit/agent-sdk-go/pkg/gateway/llm/responses"
-)
-
-// ... request initialization with Tools ...
-
-stream, err := model.NewStreamingResponses(ctx, request)
-if err != nil {
-    panic(err)
-}
-
-for chunk := range stream {
-    // Detect when an output item is completed
-    if chunk.ChunkType() == "response.output_item.done" {
-        item := chunk.OfOutputItemDone.Item
-        
-        // Check if the completed item is a function call
-        if item.Type == "function_call" {
-            fmt.Printf("Model requested tool: %s\n", *item.Name)
-            fmt.Printf("Arguments: %s\n", *item.Arguments)
-            
-            // Execute your local logic here...
-        }
-    }
-}
-```
-
-## Returning Tool Results
-
-After executing the requested tool, you can send the results back to the model to continue the conversation. Use the `OfFunctionCallOutput` message type in the `InputMessageList`.
-
-```go
-resp, err := model.NewResponses(ctx, &responses.Request{
-    Input: responses.InputUnion{
-        OfInputMessageList: responses.InputMessageList{
-            // ... original user message ...
-            // ... original tool call request from model ...
-            {
-                OfFunctionCallOutput: &responses.FunctionCallOutputMessage{
-                    CallID: "call_123", // Must match the ID from the request
-                    Output: responses.FunctionCallOutputContentUnion{
-                        OfString: utils.Ptr(`{"temperature": 22, "condition": "Sunny"}`),
-                    },
-                },
-            },
-        },
-    },
-})
-```
-
+A direct function schema does not provide approvals, persistent tool state, or retry-safe execution. Those are responsibilities of your loop or the higher-level agent APIs.

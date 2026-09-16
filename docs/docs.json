@@ -46,101 +46,89 @@
             "icon": "golang",
             "groups": [
               {
-                "group": "Getting started",
-                "icon": "rocket",
+                "group": "Start here",
                 "pages": [
                   "hastekit-sdk/introduction",
-                  "hastekit-sdk/setting-up",
-                  "hastekit-sdk/multiple-keys",
-                  "hastekit-sdk/tracing"
+                  "hastekit-sdk/setting-up"
                 ]
               },
               {
-                "group": "LLM Gateway",
-                "icon": "route",
-                "expanded": true,
+                "group": "Agents",
                 "pages": [
-                  {
-                    "group": "Responses",
-                    "icon": "comment-dots",
-                    "pages": [
-                      "hastekit-sdk/responses/responses-api",
-                      "hastekit-sdk/responses/text-generation",
-                      "hastekit-sdk/responses/image-generation",
-                      "hastekit-sdk/responses/tool-calling",
-                      "hastekit-sdk/responses/reasoning",
-                      "hastekit-sdk/responses/structured-output",
-                      "hastekit-sdk/responses/web-search-tool",
-                      "hastekit-sdk/responses/code-execution-tool"
-                    ]
-                  },
+                  "hastekit-sdk/agents/simple-agent",
+                  "hastekit-sdk/agents/system-instruction",
+                  "hastekit-sdk/agents/skills",
+                  "hastekit-sdk/agents/hooks",
+                  "hastekit-sdk/agents/tools/agent-as-a-tool",
+                  "hastekit-sdk/agents/multi-agents/handoff"
+                ]
+              },
+              {
+                "group": "Tools and integrations",
+                "pages": [
+                  "hastekit-sdk/agents/tools/function-tools",
+                  "hastekit-sdk/agents/tools/mcp-tools",
+                  "hastekit-sdk/agents/tools/deferred-tools",
+                  "hastekit-sdk/agents/tools/human-in-the-loop",
+                  "hastekit-sdk/agents/tools/background-tools",
+                  "hastekit-sdk/agents/tools/sandbox-tool"
+                ]
+              },
+              {
+                "group": "State and files",
+                "pages": [
+                  "hastekit-sdk/agents/conversations/history",
+                  "hastekit-sdk/agents/conversations/summarization",
+                  "hastekit-sdk/agents/attachments"
+                ]
+              },
+              {
+                "group": "Serving agents",
+                "pages": [
+                  "hastekit-sdk/agents/serving-agents/serving-agents-agui",
+                  "hastekit-sdk/agents/serving-agents/serving-agents-http",
+                  "hastekit-sdk/agents/durable/temporal",
+                  "hastekit-sdk/agents/durable/restate"
+                ]
+              },
+              {
+                "group": "Workflows",
+                "pages": [
+                  "hastekit-sdk/workflows/introduction",
+                  "hastekit-sdk/workflows/yaml",
+                  "hastekit-sdk/workflows/built-in-nodes",
+                  "hastekit-sdk/workflows/defining-nodes",
+                  "hastekit-sdk/workflows/edges-and-branching",
+                  "hastekit-sdk/workflows/running-workflows",
+                  "hastekit-sdk/workflows/pausing-and-resuming",
+                  "hastekit-sdk/workflows/agent-tools",
+                  "hastekit-sdk/workflows/http",
+                  "hastekit-sdk/workflows/temporal"
+                ]
+              },
+              {
+                "group": "Model APIs",
+                "pages": [
+                  "hastekit-sdk/multiple-keys",
+                  "hastekit-sdk/responses/responses-api",
+                  "hastekit-sdk/responses/text-generation",
+                  "hastekit-sdk/responses/tool-calling",
+                  "hastekit-sdk/responses/structured-output",
+                  "hastekit-sdk/responses/reasoning",
+                  "hastekit-sdk/responses/image-generation",
+                  "hastekit-sdk/responses/web-search-tool",
+                  "hastekit-sdk/responses/code-execution-tool",
                   "hastekit-sdk/embeddings/embeddings",
                   "hastekit-sdk/speech/speech",
                   "hastekit-sdk/speech/transcription"
                 ]
               },
               {
-                "group": "Agents",
-                "icon": "robot",
-                "expanded": true,
+                "group": "Operate and upgrade",
                 "pages": [
-                  "hastekit-sdk/agents/simple-agent",
-                  "hastekit-sdk/agents/system-instruction",
-                  "hastekit-sdk/agents/skills",
-                  "hastekit-sdk/agents/hooks",
-                  {
-                    "group": "Conversations",
-                    "icon": "comments",
-                    "expanded": true,
-                    "pages": [
-                      "hastekit-sdk/agents/conversations/history",
-                      "hastekit-sdk/agents/conversations/summarization"
-                    ]
-                  },
-                  {
-                    "group": "Tools",
-                    "icon": "screwdriver-wrench",
-                    "expanded": true,
-                    "pages": [
-                      "hastekit-sdk/agents/tools/function-tools",
-                      "hastekit-sdk/agents/tools/mcp-tools",
-                      "hastekit-sdk/agents/tools/deferred-tools",
-                      "hastekit-sdk/agents/tools/sandbox-tool",
-                      "hastekit-sdk/agents/tools/human-in-the-loop"
-                    ]
-                  },
-                  {
-                    "group": "Multi Agents",
-                    "icon": "sitemap",
-                    "expanded": true,
-                    "pages": [
-                      "hastekit-sdk/agents/tools/agent-as-a-tool",
-                      "hastekit-sdk/agents/multi-agents/handoff"
-                    ]
-                  },
-                  "hastekit-sdk/agents/serving-agents/serving-agents-http",
-                  "hastekit-sdk/agents/serving-agents/serving-agents-agui",
-                  {
-                    "group": "Durable Execution",
-                    "icon": "shield-halved",
-                    "expanded": true,
-                    "pages": [
-                      "hastekit-sdk/agents/durable/restate",
-                      "hastekit-sdk/agents/durable/temporal"
-                    ]
-                  }
-                ]
-              },
-              {
-                "group": "Workflows",
-                "icon": "diagram-project",
-                "expanded": true,
-                "pages": [
-                  "hastekit-sdk/workflows/introduction",
-                  "hastekit-sdk/workflows/defining-nodes",
-                  "hastekit-sdk/workflows/edges-and-branching",
-                  "hastekit-sdk/workflows/running-workflows",
-                  "hastekit-sdk/workflows/pausing-and-resuming"
+                  "hastekit-sdk/production",
+                  "hastekit-sdk/tracing",
+                  "hastekit-sdk/migration"
                 ]
               }
             ]

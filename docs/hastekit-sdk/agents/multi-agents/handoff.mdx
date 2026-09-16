@@ -1,138 +1,28 @@
 ---
-title: Agent Handoff
-icon: arrow-right-arrow-left
+title: "Agent handoffs"
+description: "Transfer control to a specialist within the current conversation."
 ---
 
-Agent handoff enables a one agent to delegate tasks to others agents based on the user's request. This pattern is useful for building multi-agent systems where different agents have specific capabilities, and a central agent routes requests to the appropriate specialist.
+A handoff changes which agent executes the current run. The specialist works in the same conversation/run context rather than returning an ordinary tool result to a parent.
 
-## Overview
+## Configure a handoff
 
-Handoffs allow you to:
-- **Route requests**: A router agent analyzes user input and delegates to the right specialist
-- **Specialize agents**: Create focused agents for specific tasks (jokes, facts, code, etc.)
-- **Share conversation context**: Handoff agents can share conversation history for continuity
-- **Build hierarchical systems**: Combine multiple specialists under one entry point
-
-Unlike [Agent as a Tool](/hastekit-sdk/agents/tools/agent-as-a-tool) where the parent agent calls sub-agents as tools and continues processing, handoffs transfer control entirely to the target agent, which then responds directly to the user.
-
-## Creating a Handoff
-
-To create a handoff, use `agents.NewHandoff()` with the target agent:
+With `specialist` already created, add this to the router's `AgentConfig`:
 
 ```go
-import (
-    "github.com/hastekit/agent-sdk-go/pkg/agents"
-)
-
-// Create a specialized agent
-jokeAgent := hastekit.NewAgent(&hastekit.AgentConfig{
-    Name:        "JokeAgent",
-    Instruction: hastekit.NewPrompt("You are a joke teller"),
-    LLM:         model,
-    History:     hastekit.NewFileHistory("./conversations"),
-})
-
-// Create a handoff to this agent
-handoff := agents.NewHandoff(
-    jokeAgent.Name,                           // Name (used for routing)
-    "Use this agent to generate jokes",       // Description (helps router decide)
-    jokeAgent,                                // Target agent
-)
+Handoffs: []*hastekit.Handoff{
+    hastekit.NewHandoff("billing", "Handle invoices and billing questions.", specialist),
+},
 ```
 
-### NewHandoff Parameters
+Enable `prompts.ResolveHandoffs` in the router's instruction provider, usually through `prompts.DefaultResolvers()`, so the prompt describes the transfer options.
 
-| Parameter | Type | Description |
-| :--- | :--- | :--- |
-| **name** | `string` | Name of the handoff (typically matches the agent name) |
-| **desc** | `string` | Description that helps the router agent decide when to use this handoff |
-| **agent** | `*Agent` | The target agent that will handle the request |
+## Continue with a specialist
 
-## Using Handoffs with a Router Agent
+`StickyHandoff` controls whether subsequent runs entering through the original agent continue with the last specialist. Configure it deliberately and preserve conversation history for continuity. Build the handoff graph before starting durable workers; `AddHandoffs` updates the stored configuration as well as the local agent.
 
-Handoffs are configured on the router agent using the `Handoffs` field in `AgentConfig`:
+Keep tool authorization consistent across the agents that can own a conversation. Transferring control is not permission to cross a namespace or expand the user's access.
 
-```go
-routerAgent := hastekit.NewAgent(&hastekit.AgentConfig{
-    Name:        "RouterAgent",
-    Instruction: hastekit.NewPrompt("You are a router agent. You must not respond directly. Your role is only to delegate to other agents"),
-    LLM:         model,
-    Handoffs: []*agents.Handoff{
-        agents.NewHandoff(jokeAgent.Name, "Use this agent to generate jokes", jokeAgent),
-        agents.NewHandoff(factAgent.Name, "Use this agent to generate facts", factAgent),
-    },
-    History: hastekit.NewFileHistory("./conversations"),
-})
-```
+## Choose the right composition
 
-The router agent uses the handoff descriptions to determine which agent should handle each request. Write clear, specific descriptions to help the router make accurate routing decisions.
-
-## Complete Example
-
-Here's a complete example demonstrating a router agent that delegates to specialized joke and fact agents:
-
-```go
-package main
-
-import (
-    "log"
-    "net/http"
-    "os"
-
-    hastekit "github.com/hastekit/agent-sdk-go"
-    "github.com/hastekit/agent-sdk-go/pkg/agents"
-)
-
-func main() {
-    // Configure an LLM client
-    client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
-        {
-            ProviderName:  hastekit.ProviderOpenAI,
-            BaseURL:       "",
-            CustomHeaders: nil,
-            ApiKeys: []*hastekit.APIKeyConfig{
-                {
-                    Name:   "Key 1",
-                    APIKey: os.Getenv("OPENAI_API_KEY"),
-                },
-            },
-        },
-    })
-
-    // Create LLM model
-    model := client.Model("OpenAI/gpt-4.1-mini")
-
-    // Create specialized agents
-    jokeAgent := hastekit.NewAgent(&hastekit.AgentConfig{
-        Name:        "JokeAgent",
-        Instruction: hastekit.NewPrompt("You are a joke teller"),
-        LLM:         model,
-        History:     hastekit.NewFileHistory("./conversations"),
-    })
-
-    factAgent := hastekit.NewAgent(&hastekit.AgentConfig{
-        Name:        "FactAgent",
-        Instruction: hastekit.NewPrompt("You are a fact teller"),
-        LLM:         model,
-        History:     hastekit.NewFileHistory("./conversations"),
-    })
-
-    // Create router agent with handoffs
-    _ = hastekit.NewAgent(&hastekit.AgentConfig{
-        Name:        "RouterAgent",
-        Instruction: hastekit.NewPrompt("You are a router agent. You must not respond directly. Your role is only to delegate to other agents"),
-        LLM:         model,
-        Handoffs: []*agents.Handoff{
-            agents.NewHandoff(jokeAgent.Name, "Use this agent to generate jokes", jokeAgent),
-            agents.NewHandoff(factAgent.Name, "Use this agent to generate facts", factAgent),
-        },
-        History: hastekit.NewFileHistory("./conversations"),
-    })
-
-    // Serve the agents
-    err := http.ListenAndServe(":8070", hastekit.NewHTTPHandler())
-    if err != nil {
-        log.Fatal(err)
-    }
-}
-```
+Use a handoff for a support conversation that moves from a general router to a billing specialist. Use an [agent tool](/hastekit-sdk/agents/tools/agent-as-a-tool) when a parent asks a specialist a question and then incorporates its answer. Use an explicit [workflow](/hastekit-sdk/workflows/introduction) when routing must follow application-defined conditions rather than model decisions.

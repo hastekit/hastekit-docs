@@ -1,135 +1,34 @@
 ---
-title: Agent as a tool
-icon: users-gear
+title: "Agents as tools"
+description: "Delegate a bounded task and return the result to the calling agent."
 ---
 
-You can use an agent as a tool that another agent can call. This enables hierarchical agent architectures where specialized agents handle specific tasks, and a parent agent orchestrates them by calling these agent tools as needed.
+An agent tool runs a child agent and returns its answer to the parent as a tool result. The parent keeps control of the conversation and decides what to do next. Use a [handoff](/hastekit-sdk/agents/multi-agents/handoff) when the specialist should take over the run instead.
 
-## Creating an Agent Tool
+## Wrap a child agent
 
-To create an agent tool, you need to:
-
-1. Create a specialized agent that will act as the tool
-2. Wrap it using `tools.NewAgentTool` with a tool definition
+Given an already-created `researcher`, import `pkg/agents/tools`:
 
 ```go
-import (
-    hastekit "github.com/hastekit/agent-sdk-go"
-    "github.com/hastekit/agent-sdk-go/pkg/agents/tools"
-    "github.com/hastekit/agent-sdk-go/pkg/gateway/llm/responses"
-    "github.com/hastekit/agent-sdk-go/pkg/utils"
+researchTool := tools.NewAgentTool(
+    "research",
+    "Ask the research agent to investigate a topic.",
+    researcher,
+    tools.SubAgentContextModeIsolated,
 )
-
-// Create a specialized agent
-subAgent := hastekit.NewAgent(&hastekit.AgentConfig{
-    Name:        "User lookup agent",
-    Instruction: hastekit.NewPrompt("You are a helpful assistant that looks up user information."),
-    LLM:         model,
-})
-
-// Wrap the agent as a tool
-agentTool := tools.NewAgentTool("get_user_name", "Returns the user's name", subAgent, tools.SubAgentContextModeNone)
 ```
 
-### Parameters
+Add `researchTool` to the parent's `AgentConfig.Tools`. Construct the child with its own model, instructions, tool permissions, and history configuration.
 
-- **`name`**: The tool name exposed to the calling LLM.
-- **`description`**: A human-readable description of what the tool does.
-- **`agent`**: The agent instance that will be executed when the tool is called.
-- **`contextMode`**: Context mode for the agent tool.
-    - `SubAgentContextModeNone` - The thread id is derived from the LLM-provided `thread_id` argument. When it is empty, each invocation starts a fresh conversation; the LLM can pass back a returned thread id to continue an earlier one.
-    - `SubAgentContextModeIsolated` - A single sub-agent thread is stored and reused across calls, so invocations share and persist accumulated context within the session.
+| Context mode | Thread behavior |
+|---|---|
+| `SubAgentContextModeIsolated` | The integration manages a separate child conversation for the call |
+| `SubAgentContextModeNone` | The tool schema exposes an optional `thread_id` for selecting a child conversation |
 
-When the tool is called, the agent receives the tool's arguments as input and returns its output as the tool's result.
+An isolated thread is a conversation boundary, not a security sandbox. The child still executes with its configured tools and forwarded application context.
 
-## Using Agent Tools
+## Pauses and durable execution
 
-Once created, you can use the agent tool in another agent's tools list:
+If the child pauses, the wrapper returns the interruption through the parent and saves the continuation identifiers in tool state. Resume the parent using the standard interruption resolution flow. Keep the same child configuration available after the pause.
 
-```go
-// Create a parent agent that uses the agent tool
-agent := hastekit.NewAgent(&hastekit.AgentConfig{
-    Name:        "Main agent",
-    Instruction: hastekit.NewPrompt("You are a helpful assistant. Use the get_user_name tool when needed."),
-    LLM:         model,
-    Tools:       []hastekit.Tool{agentTool},
-})
-```
-
-## Complete Example
-
-Here's a complete example demonstrating an agent using another agent as a tool:
-
-```go
-package main
-
-import (
-	"context"
-	"fmt"
-	"log"
-	"os"
-
-	"github.com/bytedance/sonic"
-	hastekit "github.com/hastekit/agent-sdk-go"
-	"github.com/hastekit/agent-sdk-go/pkg/agents"
-	"github.com/hastekit/agent-sdk-go/pkg/agents/history"
-	"github.com/hastekit/agent-sdk-go/pkg/agents/tools"
-	"github.com/hastekit/agent-sdk-go/pkg/gateway/llm/responses"
-)
-
-func main() {
-	// Initialize LLM client
-    client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
-        {
-            ProviderName: hastekit.ProviderOpenAI,
-            ApiKeys: []*hastekit.APIKeyConfig{
-                {
-                    Name:   "Key 1",
-                    APIKey: os.Getenv("OPENAI_API_KEY"),
-                },
-            },
-        },
-    })
-
-	// Bind a model
-	model := client.Model("OpenAI/gpt-4o-mini")
-
-	// Create a specialized agent that will act as a tool
-	subAgent := hastekit.NewAgent(&hastekit.AgentConfig{
-		Name:        "Hello world agent",
-		Instruction: hastekit.NewPrompt("You are helpful assistant."),
-		LLM:         model,
-	})
-
-	// Wrap the agent as a tool
-	agentTool := tools.NewAgentTool("get_user_name", "Returns the user's name", subAgent, tools.SubAgentContextModeNone)
-
-	// Create the main agent that uses the agent tool
-	agent := hastekit.NewAgent(&hastekit.AgentConfig{
-		Name:        "Hello world agent",
-		Instruction: hastekit.NewPrompt("You are helpful assistant."),
-		LLM:         model,
-		Tools:       []hastekit.Tool{agentTool},
-	})
-
-	// Execute the main agent
-	handle, err := agent.Execute(context.Background(), &agents.AgentInput{
-		Message: history.Message{
-            Messages: []responses.InputMessageUnion{
-			    responses.UserMessage("Hello!"),
-			},
-		},
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-	out, err := handle.Result()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	b, _ := sonic.Marshal(out)
-	fmt.Println(string(b))
-}
-
-```
+Register all participating agent configurations with a durable runtime before starting its workers. When returning a result to the parent, account for the additional model calls, tool calls, and token usage caused by delegation.

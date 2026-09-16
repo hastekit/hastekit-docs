@@ -1,312 +1,84 @@
 ---
-title: Serving Agents over AG-UI
-icon: window-maximize
-description: Expose agents over the AG-UI protocol and get a ready-made browser chat client for free
+title: "AG-UI and embedded chat"
+description: "Serve chat, scoped history, run controls, and resumable event streams."
 ---
 
-The `pkg/agui` package serves your agents over the [AG-UI protocol](https://docs.ag-ui.com) — the same wire format CopilotKit and `@ag-ui/client` speak. You get streaming assistant text, reasoning, tool calls, conversation threads, and human-in-the-loop approvals over a single SSE endpoint, plus an optional embedded chat UI so you can talk to an agent in the browser without building a frontend.
+The AG-UI handler exposes registered agents through HTTP and server-sent events. The embedded chat client uses the same endpoints; you can also bring your own AG-UI client.
 
-There are three layers, from highest to lowest level:
+## Mount the embedded UI
 
-| Use | Function |
-| --- | --- |
-| Ship a browser chat UI with zero frontend work | `web.Serve` / `web.Handler` (`pkg/agui/web`) |
-| Expose every registered agent to external AG-UI clients | `agui.NewHandler` (`pkg/agui`) |
-| Mount a single agent's run endpoint on your own mux | `agui.AgentHandler` (`pkg/agui`) |
-
-`*hastekit.AgentRegistry` satisfies the `agui.Registry` interface (`Agent(name)` + `AgentNames()`), so you pass one to any of these. Agents register into a package-global registry when you create them with `hastekit.NewAgent`, so a zero-value `&hastekit.AgentRegistry{}` already sees every agent.
-
-## Embedded chat UI
-
-The fastest way to interact with an agent. `web.Serve` mounts a ready-made CopilotKit chat client and the AG-UI protocol endpoints on the same address:
+With `agent` constructed, import `github.com/hastekit/agent-sdk-go/pkg/agui/web`:
 
 ```go
-package main
-
-import (
-	"log"
-	"os"
-
-	hastekit "github.com/hastekit/agent-sdk-go"
-	"github.com/hastekit/agent-sdk-go/pkg/agui/web"
-)
-
-func main() {
-	client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
-		{
-			ProviderName: hastekit.ProviderOpenAI,
-			ApiKeys: []*hastekit.APIKeyConfig{
-				{Name: "Key 1", APIKey: os.Getenv("OPENAI_API_KEY")},
-			},
-		},
-	})
-
-	hastekit.NewAgent(&hastekit.AgentConfig{
-		Name:        "Assistant",
-		Instruction: hastekit.NewPrompt("You are a helpful assistant."),
-		LLM:         client.Model("OpenAI/gpt-4.1-mini"),
-	})
-
-	// Serves the chat UI and the AG-UI endpoints on :8080.
-	if err := web.Serve(":8080", &hastekit.AgentRegistry{}); err != nil {
-		log.Fatal(err)
-	}
+registry := hastekit.NewRegistry()
+if err := registry.Register(agent); err != nil { return err }
+server := &http.Server{
+    Addr: ":8080",
+    Handler: web.Handler(registry),
+    ReadHeaderTimeout: 5 * time.Second,
 }
+return server.ListenAndServe()
 ```
 
-Open `http://localhost:8080`. The default UI lists registered agents, shows a sidebar of prior conversations to resume, streams assistant text / reasoning / tool calls live, and renders approval cards inline for human-in-the-loop pauses.
+The UI is served at `/`, with a basic fallback at `/basic.html`. API routes are mounted under `/api/agui`. Static assets are embedded in the binary, so applications importing the package do not need to build the frontend themselves.
 
-`web.Handler(registry, opts...)` returns the same surface as an `http.Handler` for mounting into an existing server. It serves:
+For endpoints without the UI, use `agui.NewHandler(registry)`. The route table below is relative to that handler; prepend `/api/agui` when using `web.Handler`.
 
-| Path | Description |
-| --- | --- |
-| `GET /` | Embedded CopilotKit chat UI |
-| `GET /basic.html` | Offline, zero-dependency fallback UI (no CDN) |
-| `GET /api/agui/agents` | Registered agent names |
-| `POST /api/agui/agents/{name}/run` | AG-UI run endpoint (SSE) |
-| `POST /api/agui/agents/{name}/stop` | Stop a run in flight |
-| `GET /api/agui/agents/{name}/threads` | Conversation list |
-| `GET /api/agui/agents/{name}/threads/{thread}/messages` | Thread history |
-| `GET /api/agui/agents/{name}/threads/{thread}/stream` | Rejoin a run in flight |
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/agents` | Agent names and handler capabilities |
+| POST | `/agents/{agent}/run` | Start a run, or deliver a message to an active thread |
+| POST | `/agents/{agent}/stop` | Stop the resolved thread's active run |
+| GET | `/agents/{agent}/threads` | List stored threads |
+| GET | `/agents/{agent}/threads/{thread}/messages` | Read a page of history |
+| GET | `/agents/{agent}/threads/{thread}/stream` | Replay and follow a thread stream |
+| GET | `/agents/{agent}/runs` | Run lifecycle event feed |
 
-The protocol endpoints are mounted under `/api/agui` (exported as `web.APIPrefix`), so external AG-UI clients can target them too — the embedded UIs are just two more consumers.
+## Resolve a namespace
 
-## Protocol handler
+All namespace-scoped operations use one namespace resolved from the request. Configure `agui.WithNamespaceResolver` on the protocol or embedded handler. The resolver should read identity already established by your authentication layer; it must be safe for concurrent requests.
 
-If you have your own frontend (CopilotKit's `HttpAgent`, raw `@ag-ui/client`, or a custom SSE consumer), serve just the protocol with `agui.NewHandler`:
+A nil resolver, or a blank result, selects `default`. A resolver error returns HTTP 403. There is no `WithNamespace` option and no additional cross-namespace authorization callback. A request cannot opt into another namespace by choosing a thread or stream ID.
 
-```go
-import "github.com/hastekit/agent-sdk-go/pkg/agui"
+The embedded UI needs no namespace selector and can use `default`. For a tenant-aware deployment, resolve the tenant server-side from the authenticated request. Namespace partitioning does not itself authenticate users or restrict which registered agent names they may use.
 
-// ... create the client and register agents with hastekit.NewAgent ...
+## Start and stop
 
-http.ListenAndServe(":8080", agui.NewHandler(&hastekit.AgentRegistry{}))
-```
-
-### Routes
-
-| Method & Path | Description |
-| --- | --- |
-| `GET /agents` | List registered agent names, plus a `full_history` flag |
-| `POST /agents/{agent}/run` | Run the agent; SSE stream of AG-UI events from a `RunAgentInput` body |
-| `POST /agents/{agent}/stop` | Stop a run already streaming, by its stream id |
-| `GET /agents/{agent}/threads` | Stored conversation threads, newest first |
-| `GET /agents/{agent}/threads/{thread}/messages` | Thread history as AG-UI messages |
-| `GET /agents/{agent}/threads/{thread}/stream` | Attach to a run in flight without starting one |
-
-`GET /agents` answers `{"agents": [...], "full_history": false}`. The flag tells a client whether this server needs the whole conversation on every run. It normally does not — the agent loads the thread itself from `threadId` — so a client that reads it can post just the new turn instead of re-uploading a thread that grows every time.
-
-The threads endpoints power conversation pickers. Listing requires the agent's persistence adapter to implement `history.ThreadLister` (the SDK's in-memory and file adapters do); when it doesn't, the listing endpoint answers `501` so clients can hide the picker. See [Conversation History](/hastekit-sdk/agents/conversations/history) for persistence setup.
-
-### Single agent
-
-To mount one agent's run endpoint on an existing mux, use `agui.AgentHandler`, which runs the agent for every `POST` regardless of path:
-
-```go
-mux.Handle("POST /my-agent/run", agui.AgentHandler(agent))
-```
-
-`AgentHandler` serves only the run endpoint — it has no route to carry a stop or a stream rejoin. Mount `NewHandler` for those, or call `agent.Stop(ctx, streamID)` from a route of your own.
-
-## Request body
-
-The run endpoint accepts the canonical AG-UI `RunAgentInput` body (camelCase field names):
-
-```go
-type RunAgentInput struct {
-	ThreadID       string         `json:"threadId"`       // required
-	RunID          string         `json:"runId,omitempty"`
-	State          any            `json:"state,omitempty"`
-	Messages       []Message      `json:"messages"`
-	Tools          []InputTool    `json:"tools,omitempty"`
-	Context        []InputContext `json:"context,omitempty"`
-	ForwardedProps any            `json:"forwardedProps,omitempty"`
-}
-```
-
-Each `Message` follows the AG-UI message shape:
-
-```go
-type Message struct {
-	ID         string     `json:"id"`
-	Role       string     `json:"role"`              // "user", "assistant", ...
-	Content    string     `json:"content,omitempty"`
-	Name       string     `json:"name,omitempty"`
-	ToolCalls  []ToolCall `json:"toolCalls,omitempty"`
-	ToolCallID string     `json:"toolCallId,omitempty"`
-}
-```
-
-A request must have a `threadId` and at least one of `messages` or an approval decision (see [Human-in-the-loop](#human-in-the-loop) below).
-
-```bash
-curl -N -X POST "http://localhost:8080/agents/Assistant/run" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "threadId": "thread-1",
-    "messages": [
-      { "id": "m1", "role": "user", "content": "Hello!" }
-    ]
-  }'
-```
-
-By default the handler extracts only the new trailing turn from `messages` and relies on the SDK's conversation persistence for prior history. Use [`WithFullHistory`](#options) if the client owns history and the agent has no persistence.
-
-### Grounding context
-
-`context` entries reach the model two ways.
-
-They are flattened into the run's `RunContext` so prompt templates can reference them: a `{description, value}` pair becomes `{{Context.<description>}}`, while `state` and `forwardedProps` are available as `{{State.x}}` and `{{ForwardedProps.y}}`. Inbound `X-*` and `Authorization` request headers land under `{{Header.x}}` (with `-` replaced by `_`), so a per-tenant token on the request is reachable from the prompt and from [hooks](/hastekit-sdk/agents/hooks) without threading it through by hand.
-
-They are *also* appended to the user message as a `<context>…</context>` block, so the model sees them even when the prompt does not template them:
-
-```
-<context>
-current page: /billing/invoices
-selected invoice: INV-4021
-</context>
-```
-
-<Note>These injected blocks are stripped again when a thread is read back through the messages endpoint, so a conversation picker shows the user what they actually typed rather than the grounding the client attached.</Note>
-
-<Warning>Template placeholders are only substituted if the prompt's resolver chain includes `prompts.ResolveTemplate` — see [Prompt resolvers](/hastekit-sdk/agents/system-instruction#prompt-resolvers). The `<context>` block is appended either way.</Warning>
-
-## Event stream
-
-The run endpoint responds with `Content-Type: text/event-stream` and emits canonical AG-UI events. It always starts with `RUN_STARTED` and always ends with `RUN_FINISHED` (or `RUN_ERROR`), synthesising the terminal event if the stream closes early so clients never hang. The main event types:
-
-| Group | Events |
-| --- | --- |
-| Run lifecycle | `RUN_STARTED`, `RUN_FINISHED`, `RUN_ERROR` |
-| Steps | `STEP_STARTED`, `STEP_FINISHED` |
-| Assistant text | `TEXT_MESSAGE_START`, `TEXT_MESSAGE_CONTENT`, `TEXT_MESSAGE_END`, `TEXT_MESSAGE_CHUNK` |
-| Reasoning | `REASONING_START`, `REASONING_MESSAGE_CONTENT`, `REASONING_END`, … |
-| Tool calls | `TOOL_CALL_START`, `TOOL_CALL_ARGS`, `TOOL_CALL_END`, `TOOL_CALL_RESULT`, `TOOL_CALL_CHUNK` |
-| State / messages | `STATE_SNAPSHOT`, `STATE_DELTA`, `MESSAGES_SNAPSHOT` |
-| Escape hatches | `RAW`, `CUSTOM` |
-
-Right after `RUN_STARTED`, the handler also emits a `CUSTOM` event carrying the broker `streamId`, `runId`, and `threadId` so a client can correlate the AG-UI run with the SDK's streaming surface — and so it has the stream id needed to [stop the run](#stopping-a-run).
-
-### HasteKit CUSTOM events
-
-AG-UI has no native event for some of what the SDK streams, so those surface as `CUSTOM` events under `hastekit.*` names:
-
-| Name | Carries |
-| --- | --- |
-| `hastekit.stream_id` | The broker `streamId`, `runId` and `threadId` |
-| `hastekit.tool_progress` | A tool's mid-execution [progress update](/hastekit-sdk/agents/tools/function-tools#reporting-progress) — `callId`, `toolName`, `progress`, `total`, `message` |
-| `hastekit.on_interrupt` | The pending calls a paused run is waiting on |
-| `hastekit.file_generated` | A file the run produced |
-| `hastekit.annotation` | Citations and other output annotations |
-
-Reasoning is streamed with the canonical `REASONING_*` events; when a thread is read back through the messages endpoint it rehydrates as a message with role `reasoning` instead, carrying `encryptedValue` for provider-encrypted reasoning.
-
-### Correlation headers
-
-The response sets these headers before the first event:
-
-- `X-Stream-Id` — the broker stream id (matches `handle.StreamID`)
-- `X-Agui-Run-Id` — the AG-UI run id (echoed from `runId`, or generated)
-- `X-Agui-Thread-Id` — the thread id from the request
-
-An idle connection receives a keep-alive SSE comment every 15 seconds (configurable) so reverse proxies don't reap it.
-
-## Options
-
-All three entry points (`web.Serve`, `web.Handler`, `agui.NewHandler`, `agui.AgentHandler`) accept the same options:
-
-- `agui.WithNamespace(ns)` — Conversation namespace (default `"default"`).
-- `agui.WithSenderID(id)` — Sender attribution for messages POSTed by AG-UI clients (default `"user"`).
-- `agui.WithFullHistory()` — Forward the client's complete message list into the run instead of only the trailing turn. Use this when the agent has no conversation persistence and the client owns history; with persistence enabled (the SDK default) it would duplicate prior turns in the thread on every POST.
-- `agui.WithKeepalive(d)` — SSE keep-alive comment interval (default `15s`).
-
-## Human-in-the-loop
-
-When an agent pauses on an [approval-gated tool](/hastekit-sdk/agents/tools/human-in-the-loop), the run ends with a `RUN_FINISHED` in a paused state and the client renders an approval card. To resume, the client POSTs back to the same `threadId` with the decision under `forwardedProps.command.resume` (CopilotKit's `useInterrupt` shape) — no new `messages` are required:
+A minimal AG-UI run body is:
 
 ```json
 {
-  "threadId": "thread-1",
-  "messages": [],
-  "forwardedProps": {
-    "command": {
-      "resume": {
-        "decisions": [
-          { "toolCallId": "call_xyz", "approved": true }
-        ]
-      }
-    }
-  }
+  "threadId": "thread-42",
+  "messages": [{"id": "message-1", "role": "user", "content": "Hello"}]
 }
 ```
 
-A flat `forwardedProps.hastekitApprovals` array with the same `{toolCallId, approved}` entries is also accepted for simpler clients. The handler maps these decisions onto the SDK's approval resume flow and continues the paused run.
+`runId` is optional. The handler returns `X-Agui-Run-Id`, `X-Agui-Thread-Id`, and `X-Stream-Id` when starting a stream. For cross-origin clients, expose the headers through your CORS policy if JavaScript needs to read them.
 
-### What counts as approval
+With SDK history enabled, post the new trailing turn. `WithFullHistory()` is for a client that is the source of truth for history; using it with persisted history duplicates prior turns.
 
-The zero value of a bool is a rejection, and silently discarding a submitted form is the worst possible default, so a decision is read in this order:
+To stop, POST `{"threadId":"thread-42"}` to the stop route. An optional `streamId` must match that thread in the resolved namespace. HTTP 202 means the stop was recorded, not that every external side effect has been reversed. A new message posted to a thread already running is queued and returns HTTP 204; keep reading its existing stream.
 
-1. An explicit `action` verb wins. Both this SDK's `approve`/`reject` and MCP's elicitation verbs (`accept`/`decline`/`cancel`) are accepted, so a frontend can forward an MCP-shaped answer unchanged.
-2. An explicit `approved` boolean.
-3. Otherwise, a decision carrying `content` is a submission, and therefore an approval — a form arriving with no verdict field means the user filled it in and pressed submit.
-4. Otherwise, a rejection.
+## Reconnect without duplicating events
 
-### Form elicitations
+Record the SSE `id` of the last successfully processed event. Rejoin the thread's stream with `Last-Event-ID: <id>`, or the `lastEventId` query parameter. The server resumes strictly after that event, then follows live events.
 
-When the pause is an [MCP form elicitation](/hastekit-sdk/agents/tools/mcp-tools#elicitation) rather than a plain approval, attach the filled form as `content`:
+Without a cursor, the endpoint replays the retained run from its opening event, including a completed run if retained. This is useful after a full reload. It is not an unlimited archive of the whole conversation; use the history endpoint for prior turns.
 
-```json
-{
-  "threadId": "thread-1",
-  "messages": [],
-  "forwardedProps": {
-    "command": {
-      "resume": {
-        "decisions": [
-          {
-            "toolCallId": "call_xyz",
-            "action": "accept",
-            "content": { "email": "alice@example.com", "team_size": 12 }
-          }
-        ]
-      }
-    }
-  }
-}
-```
+Invalid cursors, conflicting header/query values, and cursors for another stream return HTTP 400. A cursor whose required replay is no longer available returns HTTP 410. Reload persisted history and reconnect without the expired cursor. The embedded client handles reconnect cursors and history loading.
 
-Content rides through to the resuming tool. A rejected decision drops its content rather than delivering it — a declined form has no answer to pass on.
+Shared replay and stop behavior across replicas requires a shared broker. A memory broker only knows events in its process. See [durable execution](/hastekit-sdk/agents/durable/temporal).
 
-## Stopping a run
+## Paginate history
 
-A run already streaming can't be stopped on its own connection — that connection is busy streaming — so stopping is a separate request keyed on the run's stream id (the `X-Stream-Id` response header, or the `streamId` `CUSTOM` event):
+Request `?limit=50`; the accepted range is 1–200 complete turns, with 50 as the default. Responses contain `threadId`, `messages`, `run`, `nextCursor`, and `hasMore`.
 
-```bash
-curl -X POST "http://localhost:8080/agents/Assistant/stop" \
-  -H "Content-Type: application/json" \
-  -d '{"streamId": "…"}'
-```
+Send `cursor=<nextCursor>` to fetch older turns. Messages inside each page are chronological; prepend older pages to the UI. Treat the cursor as opaque and keep it scoped to the original namespace/thread. The `run` field describes the latest pending interruption or background work even when fetching an older page.
 
-`?streamId=…` as a query parameter works too. The endpoint answers `202 Accepted` once the stop is recorded; the run winds down and ends on its own SSE connection with `RUN_FINISHED`, which is where a client should watch for the outcome.
+Thread listing requires `history.ThreadLister`; unsupported adapters return HTTP 501. Implement `history.TranscriptPageReader` for efficient database pagination.
 
-The stop travels through the agent's broker, so with a shared broker (Redis) it does not have to reach the replica holding the SSE connection. The agent in the path selects whose broker to ask; it is not an ownership check — the stream id is the capability, and only the client that started the run has it.
+## Deploy an SSE endpoint
 
-## Rejoining a run
+Disable proxy buffering for event streams and configure idle timeouts to allow keepalives. `agui.WithKeepalive` defaults to 15 seconds. Do not apply a short blanket HTTP write timeout that cuts off valid long runs.
 
-A thread streams on the same channel every turn, so a client that reloaded or navigated away can pick a run back up without having kept anything:
-
-```bash
-curl -N "http://localhost:8080/agents/Assistant/threads/thread-1/stream"
-```
-
-The broker replays what the run has emitted so far and then follows it live. Events carry the same ids as the run's own connection, because the run id comes off the replayed `run.created` chunk.
-
-A thread with no run in flight answers `204 No Content`, so a client can attach without checking first and without being left holding a stream nothing will ever publish to.
-
-## Steering a run in flight
-
-A turn POSTed for a thread that is *already running* folds into that run instead of starting a second one on the same channel. The server answers `204 No Content` — the caller gets no stream of its own, because the reply appears on the live run's stream, which it can already read or [rejoin](#rejoining-a-run).
-
-That is how a client steers: send the new turn and keep reading the stream it already has. The agent drains queued messages at iteration boundaries, and the mid-run arrival is marked for the model with a [steering notice](/hastekit-sdk/agents/conversations/history#steering-notices) so a correction shouted mid-task isn't mistaken for the instruction already being carried out.
-
-<Note>Folding requires a broker implementing `agents.RunClaimBroker`; the built-in memory and Redis brokers both do. With any other broker a concurrent POST starts its own run as before.</Note>
+Use the same persistence and broker infrastructure on replicas serving the same conversations. Add [attachment storage](/hastekit-sdk/agents/attachments) to enable uploads and previews. Traces are exported through [OpenTelemetry](/hastekit-sdk/tracing); an embedded trace browser is not currently provided.

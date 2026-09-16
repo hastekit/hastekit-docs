@@ -1,233 +1,42 @@
 ---
-title: Image Generation
-icon: image
+title: "Images and vision"
+description: "Send image inputs and handle generated media as typed output."
 ---
 
-If the downstream LLM provider supports image processing (vision) and generation capabilities, then HasteKit SDK also supports it.
+Vision input and image generation are separate capabilities. Configure a model that supports the operation and inspect its supported size, quality, and format options.
 
-## Image Processing
+## Send an image input
 
-Models that supports image processing or vision can understand images as input. You can attach images in either as a URL or as a base64 encoded string like this:
+Import `responses`, `constants`, and `utils` from the SDK. Given `model` and `ctx`:
 
 ```go
-resp, err := model.NewResponses(
-    context.Background(),
-    &responses.Request{
-        Instructions: utils.Ptr("Describe this image"),
-        Input: responses.InputUnion{
-            OfInputMessageList: responses.InputMessageList{
-                {
-                    OfEasyInput: &responses.EasyMessage{
-                        Role: constants.RoleUser,
-                        Content: responses.EasyInputContentUnion{
-                            OfString: utils.Ptr("Describe this image"),
-                        },
-                    },
-                },
-                {
-                    OfInputMessage: &responses.InputMessage{
-                        Role: constants.RoleUser,
-                        Content: responses.InputContent{
-                            {
-                                OfInputImage: &responses.InputImageContent{
-                                    // or https://picsum.photos/200/300
-                                    ImageURL: utils.Ptr("data:image/png;base64,yourbase64image"),
-                                    Detail:   "auto",
-                                },
-                            },
-                        },
-                    },
-                },
+response, err := model.NewResponses(ctx, &responses.Request{
+    Input: responses.InputUnion{OfInputMessageList: responses.InputMessageList{{
+        OfInputMessage: &responses.InputMessage{
+            Role: constants.RoleUser,
+            Content: responses.InputContent{
+                {OfInputText: &responses.InputTextContent{Text: "Describe this image."}},
+                {OfInputImage: &responses.InputImageContent{
+                    ImageURL: utils.Ptr("https://example.com/image.png"), Detail: "auto",
+                }},
             },
         },
-    },
-)
+    }}},
+})
+if err != nil { return err }
+_ = response
 ```
 
-## Image Generation
+Replace the illustrative URL with an accessible image. For application-owned files, use [attachment references](/hastekit-sdk/agents/attachments) with an agent attachment middleware. An `attachment://` reference is opaque SDK state, not a public URL that a direct provider call can fetch.
 
-To enable image generation, include the `ImageGenerationTool` in your request's `Tools` array:
+## Generate an image
 
-```go
-resp, err := model.NewResponses(
-    context.Background(),
-    &responses.Request{
-        Input: responses.InputUnion{
-            OfString: utils.Ptr("Generate a beautiful sunset over mountains"),
-        },
-        Tools: []responses.ToolUnion{
-            {
-                OfImageGeneration: &responses.ImageGenerationTool{},
-            },
-        },
-    },
-)
-```
+For generation through a compatible Responses model, add `Tools: []responses.ToolUnion{{OfImageGeneration: &responses.ImageGenerationTool{}}}` to the request. The completed `OfImageGenerationCall` item carries the result. Do not assume an image appears in a text delta.
 
-The `ImageGenerationTool` accepts the following options:
+For a dedicated image endpoint, call `model.NewImageGeneration` with `image_generation.Request`. The result's `Images` entries may contain base64 data or URLs; inspect the populated field and MIME type. `NewImageEdit` is a separate operation for editing input images.
 
-- **`Size`** (`string`): Image dimensions, e.g. `"1024x1024"`.
-- **`Quality`** (`string`): Image quality, e.g. `"high"` or `"medium"`.
+## Store and display results
 
-```go
-OfImageGeneration: &responses.ImageGenerationTool{
-    Size:    "1024x1024",
-    Quality: "high",
-},
-```
+Decode base64 with error checking and preserve the returned media type instead of guessing a file extension. Provider URLs may have limited lifetimes. Store media under your application's retention/access policy if later conversation turns need it.
 
----
-
-### Image Generation Responses
-
-When the model generates an image, it returns an `ImageGenerationCallMessage` in the response output. This message contains the generated image as base64-encoded data.
-
-```go
-import (
-    "context"
-    "encoding/base64"
-    "fmt"
-    "os"
-    "github.com/hastekit/agent-sdk-go/pkg/gateway/llm/responses"
-    "github.com/hastekit/agent-sdk-go/pkg/utils"
-)
-
-func main() {
-    // ... client initialization ...
-
-    resp, err := model.NewResponses(context.Background(), &responses.Request{
-        Input: responses.InputUnion{
-            OfString: utils.Ptr("Create an image of a serene lake at sunset"),
-        },
-        Tools: []responses.ToolUnion{
-            {
-                OfImageGeneration: &responses.ImageGenerationTool{},
-            },
-        },
-    })
-    if err != nil {
-        panic(err)
-    }
-
-    // Process the response
-    for _, output := range resp.Output {
-        if output.OfImageGenerationCall != nil {
-            imgCall := output.OfImageGenerationCall
-            
-            fmt.Printf("Image ID: %s\n", imgCall.ID)
-            fmt.Printf("Status: %s\n", imgCall.Status)
-            fmt.Printf("Format: %s\n", imgCall.OutputFormat)
-            fmt.Printf("Size: %s\n", imgCall.Size)
-            fmt.Printf("Quality: %s\n", imgCall.Quality)
-            
-            // Decode and save the image
-            if imgCall.Result != "" {
-                imageData, err := base64.StdEncoding.DecodeString(imgCall.Result)
-                if err != nil {
-                    panic(err)
-                }
-                
-                filename := fmt.Sprintf("generated_image.%s", imgCall.OutputFormat)
-                if err := os.WriteFile(filename, imageData, 0644); err != nil {
-                    panic(err)
-                }
-                
-                fmt.Printf("Image saved to %s\n", filename)
-            }
-        }
-    }
-}
-```
-
-### Streaming Image Generation
-
-When streaming, image generation progress is reported through different chunk types:
-
-- `response.image_generation_call.in_progress`: Generation has started
-- `response.image_generation_call.generating`: Image is being generated
-- `response.image_generation_call.partial_image`: Partial image data
-
-```go
-import (
-    "context"
-    "encoding/base64"
-    "fmt"
-    "os"
-    "github.com/hastekit/agent-sdk-go/pkg/gateway/llm/responses"
-    "github.com/hastekit/agent-sdk-go/pkg/utils"
-)
-
-func main() {
-    // ... client initialization ...
-
-    stream, err := model.NewStreamingResponses(context.Background(), &responses.Request{
-        Input: responses.InputUnion{
-            OfString: utils.Ptr("Generate a futuristic cityscape"),
-        },
-        Parameters: responses.Parameters{
-            Stream: utils.Ptr(true),
-        },
-        Tools: []responses.ToolUnion{
-            {
-                OfImageGeneration: &responses.ImageGenerationTool{
-                    Type:    "image_generation",
-                    Size:    "1024x1024",
-                    Quality: "high",
-                },
-            },
-        },
-    })
-    if err != nil {
-        panic(err)
-    }
-
-    var imageResult *responses.ImageGenerationCallMessage
-
-    for chunk := range stream {
-        // Check for image generation progress
-        if chunk.OfImageGenerationCallInProgress != nil {
-            fmt.Println("Image generation started...")
-        }
-        
-        if chunk.OfImageGenerationCallGenerating != nil {
-            fmt.Println("Generating image...")
-        }
-        
-        if chunk.OfImageGenerationCallPartialImage != nil {
-            partial := chunk.OfImageGenerationCallPartialImage
-            fmt.Printf("Received partial image chunk %d\n", partial.PartialImageIndex)
-            
-            // You can optionally decode and display partial images
-            if partial.PartialImageBase64 != "" {
-                // Handle partial image data if needed
-            }
-        }
-        
-        // Check for completed output items
-        if chunk.ChunkType() == "response.output_item.done" {
-            item := chunk.OfOutputItemDone.Item
-            if item.Type == "image_generation_call" {
-                // The image generation is complete
-				// Final image is available in chunk.OfOutputItemDone.Item.Result
-            }
-        }
-    }
-}
-```
-
-
-
-## Image Generation Message Structure
-
-The `ImageGenerationCallMessage` contains the following fields:
-
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| **Type** | `string` | Always `"image_generation_call"` |
-| **ID** | `string` | Unique identifier for the image (prefixed with `"ig_"`) |
-| **Status** | `string` | Status of generation (e.g., `"generating"`, `"completed"`) |
-| **Background** | `string` | Background type (e.g., `"opaque"`) |
-| **OutputFormat** | `string` | Image format (e.g., `"png"`, `"jpeg"`) |
-| **Quality** | `string` | Image quality (e.g., `"medium"`, `"high"`) |
-| **Size** | `string` | Image dimensions (e.g., `"1024x1024"`) |
-| **Result** | `string` | Base64-encoded image data |
+The attachment middleware externalizes complete generated images into immutable references before durable agent state stores them. It suppresses binary partial previews while preserving other streaming events. Without that middleware, provider-native image output continues through the SDK's normal response types.

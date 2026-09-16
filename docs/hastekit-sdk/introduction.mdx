@@ -1,99 +1,35 @@
 ---
-title: Introduction
-icon: circle-info
-description: Golang SDK for building LLM powered apps, AI agents, and orchestrating multi-agent workflows across multiple LLM providers.
+title: "Go SDK overview"
+description: "Build Go agents, call models, and execute explicit workflows."
 ---
 
-## HasteKit SDK
+The HasteKit Go SDK provides three layers you can use independently:
 
-A Golang SDK for developers who want fine-grained control over LLM interactions and agent orchestration. The HasteKit SDK abstracts away provider differences, letting you switch between OpenAI, Anthropic, Gemini and more with a single line change. Build agents, connect MCP tools, and get structured outputs—all through a unified API.
+| Layer | Use it when you need | Main API |
+|---|---|---|
+| Model calls | Direct control over requests, messages, and response events | `NewLLMClient`, `client.Model` |
+| Agents | A model that selects tools and continues until it answers or pauses | `NewAgent`, `agent.Run`, `agent.Execute` |
+| Workflows | An explicit graph with application-defined routing and checkpoints | `workflow.NewGraph`, `workflow.LoadYAML` |
 
-### Core Capabilities
+The SDK runs inside your Go application. A separately deployed HasteKit AI Gateway is optional; it is not required to call a provider directly or run an agent.
 
-<CardGroup cols={2}>
-  <Card title="Multi-Provider Support" icon="shuffle">
-    Access to multiple providers through a unified API. Seamlessly switch between OpenAI, Anthropic, Gemini, xAI, Bedrock, and more.
-  </Card>
-  <Card title="Agent SDK" icon="robot">
-    Build sophisticated AI agents with tools, MCP servers, conversation history, summarization, sub-agents, and skills.
-  </Card>
-  <Card title="Skills" icon="book-open">
-    Give agents folders of instructions they read only when a task calls for them, instead of paying for them every turn.
-  </Card>
-  <Card title="Hooks" icon="filter">
-    Intercept tool calls and model calls in one place for auth, budgets, quotas, and audit.
-  </Card>
-  <Card title="Human-in-the-loop" icon="person">
-    Integrate human feedback into agent workflows for review, approval, and form-filling.
-  </Card>
-  <Card title="Durable Execution" icon="helmet-safety">
-    Create durable agents that can pause, resume, and recover from failures. Powered by Temporal and Restate.
-  </Card>
-</CardGroup>
+## Start with a working agent
 
-### Example
+Follow the [installation and quickstart](/hastekit-sdk/setting-up), then add [function tools](/hastekit-sdk/agents/tools/function-tools) or [MCP tools](/hastekit-sdk/agents/tools/mcp-tools). Use [Run and stream](/hastekit-sdk/agents/simple-agent) to choose the execution and cancellation behavior your application needs.
 
-<Tabs>
-  <Tab title="LLM Calls">
-    Use the SDK as a lightweight wrapper to call any LLM provider. Simply change the `Provider` and `Model` to switch between providers—your application logic stays the same:
+## Build an application
 
-```go
-model := client.Model("OpenAI/gpt-4.1-mini") // or "Anthropic/claude-haiku-4-5" or "Gemini/gemini-2.5-flash"
-resp, _ := model.NewResponses(ctx, &responses.Request{
-    Instructions: utils.Ptr("You are a helpful assistant."),
-    Input: responses.InputUnion{
-        OfString: utils.Ptr("What is the capital of France?"),
-    },
-})
-```
-  </Tab>
-  <Tab title="Agents">
-    Create agents with tools, memory, and multi-step reasoning. Agents work the same way across all providers:
+- **Conversation state:** store messages and continue a thread with [history](/hastekit-sdk/agents/conversations/history).
+- **Human decisions:** require approval or collect form input with [interruptions](/hastekit-sdk/agents/tools/human-in-the-loop).
+- **HTTP and UI:** expose agents through [AG-UI](/hastekit-sdk/agents/serving-agents/serving-agents-agui), including the embedded chat UI.
+- **Files:** keep uploaded and generated media in [attachment storage](/hastekit-sdk/agents/attachments).
+- **Durable agents:** run with [Temporal](/hastekit-sdk/agents/durable/temporal) or [Restate](/hastekit-sdk/agents/durable/restate).
+- **Explicit orchestration:** build [workflows](/hastekit-sdk/workflows/introduction) in Go or YAML, then invoke them directly or expose them as tools.
 
-```go
-agent := hastekit.NewAgent(&hastekit.AgentConfig{
-    Name:        "Assistant",
-    Instruction: hastekit.NewPrompt("You are a helpful assistant."),
-    LLM:         client.Model("OpenAI/gpt-4o-mini"),
-})
+## Read examples correctly
 
-handle, _ := agent.Execute(ctx, &agents.AgentInput{
-    Message: history.Message{
-    	Messages: []responses.InputMessageUnion{
-            responses.UserMessage("Hello!"),
-        },
-    },
-})
-out, _ := handle.Result()
-```
-  </Tab>
-</Tabs>
+These guides describe the current SDK source. Pin the module version in your application and use documentation that matches that version. Examples use the root package with the alias `hastekit`; lower-level types live under `pkg/agents`, `pkg/gateway`, and `pkg/workflow`.
 
-<Card title="Get Started with the SDK →" icon="arrow-right" href="/hastekit-sdk/setting-up">
-  Install the SDK and make your first LLM call in under 5 minutes.
-</Card>
+Complete programs include `package main` and imports. Smaller snippets state the variables they assume and belong inside an application function unless they declare types or methods. Provider model IDs in examples are illustrative: configure a model available to your account that supports the requested capability.
 
----
-
-### Supported Providers
-
-| Provider | Text | Streaming | Tool Calling | Vision | Embeddings | Image Gen | Image Edit | Speech | Transcription |
-|----------|:----:|:---------:|:------------:|:------:|:----------:|:---------:|:----------:|:------:|:-------------:|
-| **OpenAI** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Anthropic** | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **Gemini** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **xAI** | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅¹ | ❌ |
-| **Bedrock** | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **ElevenLabs** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
-
-¹ Non-streaming only — xAI has no `NewStreamingSpeech`.
-
-**Text** is the [Responses API](/hastekit-sdk/responses/responses-api) (`NewResponses`), which is what agents use. OpenAI additionally implements the older Chat Completions API (`NewChatCompletion` / `NewStreamingChatCompletion`); no other provider does.
-
-`ProviderOllama` and `ProviderOpenRouter` are not in the table because their capabilities aren't the SDK's to state: both are served by the OpenAI-compatible client, so every method is wired up and each call is passed straight through. What actually answers depends on the endpoint and the model behind it. OpenRouter defaults to `https://openrouter.ai/api/v1`; Ollama needs an explicit `BaseURL` on its provider config.
-
-<Warning>
-A ❌ is not a graceful "unsupported" error. Unimplemented methods fall through to the embedded base provider, where the text and embedding methods **panic** and the media methods return `(nil, nil)` — so a call for a capability a provider doesn't have will either crash or hand back a silent nil. Check this table before reaching for a non-text method on a non-OpenAI provider.
-</Warning>
-
----
+A unified request shape does not mean every provider supports every field or tool. Consult the relevant feature guide before switching providers.

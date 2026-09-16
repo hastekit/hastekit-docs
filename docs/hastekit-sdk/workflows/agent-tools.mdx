@@ -1,0 +1,38 @@
+---
+title: "Workflows as agent tools"
+description: "Expose a compiled graph through the agent tool and interruption protocol."
+---
+
+`workflow.NewTool` wraps a Go-built or YAML-compiled graph as an `agents.Tool`. The model selects when to run it and supplies its arguments; the graph defines the steps inside that call.
+
+## Create the wrapper
+
+With `compiled` ready:
+
+```go
+tool, err := workflow.NewTool("review_payment", "Review a proposed payment.",
+    map[string]any{
+        "type": "object",
+        "properties": map[string]any{"amount": map[string]any{"type": "number"}},
+        "required": []string{"amount"},
+        "additionalProperties": false,
+    }, compiled)
+if err != nil { return err }
+_ = tool
+```
+
+Add `tool` to `AgentConfig.Tools`. The wrapper validates the JSON input schema and arguments. Tool arguments become `RunContext.input`; application run context becomes `RunContext.context`. Namespace, thread, and session metadata come from the calling agent, not model-provided arguments.
+
+## Interruptions and results
+
+A workflow pause becomes an agent interruption. The wrapper serializes the checkpoint into `ToolCallResponse.StateUpdates`, keyed by the tool and outer call ID. Resume using the agent's normal resolution messages; there is no second workflow-specific tool the model needs to call.
+
+A completed result contains workflow context excluding the application `context` field. Avoid copying credentials or private context into ordinary node output, which can be returned to the model.
+
+## Runtime boundaries
+
+The wrapper accepts ordinary `workflow.InvokeOption` values. Its default is the in-process workflow runtime. Merely giving the parent agent a Temporal runtime does not turn each inner workflow node into its own Temporal activity: the tool executes inside the parent's tool boundary.
+
+The explicit [Temporal graph executor](/hastekit-sdk/workflows/temporal) is registered separately and uses Temporal workflow context. Connecting it through a custom agent tool requires an application bridge that starts or calls the registered Temporal workflow.
+
+Persist the parent agent's history and keep the graph stable for paused calls. Side effects before a saved checkpoint can repeat if the enclosing tool activity retries. Use idempotency at those boundaries.

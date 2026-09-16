@@ -1,114 +1,38 @@
 ---
-title: Pausing & Resuming
-icon: pause
-description: Suspend a run for an external decision and resume it durably, without re-running completed nodes
+title: "Pause and resume"
+description: "Persist checkpoints and continue only the work waiting for a decision."
 ---
 
-A node can **suspend** the entire workflow instead of completing — to wait on a human approval, an external callback, or any out-of-band decision. The run stops cleanly with its state preserved, and you resume it later from exactly where it paused. Already-completed nodes are not re-executed, so resumes are idempotent and side-effect-free.
+The built-in human node pauses with a message and optional form schema. A custom node can pause by returning `workflow.Pause(payload)`. The walker records a paused status and returns the state with no execution error.
 
-This is the engine-level primitive behind [human-in-the-loop](/hastekit-sdk/agents/tools/human-in-the-loop) approval gates.
+## Save the checkpoint
 
-## Pausing a run
+Persist the **complete** `workflow.Input`: run ID, context, metadata, statuses, ports, suspended payloads, and resume data. Saving only `Pause` loses the information needed to skip completed work and restore integration continuations.
 
-Return `workflow.Pause(payload)` from a node's `Execute`. The `payload` is an opaque, host-defined bag describing what the run is waiting on — it's surfaced to the caller so they can act on it.
+The Go API leaves persistence to your application. Serialize the state and store it under an authorized run identity before acknowledging a durable pause to the user. Keep private context and continuation data out of public responses.
 
-```go
-type ApprovalNode struct {
-	workflow.BaseNode
-	nodeID string
-}
+## Supply a decision
 
-func (n *ApprovalNode) Execute(ctx context.Context, in *workflow.Input) (map[string]any, string, error) {
-	// If a decision has been staged for this node, proceed using it
-	// as the output port (e.g. "approved" / "rejected").
-	if decision, ok := in.Resume(n.nodeID); ok {
-		return map[string]any{"decided": true}, decision["decision"].(string), nil
-	}
-
-	// Otherwise suspend the run and describe what we're waiting on.
-	return nil, "", workflow.Pause(map[string]any{
-		"title":       "Publish article?",
-		"description": "Approve to publish, reject to discard.",
-	})
-}
-```
-
-When a node pauses, the run returns **without an error**. The engine:
-
-- marks the node `NodeStatusPaused`,
-- stamps `Input.Pause` with a `PauseState{NodeID, Payload}`,
-- records any sibling nodes that completed in the same wave, and
-- stops the walk.
+For a built-in human node, resume with `action` and optional form `content`:
 
 ```go
-out, err := compiled.Execute(ctx, &workflow.Input{RunID: "r1"})
-if err != nil {
-	log.Fatal(err)
-}
-
-if out.Pause != nil {
-	fmt.Printf("paused at %s: %v\n", out.Pause.NodeID, out.Pause.Payload)
-	// surface the payload to a human, persist `out`, and return.
-}
+if state.Pause == nil { return fmt.Errorf("workflow is not paused") }
+state.SetResume(state.Pause.NodeID, map[string]any{
+    "action": "approve",
+    "content": map[string]any{"note": "Reviewed"},
+})
+state, err = compiled.Execute(ctx, state)
+if err != nil { return err }
 ```
 
-## Durability: persist the paused run
+The accepted actions are `approve` and `reject`; routing ports are `approved` and `rejected`. If a schema is configured, submitted form content is validated. Custom nodes define their own decision payload and read it through `Input.Resume(nodeID)`.
 
-The entire `Input` is the run's durable memory — every field carries JSON tags. When a run pauses, serialize `out` and store it; restore it when the decision arrives.
+On resume, the walker starts from the roots and follows the saved ports of completed nodes without re-executing them. A paused node without its own resolution remains suspended. If multiple nodes paused in one wave, resolving one can expose the next pending pause; continue until there are none.
 
-```go
-blob, _ := json.Marshal(out)      // persist to your store
-// ... later, when the decision arrives ...
-var resumed workflow.Input
-_ = json.Unmarshal(blob, &resumed)
-```
+## Recovery limits
 
-## Resuming
+Checkpoints protect completed nodes only once state is saved. A side effect performed before a crash or failed checkpoint write can repeat. Use an external idempotency key, transactional state where possible, or a durable executor appropriate to the operation.
 
-Stage the decision with `SetResume`, then run the **same compiled graph** again with the restored input:
+Keep the graph and its named dependencies stable while checkpoints exist. Editing routing, deleting nodes, or changing a tool's continuation behavior can make saved state invalid. Version definitions rather than silently replacing the graph used by a paused run.
 
-```go
-resumed.SetResume("approval", map[string]any{"decision": "approved"})
-
-out, err := compiled.Execute(ctx, &resumed)
-```
-
-`SetResume(nodeID, decision)` stores the decision for that node and clears `Input.Pause`, so the run is no longer considered suspended. On the resume walk:
-
-- The engine re-walks from the roots, but any node already marked `NodeStatusCompleted` is **short-circuited** — its cached output port is replayed to follow its edges instead of re-executing it. Completed nodes never run twice.
-- The previously paused node runs again; this time `in.Resume(nodeID)` returns the staged decision, so it proceeds instead of pausing.
-
-The paused node decides what to do with the decision — typically emitting a port (`"approved"` / `"rejected"`) that routes the rest of the graph.
-
-## Detecting a pause from an error
-
-If you call a node's `Execute` directly, or wrap it, use `IsPauseErr` to distinguish a pause from a real failure:
-
-```go
-if pe, ok := workflow.IsPauseErr(err); ok {
-	// pe.Payload describes what the run is waiting on; this is a
-	// suspension, not a failure.
-}
-```
-
-The built-in `InProcessRuntime` already does this for you — it translates a node's `PauseError` into a paused run rather than a failed one.
-
-## End-to-end shape
-
-```go
-compiled, _ := g.Compile()
-
-// 1. First run — pauses at the approval node.
-out, _ := compiled.Execute(ctx, &workflow.Input{RunID: "r1"})
-if out.Pause != nil {
-	persist(out) // store the suspended run, notify a human
-	return
-}
-
-// 2. Later — load the run, stage the human's decision, resume.
-resumed := load("r1")
-resumed.SetResume("approval", map[string]any{"decision": "approved"})
-final, _ := compiled.Execute(ctx, resumed)
-// `final` contains the completed run; the approval node and everything
-// after it ran, while nodes before the pause were replayed from cache.
-```
+When wrapped as an [agent tool](/hastekit-sdk/workflows/agent-tools), the wrapper stores checkpoints through tool state and converts the pause into an agent interruption. The agent's history persistence then owns that state.

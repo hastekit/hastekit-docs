@@ -1,272 +1,39 @@
 ---
-title: Structured Output
-icon: list-check
+title: "Structured output"
+description: "Request JSON shaped by a Go type or an explicit schema."
 ---
 
-Structured output allows you to define a JSON schema that constrains the LLM's response format. This ensures consistent, validated outputs that are easier to parse and integrate into your applications.
+Structured output asks a compatible provider/model to return JSON matching a schema. Parse and validate the result before using it as application data; constrained output is not a substitute for business validation.
 
-## Overview
+## Build a schema from Go
 
-With structured output, you can specify the exact structure you want the model to return, including:
-- Required and optional fields
-- Data types for each field
-- Nested objects and arrays
-- Enumerations and constraints
-
-## Configuring Structured Output
-
-Structured output is configured using the `Text` parameter in your request. You provide a JSON schema that defines the expected output structure.
+With `model` and `ctx` configured:
 
 ```go
-import (
-    "github.com/hastekit/agent-sdk-go/pkg/gateway/llm/responses"
-    "github.com/hastekit/agent-sdk-go/pkg/utils"
-)
-
-// Define your JSON schema
-schema := map[string]any{
-    "type": "object",
-    "properties": map[string]any{
-        "name": map[string]any{
-            "type":        "string",
-            "description": "The person's name",
-        },
-        "age": map[string]any{
-            "type":        "integer",
-            "description": "The person's age",
-        },
-        "email": map[string]any{
-            "type":        "string",
-            "format":      "email",
-            "description": "The person's email address",
-        },
-    },
-    "required": []string{"name", "age"},
+type Classification struct {
+    Category string `json:"category"`
+    Summary string `json:"summary"`
 }
-
-request := &responses.Request{
-    Input: responses.InputUnion{
-        OfString: utils.Ptr("Extract information about John Doe, age 30, email: john@example.com"),
-    },
+response, err := model.NewResponses(ctx, &responses.Request{
+    Input: responses.InputUnion{OfString: utils.Ptr("Classify: the export button fails.")},
     Parameters: responses.Parameters{
-        Text: &responses.TextFormat{
-            Format: map[string]any{
-                "type":   "json_schema",
-                "name":   "structured_output",
-                "strict": false,
-                "schema": schema,
-            },
-        },
-    },
-}
-```
-
----
-
-## Example: Extracting Structured Data
-
-Here's a complete example that extracts structured information from unstructured text:
-
-```go
-import (
-    "context"
-    "encoding/json"
-    "fmt"
-    "github.com/hastekit/agent-sdk-go/pkg/gateway/llm/responses"
-    "github.com/hastekit/agent-sdk-go/pkg/utils"
-)
-
-func main() {
-    // ... client and model initialization ...
-
-    // Define schema for extracting contact information
-    contactSchema := map[string]any{
-        "type": "object",
-        "properties": map[string]any{
-            "contacts": map[string]any{
-                "type": "array",
-                "items": map[string]any{
-                    "type": "object",
-                    "properties": map[string]any{
-                        "name": map[string]any{
-                            "type": "string",
-                        },
-                        "phone": map[string]any{
-                            "type": "string",
-                        },
-                        "email": map[string]any{
-                            "type": "string",
-                        },
-                    },
-                    "required": []string{"name"},
-                },
-            },
-        },
-        "required": []string{"contacts"},
-    }
-
-    resp, err := model.NewResponses(context.Background(), &responses.Request{
-        Instructions: utils.Ptr("You are a data extraction assistant. Extract contact information from the given text."),
-        Input: responses.InputUnion{
-            OfString: utils.Ptr("Contact John at 555-1234 or john@example.com, and Sarah at 555-5678."),
-        },
-        Parameters: responses.Parameters{
-            Text: &responses.TextFormat{
-                Format: map[string]any{
-                    "type":   "json_schema",
-                    "name":   "structured_output",
-                    "strict": false,
-                    "schema": contactSchema,
-                },
-            },
-        },
-    })
-    if err != nil {
-        panic(err)
-    }
-
-    // Parse the structured output
-    for _, output := range resp.Output {
-        if output.OfOutputMessage != nil {
-            for _, content := range output.OfOutputMessage.Content {
-                if content.OfOutputText != nil {
-                    var result map[string]any
-                    if err := json.Unmarshal([]byte(content.OfOutputText.Text), &result); err == nil {
-                        fmt.Printf("Extracted data: %+v\n", result)
-                    }
-                }
-            }
-        }
-    }
-}
-```
-
----
-
-## Schema Format
-
-The schema follows the [JSON Schema](https://json-schema.org/) specification. Key components:
-
-### Basic Types
-
-```go
-// String
-"name": map[string]any{
-    "type": "string",
-}
-
-// Integer
-"age": map[string]any{
-    "type": "integer",
-}
-
-// Number (float)
-"price": map[string]any{
-    "type": "number",
-}
-
-// Boolean
-"active": map[string]any{
-    "type": "boolean",
-}
-
-// Array
-"tags": map[string]any{
-    "type": "array",
-    "items": map[string]any{
-        "type": "string",
-    },
-}
-```
-
-### Nested Objects
-
-```go
-schema := map[string]any{
-    "type": "object",
-    "properties": map[string]any{
-        "address": map[string]any{
-            "type": "object",
-            "properties": map[string]any{
-                "street": map[string]any{
-                    "type": "string",
-                },
-                "city": map[string]any{
-                    "type": "string",
-                },
-                "zip": map[string]any{
-                    "type": "string",
-                },
-            },
-        },
-    },
-}
-```
-
-### Enumerations
-
-```go
-"status": map[string]any{
-    "type": "string",
-    "enum": []string{"pending", "approved", "rejected"},
-}
-```
-
----
-
-## Strict vs Non-Strict Mode
-
-The `strict` parameter controls how strictly the model adheres to the schema:
-
-- **`strict: false`** (default): The model can be more flexible and may include additional fields or slightly deviate from the schema if it helps generate better responses.
-- **`strict: true`**: The model must strictly follow the schema with no deviations.
-
-```go
-Text: &responses.TextFormat{
-    Format: map[string]any{
-        "type":   "json_schema",
-        "name":   "structured_output",
-        "strict": true,  // Enforce strict adherence
-        "schema": schema,
-    },
-}
-```
-
----
-
-## Streaming with Structured Output
-
-Structured output also works with streaming responses. The model will stream the JSON structure incrementally:
-
-```go
-stream, err := model.NewStreamingResponses(ctx, &responses.Request{
-    Input: responses.InputUnion{
-        OfString: utils.Ptr("Extract information from: John Doe, 30 years old"),
-    },
-    Parameters: responses.Parameters{
-        Stream: utils.Ptr(true),
-        Text: &responses.TextFormat{
-            Format: map[string]any{
-                "type":   "json_schema",
-                "name":   "structured_output",
-                "strict": false,
-                "schema": schema,
-            },
-        },
+        Text: &responses.TextFormat{Format: hastekit.NewOutputFormatJSONSchema(Classification{}, true)},
     },
 })
-if err != nil {
-    panic(err)
-}
-
-var fullText strings.Builder
-for chunk := range stream {
-    if chunk.OfOutputTextDelta != nil {
-        fullText.WriteString(chunk.OfOutputTextDelta.Delta)
-    }
-}
-
-// Parse the complete JSON after streaming
-var result map[string]any
-json.Unmarshal([]byte(fullText.String()), &result)
+if err != nil { return err }
+_ = response
 ```
+
+`NewOutputSchema` returns a schema map. `NewOutputFormatJSONSchema(value, strict)` wraps it with the format type, name, and strict setting. You can supply a hand-written `TextFormat.Format` map for a provider-compatible schema.
+
+The schema helper removes schema metadata and inlines definitions. Providers support different JSON Schema subsets; test nested objects, nullable/optional fields, enums, and strictness with your selected model.
+
+## Agent output
+
+Set `AgentConfig.Output` to `hastekit.NewOutputSchema(Classification{})` to configure the agent's final output schema. This convenience path uses non-strict structured output. If you need explicit strictness, configure `AgentConfig.Parameters.Text` directly and leave `Output` unset, because `Output` sets that text format.
+
+## Parse only complete output
+
+Extract assistant text from a completed response or use an agent result's `Text()`, then decode JSON into your application type. Check errors and interruption status before parsing. Partial streaming JSON is not a completed structured result; accumulate and parse after successful completion.
+
+Handle refusals, output-limit exhaustion, invalid JSON, and valid JSON with unacceptable field values as separate application outcomes.

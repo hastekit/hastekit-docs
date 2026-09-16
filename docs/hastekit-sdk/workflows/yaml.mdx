@@ -1,0 +1,72 @@
+---
+title: "YAML workflows"
+description: "Load strict descriptors and resolve dependencies supplied by the application."
+---
+
+`workflow.LoadYAML` compiles one version-1 descriptor into the same graph used by the Go builder. YAML is trusted application configuration: it can select tool calls, HTTP destinations, and JavaScript code.
+
+## Define a graph
+
+```yaml
+version: 1
+id: payment-review
+nodes:
+  - id: prepare
+    type: javascript
+    config:
+      code: 'return {amount: input.amount, currency: "USD"};'
+  - id: review
+    type: human
+    config:
+      message: '${{ "Approve " + nodes.prepare.amount + " USD?" }}'
+  - id: record
+    type: mcp
+    config:
+      server: payments
+      tool: record_payment
+      arguments:
+        amount: '${{ nodes.prepare.amount }}'
+        currency: '${{ nodes.prepare.currency }}'
+edges:
+  - {from: START, to: prepare}
+  - {from: prepare, to: review}
+  - {from: review, port: approved, to: record}
+  - {from: review, port: rejected, to: END}
+  - {from: record, to: END}
+```
+
+## Supply named dependencies
+
+With `descriptor` as bytes, `connector` as an `agents.MCPToolset`, and `httpClient` configured:
+
+```go
+compiled, err := workflow.LoadYAML(descriptor, workflow.Dependencies{
+    MCPServers: map[string]agents.MCPToolset{"payments": connector},
+    HTTPClient: httpClient,
+})
+if err != nil { return err }
+_ = compiled
+```
+
+Agent nodes resolve through `Dependencies.Agents`, a map of `workflow.AgentRunner`. Each runner implements `Run(context.Context, *agents.AgentInput) (*agents.AgentOutput, error)`. MCP and agent names come from application configuration, not automatic registry lookup.
+
+Unknown fields, unknown dependencies, invalid expressions, duplicate IDs, unsupported versions, cycles, and invalid built-in ports are rejected. Keep validation at startup so malformed definitions do not first fail during a user request.
+
+## Expressions
+
+A whole scalar `${{ expression }}` evaluates JavaScript and preserves the result's JSON type. The expression must occupy the whole value; use a JavaScript template literal or concatenation to build strings.
+
+| Variable | Value |
+|---|---|
+| `input` | `RunContext.input` |
+| `nodes` | Built-in node outputs under `RunContext.nodes` |
+| `context` | The complete `RunContext` |
+| `metadata` | `Input.Metadata` |
+
+For application data stored at `RunContext.context`, use `context.context.<key>`. Expressions operate on copies; they do not mutate run state. JavaScript code nodes use a function body with `return`; if/else conditions are boolean expressions.
+
+## Limits
+
+`Dependencies.JavaScriptTimeout` defaults to one second per evaluation. `MaxResponseBytes` defaults to 4 MiB for API responses. Goja runs in-process: the timeout and call-stack limit are not a process or heap sandbox. Do not accept arbitrary public YAML as trusted executable configuration.
+
+See [built-in nodes](/hastekit-sdk/workflows/built-in-nodes) for individual fields, ports, and Go constructors.

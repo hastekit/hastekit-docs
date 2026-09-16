@@ -1,331 +1,97 @@
 ---
-title: Simple Agent
-icon: robot
+title: "Run and stream"
+description: "Choose synchronous execution, streaming, cancellation, and run identity."
 ---
 
-A simple agent is the most basic type of agent in the HasteKit SDK. It executes in-process without durability, making it perfect for stateless interactions, testing, and simple use cases that don't require crash recovery or long-running workflows.
+An agent repeatedly calls its model, executes selected tools, and supplies their results to the next model call. A run ends when the agent answers, pauses for input, fails, or reaches its loop limit.
 
-## Overview
+## Configure the agent
 
-Simple agents provide:
-- **System instructions**: Define the agent's behavior and personality
-- **LLM integration**: Use any supported LLM provider (OpenAI, Anthropic, Gemini, etc.)
-- **Tool support**: Optional tools for function calling
-- **Conversation history**: Optional memory across interactions
-- **Streaming responses**: A live channel of response chunks delivered through the run handle
-- **Stop signal**: Cancel an in-flight run cleanly via `handle.Stop`, including mid-stream and mid-tool-call
-- **Hooks**: Intercept tool calls and model calls for auth, budgets, and audit
-
-Unlike durable agents, simple agents execute in-process and don't persist state between runs across restarts. They're ideal for stateless applications, quick prototypes, and scenarios where you don't need crash recovery.
-
-## Creating a Simple Agent
-
-To create a simple agent, use `hastekit.NewAgent()` with `AgentConfig`:
+With `model` obtained from `client.Model(...)`:
 
 ```go
-import (
-    "context"
-    "fmt"
-    "log"
-
-    "os"
-
-    "github.com/hastekit/agent-sdk-go/pkg/utils"
-    "github.com/hastekit/agent-sdk-go/pkg/agents"
-    "github.com/hastekit/agent-sdk-go/pkg/agents/history"
-    "github.com/hastekit/agent-sdk-go/pkg/gateway/llm/responses"
-    hastekit "github.com/hastekit/agent-sdk-go"
-)
-
-// Configure an LLM client
-client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
-    {
-        ProviderName:  hastekit.ProviderOpenAI,
-        BaseURL:       "",
-        CustomHeaders: nil,
-        ApiKeys: []*hastekit.APIKeyConfig{
-            {
-                Name:   "Key 1",
-                APIKey: os.Getenv("OPENAI_API_KEY"),
-            },
-        },
-    },
+agent, err := hastekit.NewAgent(&hastekit.AgentConfig{
+    Name: "assistant",
+    LLM: model,
+    Instruction: hastekit.NewPrompt("Answer clearly and use tools when needed."),
 })
-
-// Create the agent
-agent := hastekit.NewAgent(&hastekit.AgentConfig{
-    Name:        "Hello world agent",
-    Instruction: hastekit.NewPrompt("You are helpful assistant. You greet user with a light-joke"),
-    LLM:         client.Model("OpenAI/gpt-4o-mini"),
-    Parameters: responses.Parameters{
-        Temperature: utils.Ptr(0.2),
-    },
-})
+if err != nil { return err }
 ```
 
-### AgentConfig Fields
+`LLM` and `Instruction` are the configuration fields. `Instruction` is a prompt provider; use `NewPrompt` for a string. There are no alternative `Model` or `Instructions` fields on `AgentConfig`.
 
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| **Name** | `string` | A unique identifier for the agent |
-| **Instruction** | `agents.SystemPromptProvider` | System prompt defining agent behavior (use `hastekit.NewPrompt()` for simple strings) |
-| **LLM** | `llm.Provider` | The LLM provider instance (bound via `client.Model("Provider/model")`) |
-| **Parameters** | `responses.Parameters` | Optional LLM parameters (temperature, max tokens, etc.) |
-| **Tools** | `[]agents.Tool` | Optional array of tools the agent can use |
-| **Handoffs** | `[]*agents.Handoff` | Optional sub-agents this agent can hand off to (see [Handoffs](/hastekit-sdk/agents/multi-agents/handoff)) |
-| **StickyHandoff** | `bool` | Keep routing a thread to the agent it was last handed off to |
-| **MaxLoops** | `*int` | Optional cap on agent loop iterations (defaults to `50`) |
-| **History** | `*history.CommonConversationManager` | Optional conversation history manager |
-| **Output** | `map[string]any` | Optional JSON schema for structured output |
-| **McpServers** | `[]agents.MCPToolset` | Optional MCP server clients |
-| **Skills** | `agents.SkillProvider` | Optional folders of instructions the agent reads on demand (see [Skills](/hastekit-sdk/agents/skills)) |
-| **Hooks** | `[]agents.Hook` | Optional interceptors for tool calls and model calls (see [Hooks](/hastekit-sdk/agents/hooks)) |
+## Choose an execution method
 
-## Executing an Agent
+| Method | Returns | Cancelling its context |
+|---|---|---|
+| `agent.Run(ctx, input)` | Final result and error | Cancels local work and signals remote work through the broker |
+| `agent.Execute(ctx, input)` | A handle with events and completion methods | Disconnects the event subscription; execution continues |
+| `handle.Wait(ctx)` | Final result and error | Stops waiting only |
+| `handle.Stop(ctx)` | Error from the stop request | Its context bounds the stop request |
 
-`Execute()` is non-blocking — it generates a stream id, subscribes to the broker, and returns an `*AgentHandle`. There are two valid ways to consume the handle:
+Use `Run` when you only need the final answer. Use `Execute` when the application consumes streaming events. There are no separate `Start` or `Stream` methods.
 
-- **`handle.Result()`** — drains the chunk channel internally and returns the aggregated `AgentOutput`. Use this when you only care about the final output.
-- **`for chunk := range handle.Chunks` + `handle.Wait()`** — observe chunks as they arrive (e.g. to forward to a UI or SSE stream), then collect the aggregated output.
+### Wait for the result
 
-Call `handle.Stop(ctx)` at any point to stop the run — including in the middle of a streaming model call or a running tool.
+Inside a function with `ctx` and `agent`:
 
 ```go
-handle, err := agent.Execute(context.Background(), &agents.AgentInput{
-    Message: history.Message{
-        Messages: []responses.InputMessageUnion{
-            responses.UserMessage("Hello!"),
-        },
-    },
+result, err := agent.Run(ctx, &hastekit.Input{
+    Namespace: "default",
+    ThreadID: "support-42",
+    Message: hastekit.UserTurn("Summarize the open issues."),
 })
-if err != nil {
-    log.Fatal(err)
-}
-
-// One-shot: drain + aggregate.
-out, err := handle.Result()
-if err != nil {
-    log.Fatal(err)
-}
-fmt.Println(out.Output[0].OfOutputMessage.Content[0].OfOutputText.Text)
+if err != nil { return err }
+fmt.Println(result.Text())
 ```
 
-Or if you want to consume chunks live:
+Inspect `result.Status` and `result.Interrupts` as well as `Text()`: a successful call can return a paused run rather than a final answer. `Output` contains the full typed message list, including non-text output.
+
+### Consume events
 
 ```go
+handle, err := agent.Execute(ctx, &hastekit.Input{
+    Namespace: "default",
+    ThreadID: "support-42",
+    Message: hastekit.UserTurn("Summarize the open issues."),
+})
+if err != nil { return err }
 for chunk := range handle.Chunks {
-    // forward chunk to your UI / SSE / log
-}
-out, err := handle.Wait()
-```
-
-### AgentInput Fields
-
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| **Message** | `history.Message` | The turn to run, wrapping `[]responses.InputMessageUnion` (use `responses.UserMessage()` helper) |
-| **Namespace** | `string` | Optional namespace for conversation isolation |
-| **ThreadID** | `string` (json `thread_id`) | Optional ID of the thread to continue. `Execute()` generates one if empty |
-| **PreviousRunID** | `string` | Optional ID of the run to continue from, to branch from an earlier turn instead of the thread's tip |
-| **SessionID** | `string` (json `shared_session_id`) | Optional conversation ID shared between a parent agent and its sub-agent |
-| **RunContext** | `map[string]any` | Optional context data for template variable resolution and for [hooks](/hastekit-sdk/agents/hooks) |
-| **StreamID** | `string` | Optional broker channel id. `Execute()` generates one if empty; supply your own to resume an existing stream or coordinate a stop signal. |
-
-### AgentHandle
-
-`Execute()` returns a handle:
-
-```go
-type AgentHandle struct {
-    StreamID string                          // Broker channel id for this run
-    Chunks   <-chan *responses.ResponseChunk // Live stream of chunks; closed on completion
-}
-
-func (h *AgentHandle) Stop(ctx context.Context) error
-func (h *AgentHandle) EnqueueMessage(ctx context.Context, msg history.Message) error
-func (h *AgentHandle) Wait() (*AgentOutput, error)
-func (h *AgentHandle) Result() (*AgentOutput, error)
-```
-
-- **`Stop`** records a stop request on the broker and unwinds the run — see [Stopping an In-Flight Run](#stopping-an-in-flight-run).
-- **`EnqueueMessage`** pushes a message onto the run's queue. The agent drains it at iteration boundaries, so a follow-up or an approval decision reaches a run that is still in flight. For a run that has already paused and exited, the next `agent.Execute` on the same thread is the right entry instead.
-- **`Wait`** blocks until the run finishes and returns the aggregated output. Safe to call only after `Chunks` has been drained.
-- **`Result`** drains `Chunks` internally and returns the aggregated output — equivalent to `for range Chunks {}; Wait()`.
-
-<Warning>Calling `Wait` without draining `Chunks` will deadlock once the broker's per-subscriber buffer fills, because the agent's publisher back-pressures. Use `Result` if you don't intend to consume chunks yourself.</Warning>
-
-### AgentOutput Structure
-
-`handle.Wait()` returns the aggregated `AgentOutput`:
-
-```go
-type AgentOutput struct {
-    RunID      string                        // Unique run identifier
-    Status     agentstate.RunStatus          // Execution status
-    Output     []responses.InputMessageUnion // Agent's response messages
-    Interrupts []responses.Interrupt         // One per tool call awaiting approval (human-in-the-loop)
-}
-```
-
-## Complete Example
-
-Here's a complete working example:
-
-```go
-package main
-
-import (
-	"context"
-	"fmt"
-	"log"
-	"os"
-
-	"github.com/hastekit/agent-sdk-go/pkg/agents"
-	"github.com/hastekit/agent-sdk-go/pkg/agents/history"
-	"github.com/hastekit/agent-sdk-go/pkg/gateway/llm/responses"
-	hastekit "github.com/hastekit/agent-sdk-go"
-	"github.com/hastekit/agent-sdk-go/pkg/utils"
-)
-
-func main() {
-	// Configure an LLM client
-	client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
-		{
-			ProviderName:  hastekit.ProviderOpenAI,
-			BaseURL:       "",
-			CustomHeaders: nil,
-			ApiKeys: []*hastekit.APIKeyConfig{
-				{
-					Name:   "Key 1",
-					APIKey: os.Getenv("OPENAI_API_KEY"),
-				},
-			},
-		},
-	})
-
-	// Create agent
-	agent := hastekit.NewAgent(&hastekit.AgentConfig{
-		Name:        "Hello world agent",
-		Instruction: hastekit.NewPrompt("You are helpful assistant. You greet user with a light-joke"),
-		LLM:         client.Model("OpenAI/gpt-4o-mini"),
-		Parameters: responses.Parameters{
-			Temperature: utils.Ptr(0.2),
-		},
-	})
-
-	// Execute agent
-	handle, err := agent.Execute(context.Background(), &agents.AgentInput{
-		Message: history.Message{
-            Messages: []responses.InputMessageUnion{
-			    responses.UserMessage("Hello!"),
-            },
-		},
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-	out, err := handle.Result()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Print response
-	fmt.Println(out.Output[0].OfOutputMessage.Content[0].OfOutputText.Text)
-}
-```
-
-## Streaming Responses
-
-Streaming is built into the handle — every run delivers chunks on `handle.Chunks` as they arrive:
-
-```go
-handle, err := agent.Execute(context.Background(), &agents.AgentInput{
-    Message: history.Message{
-        Messages: []responses.InputMessageUnion{
-            responses.UserMessage("Tell me a story"),
-        },
-    },
-})
-if err != nil {
-    log.Fatal(err)
-}
-
-for chunk := range handle.Chunks {
-    switch chunk.ChunkType() {
-    case "response.output_text.delta":
-        if chunk.OfOutputTextDelta != nil {
-            fmt.Print(chunk.OfOutputTextDelta.Delta)
-        }
-    case "response.output_text.done":
-        if chunk.OfOutputTextDone != nil && chunk.OfOutputTextDone.Text != nil {
-            fmt.Printf("\n\nComplete text: %s\n", *chunk.OfOutputTextDone.Text)
-        }
+    if chunk.OfOutputTextDelta != nil {
+        fmt.Print(chunk.OfOutputTextDelta.Delta)
     }
 }
-
-out, _ := handle.Wait()
-_ = out
+result, err := handle.Wait(ctx)
+if err != nil { return err }
+fmt.Println(result.Status)
 ```
 
-## Stopping an In-Flight Run
+Always inspect the error from `Wait`, even after the event channel closes. One consumer should read `Chunks`. The handle has a bounded backlog of 256 events; if the consumer falls behind, `Wait` reports `ErrStreamOverflow` alongside any final result. The missing events cannot be reconstructed from that handle.
 
-`handle.Stop(ctx)` records a stop request on the broker. The run records a `"Cancelled by user"` assistant turn in history and emits `run.completed` cleanly — the chunk stream stays open while the agent winds down, so you'll still see that final chunk before the channel closes.
+For a synchronous caller, avoid creating a streaming handle just to call `Wait`; `Run` does not subscribe to events.
 
-```go
-go func() {
-    time.Sleep(2 * time.Second)
-    _ = handle.Stop(context.Background())
-}()
+## Stop a run
 
-for chunk := range handle.Chunks {
-    _ = chunk
-}
-```
+Call `handle.Stop(ctx)` or `agent.Stop(ctx, streamID)` with a live request context. Then wait for completion. `handle.Cancel` is an alias for `Stop`.
 
-`Stop` does not wait for an iteration boundary. It reaches work already in flight:
+Stopping is cooperative. Built-in memory and Redis brokers support cancellation of active model and tool calls. Custom tools must honor their context. A tool that ignores cancellation may continue running after the agent stops waiting for it; stop is not a rollback of external side effects.
 
-- **Mid-stream** — the model call is cut off where it is, rather than waited out. Text that had already streamed still reached the client, but the turn is recorded as cancelled rather than as a half-answer the model never finished. Cancelling also reaches the provider's own request, which is what actually stops the tokens being generated and billed.
-- **Mid-tool-call** — a running tool has its context cancelled. A tool that ignores cancellation is abandoned after a grace period (`agents.DefaultCancelGrace`, 2s) so the run still ends; it keeps running in the background, unobserved.
+## Identify a run
 
-Either way the loop's invariant holds: every `function_call` in history is answered — a cancelled call gets a synthetic result saying so — so a stopped thread is still a valid thread to resume from.
+| Input field | Purpose |
+|---|---|
+| `Namespace` | Partition application history and run state; set it from trusted identity |
+| `ThreadID` | Conversation thread; supply it when you need to continue the conversation |
+| `RunID` | Optional identifier for the new run; generated when omitted |
+| `PreviousRunID` | History branch point or the paused run being resumed |
+| `StreamID` | Broker channel; normally generated by the SDK |
+| `SessionID` | Shared session identity for related agents |
+| `RunContext` | Application data supplied to prompts, tools, and middleware |
 
-<Note>
-Reaching a running tool or an in-flight stream needs a broker implementing `agents.StopWatcher`; the built-in memory and Redis brokers both do. With a plain broker the stop still lands, at the loop's next iteration boundary.
-</Note>
+`ThreadID`, `StreamID`, and the incoming message ID are generated when omitted. The final result exposes `RunID`; choose a stable thread ID before calling if you need it afterwards. Persistence rejects duplicate run IDs rather than performing a separate existence check first.
 
-## Single-Turn Execution
+## Bound work
 
-`SingleTurn` ends the run as soon as the model has responded, before any tool is executed. The `AgentOutput` carries exactly what the model emitted — assistant text and/or tool calls — with status `completed`.
+`AgentConfig.MaxLoops` defaults to 50. It limits model/tool rounds, not tokens, elapsed time, or cost. Use model output limits and request deadlines separately.
 
-This is for evaluating a single decision rather than an outcome: offline single-turn evals score "given this conversation, what does the model do next?", where executing the tool (or faking its result) would replace the thing under test with an improvised continuation.
-
-It lives on `agents.AgentOptions` rather than `AgentConfig`, so set it with an `AgentOption`:
-
-```go
-agent := hastekit.NewAgent(
-    &hastekit.AgentConfig{
-        Name:        "Evaluated agent",
-        Instruction: hastekit.NewPrompt("You are a helpful assistant."),
-        LLM:         model,
-        Tools:       []hastekit.Tool{weatherTool},
-    },
-    func(o *agents.AgentOptions) { o.SingleTurn = true },
-)
-```
-
-<Warning>This is not the same as `MaxLoops: 1`, which still executes the first round of tools and then fails the run with "exceeded maximum loops".</Warning>
-
-## Helper Functions
-
-The SDK provides convenient helper functions for creating messages:
-
-- **`responses.UserMessage(msg string)`**: Creates a user message from a string
-
-## Next Steps
-
-- Learn about [system instructions](/hastekit-sdk/agents/system-instruction) for customizing agent behavior
-- Add [conversation history](/hastekit-sdk/agents/conversations/history) for context-aware interactions
-- Integrate [tools](/hastekit-sdk/agents/tools/function-tools) to extend agent capabilities
-- Give the agent [skills](/hastekit-sdk/agents/skills) it reads only when it needs them
-- Add [hooks](/hastekit-sdk/agents/hooks) for auth, budgets, and audit
-- Explore [durable agents](/hastekit-sdk/agents/durable/restate) for production workloads
+The lower-level `agents.AgentOptions.SingleTurn` is intended for evaluating a single model decision: it returns the model output without executing its tools. It is not exposed as a field on the root `AgentConfig`, and differs from `MaxLoops: 1`, which still executes the first round of tools.

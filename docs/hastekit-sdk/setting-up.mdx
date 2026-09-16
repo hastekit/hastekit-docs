@@ -1,120 +1,79 @@
 ---
-title: Quickstart
-icon: bolt
-description: Setup HasteKit SDK in your project in seconds.
+title: "Installation and quickstart"
+description: "Install the module and run your first agent with explicit error handling."
 ---
 
 ## Prerequisites
 
-- Golang - [v1.25.0](https://go.dev/doc/devel/release#go1.25.0).
+Use Go **1.25.3 or later**, matching the SDK's `go.mod`, and an API key for the provider you want to call. This example uses OpenAI directly and requires no gateway, Redis, or workflow service.
 
-## Install HasteKit SDK
+## Install
 
-```bash
-go get -u github.com/hastekit/agent-sdk-go
+Create an application module, then add the SDK:
+
+```sh
+mkdir my-agent
+cd my-agent
+go mod init example.com/my-agent
+go get github.com/hastekit/agent-sdk-go
 ```
 
-## Setting up the SDK
+Commit `go.mod` and `go.sum` to pin the resolved dependencies. Use `go get github.com/hastekit/agent-sdk-go@<version>` when upgrading to a specific release.
+
+Set `OPENAI_API_KEY` in your environment. Do not put the key in source control.
+
+## Create an agent
+
+Save this as `main.go`:
 
 ```go
 package main
 
 import (
-    "os"
-
-    hastekit "github.com/hastekit/agent-sdk-go"
-    "github.com/hastekit/agent-sdk-go/pkg/gateway/llm/responses"
+	"context"
+	"fmt"
+	hastekit "github.com/hastekit/agent-sdk-go"
+	"log"
+	"os"
 )
 
 func main() {
-    client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
-        {
-            ProviderName:  hastekit.ProviderOpenAI,
-            BaseURL:       "",
-            CustomHeaders: nil,
-            ApiKeys: []*hastekit.APIKeyConfig{
-                {
-                    Name:   "Key 1",
-                    APIKey: os.Getenv("OPENAI_API_KEY"),
-                },
-            },
-        },
-    })
+	client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
+		{
+			ProviderName: hastekit.ProviderOpenAI,
+			ApiKeys: []*hastekit.APIKeyConfig{
+				{
+					Name:   "primary",
+					APIKey: os.Getenv("OPENAI_API_KEY"),
+				},
+			},
+		},
+	})
+
+	model := client.Model("OpenAI/gpt-4.1-mini")
+
+	agent, err := hastekit.NewAgent(&hastekit.AgentConfig{
+		Name: "Assistant", LLM: model, Instruction: hastekit.NewPrompt("You are a helpful assistant."),
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	result, err := agent.Run(context.Background(), &hastekit.Input{
+		Message: hastekit.UserTurn("Hello!"),
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(result.Text())
 }
 ```
 
-## Making LLM Calls
-Make a call to the model provider to generate a response:
+Run it with `go run .`.
 
-```go
-model := client.Model("OpenAI/gpt-4.1-mini")
-resp, err := model.NewResponses(ctx, &responses.Request{
-    Instructions: utils.Ptr("You are a helpful assistant."),
-    Input: responses.InputUnion{
-        OfString: utils.Ptr("What is the capital of France?"),
-    },
-})
-```
+`NewLLMClient` holds provider configuration. `Model("OpenAI/gpt-4.1-mini")` binds the provider and model for subsequent requests. `NewAgent` validates the agent configuration and returns an error on invalid setup. `Run` waits for completion; `Text()` extracts assistant text from the result.
 
-Finally, extract the generated text from the response:
-```go
-for _, output := range resp.Output {
-    if output.OfOutputMessage != nil {
-        for _, content := range output.OfOutputMessage.Content {
-            if content.OfOutputText != nil {
-                fmt.Println(content.OfOutputText.Text)
-            }
-        }
-    }
-}
-```
+The agent uses in-memory history and a process-local stream broker by default. Those defaults are useful for a first run, but do not provide persistence across restarts or communication between replicas.
 
-<Card title="Responses API" icon="arrow-right" href="/hastekit-sdk/responses/responses-api">
-    Learn more about making LLM calls with the Responses API.
-</Card>
+## Next steps
 
-## Creating Agents
-Create a simple agent with system instructions and an LLM:
-```go
-agent := hastekit.NewAgent(&hastekit.AgentConfig{
-    Name:        "Assistant",
-    Instruction: hastekit.NewPrompt("You are a helpful assistant."),
-    LLM:         client.Model("OpenAI/gpt-4o-mini"),
-})
-```
-
-Execute the agent with user messages. `Execute()` returns an `*AgentHandle`; the simplest way to get the aggregated `AgentOutput` is `handle.Result()`, which drains the chunk stream internally. To render chunks live (e.g. forward to a UI), range over `handle.Chunks` yourself and then call `handle.Wait()`.
-```go
-handle, err := agent.Execute(ctx, &agents.AgentInput{
-    Message: history.Message{
-        Messages: []responses.InputMessageUnion{
-            responses.UserMessage("Hello!"),
-        },
-    },
-})
-if err != nil {
-    log.Fatal(err)
-}
-
-out, err := handle.Result()
-if err != nil {
-    log.Fatal(err)
-}
-```
-
-Extract the agent's response:
-```go
-for _, output := range out.Output {
-    if output.OfOutputMessage != nil {
-        for _, content := range output.OfOutputMessage.Content {
-            if content.OfOutputText != nil {
-                fmt.Println(content.OfOutputText.Text)
-            }
-        }
-    }
-}
-```
-
-<Card title="Agents" icon="arrow-right" href="/hastekit-sdk/agents/simple-agent">
-    Learn more about building agents with the Agent SDK.
-</Card>
+Use [function tools](/hastekit-sdk/agents/tools/function-tools) for application actions, [history](/hastekit-sdk/agents/conversations/history) for multiple turns, and [AG-UI](/hastekit-sdk/agents/serving-agents/serving-agents-agui) for an HTTP endpoint and chat UI. For a direct model call without an agent loop, start with [text generation](/hastekit-sdk/responses/text-generation).

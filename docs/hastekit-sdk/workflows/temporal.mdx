@@ -1,0 +1,55 @@
+---
+title: "Temporal workflow execution"
+description: "Run graph nodes as activities and delays as durable timers."
+---
+
+`workflow.NewTemporalExecutor` runs a compiled graph inside a Temporal workflow. It supports Go-built and YAML-loaded graphs, including custom node implementations.
+
+## Register with a worker
+
+This setup assumes a Temporal client `temporalClient` and a compiled graph. Import the SDK graph package as `workflow`, and Temporal's workflow package as `temporalworkflow`:
+
+```go
+executor, err := workflow.NewTemporalExecutor("payment", compiled,
+    workflow.TemporalExecutorOptions{
+        ActivityOptions: temporalworkflow.ActivityOptions{
+            StartToCloseTimeout: 2 * time.Minute,
+        },
+        MaxSteps: 500,
+    })
+if err != nil { return err }
+w := worker.New(temporalClient, "payments", worker.Options{})
+executor.Register(w)
+if err := w.Start(); err != nil { return err }
+defer w.Stop()
+```
+
+Register before starting the worker. Every worker polling this queue must have a compatible graph and dependencies. Start the workflow through `temporalClient.ExecuteWorkflow`, using `"payment"` as its type and a `workflow.Input` argument.
+
+## One activity type, separate invocations
+
+Registration creates the Temporal workflow `payment` and one generic activity type, `payment.node`. Each node execution schedules a separate activity invocation carrying its node ID and input. The worker looks up the node in the compiled graph and calls its `Execute` method.
+
+Custom Go logic and clients stay on the worker. Only serializable input, output, and pause state cross the boundary. Activities in a wave are dispatched concurrently, then their results are merged in graph order.
+
+Built-in delays use Temporal timers. They survive worker restarts without holding an activity slot or restarting the whole waiting period. Conditional Go routers execute in workflow code and must be deterministic.
+
+## Defaults and cancellation
+
+The default activity timeout is five minutes, the heartbeat timeout is ten seconds, and retry attempts default to **one**. Configure `ActivityOptions.RetryPolicy` explicitly if calls are safe to retry. Activity options currently apply to all non-delay nodes; per-node overrides are not provided.
+
+Activities heartbeat so server-side cancellation reaches running node contexts. A failing node cancels the remaining work in its wave. Custom nodes must still honor cancellation. Cancelling the client context used by `WorkflowRun.Get` only stops waiting; call `CancelWorkflow` to stop the server-side execution.
+
+## Human decisions
+
+A pause completes the current invocation with a checkpoint. Save it, call `SetResume`, and start another Temporal execution with a new Temporal workflow ID and the original `Input`. The logical workflow run ID and completed node state remain in that checkpoint.
+
+For a single long-lived execution, a host Temporal workflow can call `executor.Execute`, wait for an application-defined signal when it pauses, set the resume decision, and call it again. The SDK does not impose a signal name or approval transport.
+
+## Errors and deployment
+
+Normal Temporal errors do not deliver partial output through `WorkflowRun.Get`. A host workflow calling `executor.Execute` directly can inspect its returned partial `Input` and decide how to expose it. Activity history remains available for diagnostics.
+
+Keep existing histories compatible when deploying graph changes; use workflow versioning or a new workflow type for incompatible changes. This executor is separate from `workflow.WithRuntime` because it requires Temporal's workflow context.
+
+The [runnable example](https://github.com/hastekit/agent-sdk-go/tree/master/examples/workflow/temporal) starts a worker and demonstrates pause/resume. Start a development server with `temporal server start-dev`, then run `go run ./examples/workflow/temporal` from the SDK repository.

@@ -1,335 +1,48 @@
 ---
-title: Summarization
-icon: compress
+title: "Summarization and context limits"
+description: "Control model context without deleting the stored transcript."
 ---
 
-Conversation summarization helps manage long conversation histories by condensing older messages while preserving important context. This is essential for maintaining context in extended conversations without exceeding token limits or performance constraints.
+Summarization changes what the next model call sees. It does not replace the complete stored transcript used by a conversation UI.
 
-## Overview
+Choose a strategy through `history.WithSummarizer` when constructing the conversation manager. Import `pkg/agents/history` and `pkg/agents/history/summariser` (the package uses the spelling `summariser`).
 
-The SDK provides two types of summarizers:
+## Keep a sliding window
 
-1. **LLM Summarizer**: Uses an LLM to intelligently summarize conversation history while preserving important context
-2. **Sliding Window Summarizer**: Keeps only the most recent N conversation runs and discards older messages
-
-Summarizers are integrated with conversation managers and automatically trigger when certain conditions are met (e.g., token threshold for LLM summarizer, or when the number of runs exceeds the window size for sliding window).
-
-## LLM Summarizer
-
-The LLM summarizer uses an LLM to create intelligent summaries of conversation history. It triggers when the total token count exceeds a specified threshold, keeping recent messages intact and summarizing older ones.
-
-### Configuration
+A sliding window retains recent runs without making another model call:
 
 ```go
-import (
-    "github.com/hastekit/agent-sdk-go/pkg/agents/history/summariser"
-    "github.com/hastekit/agent-sdk-go/pkg/agents/history"
-    "github.com/hastekit/agent-sdk-go/pkg/agents/prompts"
+window := summariser.NewSlidingWindowHistorySummarizer(
+    &summariser.SlidingWindowHistorySummarizerOptions{KeepCount: 10},
 )
+manager := history.NewConversationManager(
+    history.NewInMemoryConversationPersistence(),
+    history.WithSummarizer(window),
+)
+```
 
-// Create a summarizer LLM (can be different from the agent's LLM)
-summarizerLLM := client.Model("OpenAI/gpt-4o-mini")
+The count is in **runs**, not individual messages. Keeping complete runs preserves tool-call/result groupings. A non-positive count is floored to one. Older context is omitted, not compressed into a summary, so the model can lose facts that are not in the retained window.
 
-// Create an instruction provider for the summarizer
-summarizerInstruction := hastekit.NewPrompt("You are a conversation summarizer. Create concise summaries that preserve important context, decisions, and information.")
+## Summarize older runs with a model
 
-// Create the LLM summarizer
+Given a configured `model` and `persistence` adapter:
+
+```go
 summarizer := summariser.NewLLMHistorySummarizer(&summariser.LLMHistorySummarizerOptions{
-    LLM:                 summarizerLLM,
-    Instruction:         summarizerInstruction,
-    TokenThreshold:      1000,        // Summarize when total tokens exceed this
-    KeepRecentCount:     5,            // Keep the last 5 runs unsummarized (default: 5)
-    Parameters:          responses.Parameters{}, // Optional LLM parameters
+    LLM: model,
+    Instruction: hastekit.NewPrompt("Summarize decisions, constraints, and unresolved tasks accurately."),
+    TokenThreshold: 24000,
+    KeepRecentCount: 5,
 })
+manager := history.NewConversationManager(persistence, history.WithSummarizer(summarizer))
 ```
 
-### Parameters
+`TokenThreshold` is a context-occupancy trigger, not a lifetime token budget. The manager combines the latest provider usage with estimates for messages added since that call. `KeepRecentCount` preserves recent runs unchanged; despite historical comments referring to messages, grouping is by run. Its default is five.
 
-- **`LLM`**: The LLM provider to use for summarization (can be different from the agent's LLM)
-- **`Instruction`**: System prompt that defines how the summarizer should summarize conversations
-- **`TokenThreshold`**: The token count threshold at which summarization triggers
-- **`KeepRecentCount`**: Number of recent conversation runs to keep unsummarized (default: 5)
-- **`Parameters`**: Optional LLM parameters (temperature, etc.) for the summarization call
+Leave room below the selected model's context limit for instructions, tools, new input, and the next response. Tool results can enlarge context between model calls. Summarization itself costs a model call and can fail.
 
-### How It Works
+## Custom strategies and filters
 
-1. When messages are loaded, the summarizer checks whether the context occupancy exceeds `TokenThreshold`
-2. If it does and there are more than `KeepRecentCount` runs, messages are grouped into the runs that produced them
-3. It keeps the most recent `KeepRecentCount` runs intact
-4. Older runs are summarized into a single message using the LLM
-5. The summary replaces the old messages, preserving context while reducing token usage
+Implement `history.HistorySummarizer` for another strategy. Its `SummaryResult` identifies the retained messages and summarization boundary. A `history.MessageFilter` can alter the messages selected for model input.
 
-Summarization is skipped entirely when the thread has `KeepRecentCount` runs or fewer — there would be nothing left to summarize.
-
-### How the token count is measured
-
-`TokenThreshold` is compared against the run's **context occupancy**: the last prompt-token count the provider actually reported, plus an estimate of everything appended since. The estimate is deliberately rough — roughly 4 characters per token, with a flat nominal cost for images and attached files — because it only has to cover the messages added since the last usage report, and is replaced by an exact number as soon as the next one arrives.
-
-The estimate runs low on code and structured text, which errs toward summarizing sooner. That is the safe direction: the cost of a needless summary is one extra call, and the cost of a missed one is a rejected request.
-
-### Summarization is billed to the run
-
-Producing a summary costs real tokens, and those are added to the run's usage total — so a run's reported spend includes the work done to shrink it.
-
-They are deliberately **not** folded into the context-occupancy figure the summarizer keys off. A summarization request is its own instruction plus a flattened transcript, with none of the agent's tools or system prompt; counting it as context would hand the summarizer a reading of a conversation that isn't the one it is deciding about.
-
-## Sliding Window Summarizer
-
-The sliding window summarizer keeps only the most recent N conversation runs and discards older ones. This is a simple, cost-effective approach that doesn't require an LLM.
-
-### Configuration
-
-```go
-import "github.com/hastekit/agent-sdk-go/pkg/agents/history/summariser"
-
-summarizer := summariser.NewSlidingWindowHistorySummarizer(&summariser.SlidingWindowHistorySummarizerOptions{
-    KeepCount: 10, // Keep only the last 10 conversation runs
-})
-```
-
-### Parameters
-
-- **`KeepCount`**: The number of recent conversation runs to retain. Older runs are discarded. Floored at `1`, so leaving it unset keeps the run in flight rather than discarding every turn.
-
-### How It Works
-
-1. Messages are grouped into the runs that produced them
-2. If the number of runs exceeds `KeepCount`, only the most recent `KeepCount` runs are kept
-3. Older runs are discarded without creating a summary
-4. This approach is simple and cost-effective but loses older context completely
-
-Unlike the LLM summarizer, this one has no token threshold — it trims purely by run count, and needs no model call, so `SummaryResult.Usage` is nil.
-
-<Note>
-**Runs are contiguous blocks.** A run id that reappears later starts a new group rather than reopening the earlier one, so a message arriving out of order can't be filed under an unrelated run and cut the trimming boundary in the wrong place. Adjacent messages with no run id of their own still group together, which is the conservative reading: fewer runs means the keep window covers more, not less.
-</Note>
-
-## Using Summarizers with Conversation Managers
-
-To use a summarizer, pass it to the conversation manager using `history.WithSummarizer()`:
-
-```go
-import (
-    "github.com/hastekit/agent-sdk-go/pkg/agents/history"
-    "github.com/hastekit/agent-sdk-go/pkg/agents/history/summariser"
-)
-
-// Create a summarizer
-summarizer := summariser.NewLLMHistorySummarizer(&summariser.LLMHistorySummarizerOptions{
-    LLM:                 summarizerLLM,
-    Instruction:         summarizerInstruction,
-    TokenThreshold:      1000,
-    KeepRecentCount:     5,
-})
-
-// Create conversation manager with summarizer
-p, _ := history.NewFileConversationPersistence("./conversations")
-cm := history.NewConversationManager(
-    p,
-    history.WithSummarizer(summarizer),
-)
-
-// Use with agent
-agent := hastekit.NewAgent(&hastekit.AgentConfig{
-    Name:        "Assistant",
-    Instruction: hastekit.NewPrompt("You are a helpful assistant."),
-    LLM:         model,
-    History:     cm,
-})
-```
-
-## Writing your own summarizer
-
-Implement `history.HistorySummarizer`:
-
-```go
-type HistorySummarizer interface {
-	Summarize(ctx context.Context, msgIdToRunId map[string]string, messages []messages.Message, contextTokens int) (*SummaryResult, error)
-}
-```
-
-Return `nil, nil` when no summarization is needed. Otherwise return a `SummaryResult`:
-
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| **Summary** | `*messages.Message` | The summary message. Nil for summarizers that only discard, like the sliding window |
-| **MessagesToKeep** | `[]messages.Message` | The turns to keep verbatim after the summary |
-| **LastSummarizedRunID** | `string` | The last run the summary covers |
-| **SummaryID** | `string` | Unique id for the summary; generated if empty |
-| **Usage** | `*responses.Usage` | What producing the summary cost, for summarizers that call a model. Nil otherwise |
-
-<Warning>
-A summary boundary naming the run still being written is refused and cleared — the summary row is saved but stays inert on reload. Floor your keep window at one run so the boundary always stops short of the most recent.
-</Warning>
-
-## Reading a summarized thread back
-
-Once a thread has been summarized, the agent's own history load returns the summary in place of the turns it covers. That is right for the model and wrong for a UI. To render the thread as written, use `LoadTranscript` — see [Reading a thread back](/hastekit-sdk/agents/conversations/history#reading-a-thread-back).
-
-## Complete Example: LLM Summarizer
-
-Here's a complete example using an LLM summarizer:
-
-```go
-package main
-
-import (
-	"context"
-	"log"
-	"os"
-
-	hastekit "github.com/hastekit/agent-sdk-go"
-	"github.com/hastekit/agent-sdk-go/pkg/agents"
-	"github.com/hastekit/agent-sdk-go/pkg/agents/history"
-	"github.com/hastekit/agent-sdk-go/pkg/agents/history/summariser"
-	"github.com/hastekit/agent-sdk-go/pkg/gateway/llm/responses"
-)
-
-func main() {
-	// Configure an LLM client
-    client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
-        {
-            ProviderName:  hastekit.ProviderOpenAI,
-            BaseURL:       "",
-            CustomHeaders: nil,
-            ApiKeys: []*hastekit.APIKeyConfig{
-                {
-                    Name:   "Key 1",
-                    APIKey: os.Getenv("OPENAI_API_KEY"),
-                },
-            },
-        },
-    })
-
-	// Create main agent LLM
-	model := client.Model("OpenAI/gpt-4o-mini")
-
-	// Create summarizer LLM (can use a cheaper/faster model)
-	summarizerLLM := client.Model("OpenAI/gpt-4o-mini")
-
-	// Create summarizer instruction
-	summarizerInstruction := hastekit.NewPrompt(
-		"You are a conversation summarizer. Create concise summaries that preserve important context, decisions, and information needed for future interactions.",
-	)
-
-	// Create LLM summarizer
-	summarizer := summariser.NewLLMHistorySummarizer(&summariser.LLMHistorySummarizerOptions{
-		LLM:             summarizerLLM,
-		Instruction:     summarizerInstruction,
-		TokenThreshold:  1000, // Summarize when tokens exceed 1000
-		KeepRecentCount: 5,    // Keep last 5 runs
-		Parameters:      responses.Parameters{},
-	})
-
-	// Create conversation manager with summarizer
-	p, _ := history.NewFileConversationPersistence("./conversations")
-	cm := history.NewConversationManager(
-		p,
-		history.WithSummarizer(summarizer),
-	)
-
-	// Create agent with history
-	agent := hastekit.NewAgent(&hastekit.AgentConfig{
-		Name:        "Assistant",
-		Instruction: hastekit.NewPrompt("You are a helpful assistant."),
-		LLM:         model,
-		History:     cm,
-	})
-
-	// Execute agent (summarization happens automatically when threshold is exceeded)
-	handle, err := agent.Execute(context.Background(), &agents.AgentInput{
-		Message: history.Message{
-            Messages: []responses.InputMessageUnion{
-			    responses.UserMessage("Hello!"),
-			},
-		},
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-	out, err := handle.Result()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	log.Println(out.Output[0].OfOutputMessage.Content[0].OfOutputText.Text)
-}
-```
-
-## Complete Example: Sliding Window Summarizer
-
-Here's a complete example using a sliding window summarizer:
-
-```go
-package main
-
-import (
-	"context"
-	"log"
-	"os"
-
-	hastekit "github.com/hastekit/agent-sdk-go"
-	"github.com/hastekit/agent-sdk-go/pkg/agents"
-	"github.com/hastekit/agent-sdk-go/pkg/agents/history"
-	"github.com/hastekit/agent-sdk-go/pkg/agents/history/summariser"
-	"github.com/hastekit/agent-sdk-go/pkg/gateway/llm/responses"
-)
-
-func main() {
-	// Configure an LLM client
-    client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
-        {
-            ProviderName:  hastekit.ProviderOpenAI,
-            BaseURL:       "",
-            CustomHeaders: nil,
-            ApiKeys: []*hastekit.APIKeyConfig{
-                {
-                    Name:   "Key 1",
-                    APIKey: os.Getenv("OPENAI_API_KEY"),
-                },
-            },
-        },
-    })
-
-	model := client.Model("OpenAI/gpt-4o-mini")
-
-	// Create sliding window summarizer
-	summarizer := summariser.NewSlidingWindowHistorySummarizer(&summariser.SlidingWindowHistorySummarizerOptions{
-		KeepCount: 10, // Keep only the last 10 conversation runs
-	})
-
-	// Create conversation manager with summarizer
-	p, _ := history.NewFileConversationPersistence("./conversations")
-	cm := history.NewConversationManager(
-		p,
-		history.WithSummarizer(summarizer),
-	)
-
-	// Create agent
-	agent := hastekit.NewAgent(&hastekit.AgentConfig{
-		Name:        "Assistant",
-		Instruction: hastekit.NewPrompt("You are a helpful assistant."),
-		LLM:         model,
-		History:     cm,
-	})
-
-	// Execute agent
-	handle, err := agent.Execute(context.Background(), &agents.AgentInput{
-		Message: history.Message{
-            Messages: []responses.InputMessageUnion{
-			    responses.UserMessage("Hello!"),
-			},
-		},
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-	out, err := handle.Result()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	log.Println(out.Output[0].OfOutputMessage.Content[0].OfOutputText.Text)
-}
-
-```
+Keep related tool calls and outputs together, preserve unresolved interruptions, and test continuation after a summary boundary. Use the transcript APIs for display rather than reconstructing chat history from the shortened model context.

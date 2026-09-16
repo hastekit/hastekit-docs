@@ -1,148 +1,40 @@
 ---
-title: Sandbox Tool
-icon: box
-description: Run bash commands in a per-session isolated environment
+title: "Sandbox tools"
+description: "Run shell and file operations through a host-provided sandbox manager."
 ---
 
-The Sandbox tools let your agent run bash commands and manipulate files in an isolated environment. Each conversation gets its own sandbox with a persistent workspace. The agent uses the **execute_bash_commands** tool to run shell commands and receive stdout, stderr, and exit code, plus optional file tools to read, write, and delete files.
+Sandbox tools delegate shell and file operations to an `agents/sandbox.Manager`. The SDK defines the tool integration; the configured sandbox service is responsible for provisioning and isolating the execution environment.
 
-## Overview
+## Register tools
 
-When you attach the Sandbox tools to an agent:
-
-- The agent can call **execute_bash_commands** with a `code` parameter (the bash command to run).
-- The sandbox is provisioned through a **sandbox manager** (`sandbox.Manager`). The SDK ships an HTTP-backed manager, obtained from `(&hastekitgateway.Config{...}).NewSandboxClient()`, which talks to the HasteKit sandbox service. That service provisions one sandbox per session.
-- The workspace is rooted at `/workspace`. The bash tool persists its working directory across calls, so a `cd` in one command carries over to the next.
-
-## Example: Agent with Sandbox
-
-The following example uses the HasteKit SDK to create an agent with the bash tool, backed by the HTTP sandbox manager. It runs a single turn asking for the current time; the agent will use **execute_bash_commands** to run e.g. `date`.
+Given a configured `manager` implementing `sandbox.Manager`, import `pkg/agents/tools` and add:
 
 ```go
-package main
-
-import (
-	"context"
-	"fmt"
-	"log"
-	"net/http"
-	"os"
-
-	"github.com/bytedance/sonic"
-	"github.com/hastekit/agent-sdk-go/pkg/agents"
-	"github.com/hastekit/agent-sdk-go/pkg/agents/history"
-	"github.com/hastekit/agent-sdk-go/pkg/agents/tools"
-	"github.com/hastekit/agent-sdk-go/pkg/gateway/llm/responses"
-	"github.com/hastekit/agent-sdk-go/pkg/hastekitgateway"
-	hastekit "github.com/hastekit/agent-sdk-go"
-)
-
-func main() {
-    client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
-        {
-            ProviderName: hastekit.ProviderOpenAI,
-            ApiKeys: []*hastekit.APIKeyConfig{
-                {
-                    Name:   "Key 1",
-                    APIKey: os.Getenv("OPENAI_API_KEY"),
-                },
-            },
-        },
-    })
-
-	model := client.Model("OpenAI/gpt-4.1-mini")
-
-	cm := hastekit.NewFileHistory("./conversations")
-
-	// HTTP-backed sandbox manager that talks to the HasteKit sandbox service.
-	gatewayCfg := &hastekitgateway.Config{
-		Endpoint:   "<sandbox-service-endpoint>",
-		HttpClient: http.DefaultClient,
-	}
-	sandboxManager := gatewayCfg.NewSandboxClient()
-
-	agent := hastekit.NewAgent(&hastekit.AgentConfig{
-		Name:        "hello-world-agent",
-		Instruction: hastekit.NewPrompt("You are a helpful assistant with access to terminal (bash)"),
-		LLM:         model,
-		History:     cm,
-		Tools: []hastekit.Tool{
-			tools.NewBashTool(sandboxManager, "hastekit-ai-sandbox:v7", nil),
-		},
-	})
-
-	handle, err := agent.Execute(context.Background(), &agents.AgentInput{
-		Message: history.Message{
-            Messages: []responses.InputMessageUnion{
-			    responses.UserMessage("What is the current time?"),
-			},
-		},
-		Namespace:         "default",
-		PreviousMessageID: "",
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-	out, err := handle.Result()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	b, _ := sonic.Marshal(out)
-	fmt.Println(string(b))
+sandboxTools := []hastekit.Tool{
+    tools.NewBashTool(manager, "your-sandbox-image", nil),
+    tools.NewReadFileTool(manager, "your-sandbox-image", nil),
+    tools.NewWriteFileTool(manager, "your-sandbox-image", nil),
+    tools.NewDeleteFileTool(manager, "your-sandbox-image", nil),
 }
 ```
 
-## Key pieces
+Pass this slice as `AgentConfig.Tools`. The image is application configuration and must exist in your sandbox service. An optional environment map can supply run-context-templated values.
 
-- **LLM client** – `hastekit.NewLLMClient` with provider configs (e.g. OpenAI). Bind a model with `client.Model("Provider/model")`.
-- **Sandbox manager** – `(&hastekitgateway.Config{Endpoint: ..., HttpClient: ...}).NewSandboxClient()` returns an HTTP client that implements `sandbox.Manager` (`CreateSandbox`, `GetSandbox`, `DeleteSandbox`). It talks to the HasteKit sandbox service, which provisions one sandbox per session.
-- **Sandbox image** – The image name passed to the tool (e.g. `hastekit-ai-sandbox:v7`). The sandbox service uses it when provisioning the sandbox for the session.
-- **Environment variables** – The `env map[string]string` argument is forwarded into the sandbox. Its values are run-context templated, so you can reference run-context fields when constructing env values.
-- **Tool registration** – `tools.NewBashTool(svc, image, env)` returns an `agents.Tool` that exposes **execute_bash_commands** to the LLM. Pass it in `AgentConfig.Tools` along with any other tools.
+The SDK's `pkg/hastekitgateway.Config.NewSandboxClient` is an HTTP adapter for the HasteKit sandbox service. You can supply another implementation of the manager interface. The SDK does not start a local container simply because a sandbox tool is configured.
 
-## File tools
+## Tool behavior
 
-Alongside the bash tool, the SDK exposes file tools that share the same `(svc sandbox.Manager, image string, env map[string]string)` signature and operate on the same per-session sandbox:
+| Tool | Operation |
+|---|---|
+| `execute_bash_commands` | Run the `code` argument as shell commands |
+| `read_file` | Read a file in the sandbox |
+| `write_file` | Write file content |
+| `delete_file` | Remove a file |
 
-| Constructor | Tool name | Purpose |
-|-------------|-----------|---------|
-| `tools.NewReadFileTool(svc, image, env)`   | `read_file`   | Read file content from a path |
-| `tools.NewWriteFileTool(svc, image, env)`  | `write_file`  | Write content to a path |
-| `tools.NewDeleteFileTool(svc, image, env)` | `delete_file` | Delete the file at a path |
+The bash tool starts from `/workspace` and records the working directory in tool state so later commands can continue there. Session identity selects the sandbox; preserve it when related calls should use the same environment.
 
-## Tool: execute_bash_commands
+## Deployment responsibilities
 
-The bash tool exposes a single function to the LLM:
+Configure filesystem boundaries, process limits, command timeouts, network access, credentials, and cleanup in the sandbox service. A model-visible tool description is not an isolation policy. Avoid injecting application-wide secrets when a scoped credential is sufficient.
 
-| Property       | Value |
-|----------------|-------|
-| **Name**       | `execute_bash_commands` |
-| **Description**| Execute bash command and get the output |
-| **Parameters** | `code` (string, required) – the bash command to execute |
-
-The working directory is persisted across calls: after each command the tool records the resulting `cwd` via state updates (`sandbox_cwd`) and restores it on the next call, defaulting to `/workspace`.
-
-## Response format
-
-The sandbox returns a JSON object with:
-
-| Field        | Type  | Description |
-|-------------|-------|-------------|
-| `stdout`    | string| Standard output of the command |
-| `stderr`    | string| Standard error |
-| `exit_code` | int   | Process exit code (0 for success) |
-| `duration_ms` | int64 | Execution time in milliseconds |
-
-Timeouts are enforced by the daemon (default 60 seconds). On timeout, the response may indicate failure and the process is killed.
-
-## Summary
-
-| Aspect      | Detail |
-|-------------|--------|
-| Tool name   | `execute_bash_commands` |
-| Parameter   | `code` (string) – bash command |
-| SDK API     | `tools.NewBashTool(svc, image, env)` |
-| File tools  | `tools.NewReadFileTool` / `tools.NewWriteFileTool` / `tools.NewDeleteFileTool` |
-| Manager     | `(&hastekitgateway.Config{Endpoint, HttpClient}).NewSandboxClient()` (implements `sandbox.Manager`) |
-| Workspace   | `/workspace` (cwd persisted across calls via `sandbox_cwd`) |
+Inspect command exit status and stderr in tool results. Do not assume a transport-successful tool response means the shell command succeeded. Use [approval](/hastekit-sdk/agents/tools/human-in-the-loop) or [middleware](/hastekit-sdk/agents/hooks) for sensitive operations.

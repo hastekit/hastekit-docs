@@ -1,0 +1,63 @@
+---
+title: "Built-in nodes"
+description: "Configure MCP, HTTP, human, agent, branch, delay, and JavaScript nodes."
+---
+
+Each built-in has a typed Go constructor returning `(workflow.Node, error)`. The YAML loader calls the same constructors. Use the same node ID in the constructor and `Graph.AddNode`.
+
+| YAML type | Go constructor/config | Ports |
+|---|---|---|
+| `mcp` | `NewMCPNode`, `MCPNodeConfig` | `default` |
+| `api` | `NewAPINode`, `APINodeConfig` | `default` |
+| `human` | `NewHumanNode`, `HumanNodeConfig` | `approved`, `rejected` |
+| `agent` | `NewAgentNode`, `AgentNodeConfig` | `default` |
+| `if_else` | `NewIfElseNode`, `IfElseNodeConfig` | `true`, `false` |
+| `switch` | `NewSwitchNode`, `SwitchNodeConfig` | Case port or `default` |
+| `delay` | `NewDelayNode`, `DelayNodeConfig` | `default` |
+| `javascript` | `NewJavaScriptNode`, `JavaScriptNodeConfig` | `default` |
+
+JSON configuration is copied at construction. Injected clients, agents, and connectors remain shared dependencies and must support concurrent use.
+
+## MCP call
+
+Given a configured `connector`:
+
+```go
+record, err := workflow.NewMCPNode("record", workflow.MCPNodeConfig{
+    Server: connector,
+    Tool: "record_payment",
+    Arguments: map[string]any{"amount": "${{ input.amount }}"},
+})
+if err != nil { return err }
+_ = record
+```
+
+Go passes the connector directly; YAML uses `server`, `tool`, and optional `arguments`. Arguments must resolve to an object. Approval and supported MCP interruption state are preserved for resume. Background MCP tasks are not supported by this workflow node.
+
+## HTTP API call
+
+`APINodeConfig` accepts `URL`, `Method`, `Headers`, `Body`, `HTTPClient`, `Timeout`, `MaxResponseBytes`, and `ExpressionTimeout`. YAML accepts `url`, `method`, `headers`, `body`, and `timeout`.
+
+URL, headers, and body support bindings. The default method is GET, timeout is 30 seconds, and response limit is 4 MiB. A body is encoded as JSON. Non-2xx responses fail the node. Output is `{status, headers, body}`; JSON bodies are decoded and other bodies become text. Use an injected HTTP client to configure transport, authentication, and endpoint restrictions.
+
+## Human input
+
+`HumanNodeConfig{Message: "Approve?", Schema: schema}` accepts an optional JSON schema for form content. YAML fields are `message` and `schema`. Resolve a pause with `action: approve` or `action: reject`; output records the decision. See [pause and resume](/hastekit-sdk/workflows/pausing-and-resuming).
+
+## Agent invocation
+
+`AgentNodeConfig{Agent: runner, Message: "${{ input.question }}"}` runs an agent synchronously with the node context. YAML selects it with `agent` and `message`. Child threads are isolated using workflow run/node identity. A child interruption pauses the workflow and saves its continuation identifiers. Trusted application context is forwarded from `RunContext.context`.
+
+## Branches
+
+`IfElseNodeConfig.Condition` must evaluate to a boolean. `SwitchNodeConfig.Value` resolves a value and compares it to literal `SwitchCase.Value` entries; `Port` selects the outgoing edge. YAML uses `condition`, or `value` plus `cases: [{value: ..., port: ...}]`. Switch falls back to `default` when no case matches.
+
+## Delay
+
+Go uses `DelayNodeConfig{Duration: time.Second}`. YAML uses `duration: 1s`. Durations must be non-negative. The local executor uses a cancellable Go timer; the Temporal executor uses a durable Temporal timer without occupying an activity slot. Output contains the canonical duration string.
+
+## JavaScript
+
+`JavaScriptNodeConfig.Code` is a synchronous function body such as `return input.amount * 2;`. YAML uses `code`. Values must be JSON-compatible; promises, undefined results, and unsupported output values fail. There is no Node.js runtime, filesystem API, or asynchronous event loop.
+
+Expression/code timeouts default to one second. Use `Timeout` on expression-bearing Go configs, or `ExpressionTimeout` for API expressions. The API node's `Timeout` instead controls the HTTP request. These execution limits do not provide isolation from untrusted code.

@@ -1,0 +1,73 @@
+---
+title: "Attachments and S3 storage"
+description: "Keep media in owned storage and resolve it only at the model boundary."
+---
+
+Attachments separate binary media from conversation history. Messages store immutable `attachment://` references; middleware reads the bytes only when building a model request and stores supported inline results before they enter durable agent state.
+
+A reference is opaque SDK data, not a provider file ID or downloadable URL. Ordinary provider file IDs continue to pass through unchanged.
+
+## Choose a store
+
+The SDK includes a filesystem `FileStore` and an `S3Store`. Both implement the upload/read interfaces used by the resolver, middleware, and HTTP attachment handler.
+
+For local storage, import `pkg/attachments`:
+
+```go
+store, err := attachments.NewFileStore("./data/attachments", attachments.FileStoreConfig{
+    MaxFileBytes: 20 << 20,
+})
+if err != nil { return err }
+defer store.Close()
+resolver := attachments.NewResolver(store, attachments.Config{
+    CacheBytes: 64 << 20,
+    MaxFileBytes: 20 << 20,
+    MaxConcurrentLoads: 4,
+})
+```
+
+Share the resolver among agents using the same store to reuse its bounded cache. Close a file store only after its users finish.
+
+For S3, supply an AWS SDK v2 client configured with your region and credentials:
+
+```go
+store, err := attachments.NewS3Store(s3Client, attachments.S3StoreConfig{
+    Bucket: "private-agent-attachments",
+    Prefix: "attachments",
+    MaxFileBytes: 20 << 20,
+})
+if err != nil { return err }
+resolver := attachments.NewResolver(store, attachments.Config{})
+```
+
+Create the bucket separately. The client needs object put/get access for the prefix; metadata lookup uses `HeadObject`. Configure encryption, lifecycle, and access policy in your infrastructure. The store does not create a public ACL or expose S3 URLs.
+
+S3-compatible services must support conditional puts (`If-None-Match: *`) and conditional gets (`If-Match`). Objects contain content metadata and a digest; references carry a content version. Bucket versioning is optional. Uploads are buffered up to the configured size limit (20 MiB by default), so account for concurrent upload memory.
+
+## Install agent middleware
+
+With `store` and `resolver` configured, import `pkg/agents/middleware`:
+
+```go
+attachmentMiddleware := middleware.NewAttachmentMiddleware(middleware.AttachmentMiddlewareConfig{
+    Store: store,
+    Resolver: resolver,
+    MaxInlineBytes: 32 << 20,
+})
+```
+
+Set `AgentConfig.Middlewares` to include this value. The middleware resolves attachment inputs inside model calls and externalizes supported inline tool/model media before it is persisted. Installing a store alone does not enable model resolution.
+
+Use `attachments.FileID(ref)` in an image/file input's `FileID`, and `attachments.RefFromFileID` to decode a reference. Generated images use the existing `image_generation_call.result` field. A direct LLM call without this middleware does not resolve SDK-owned references.
+
+## Enable browser uploads
+
+Pass `agui.WithAttachmentStore(store)` to `web.Handler` or `agui.NewHandler`. Use the same store in the agent middleware. The attachment endpoints use the handler's resolved namespace, and the embedded UI enables its file picker when support is advertised.
+
+Images become image inputs; other files become native file inputs with their stored filename and MIME type. The middleware does not extract document text, convert file formats, or transcribe audio. The selected provider decides whether it supports the supplied type.
+
+## Durable deployment
+
+Every worker that resolves a reference must be able to access its storage. Use shared object storage or an appropriately shared filesystem; a path on the HTTP server alone is insufficient. Namespace authorization is supplied by the caller, not inferred from a reference.
+
+Keep upload, resolver, middleware, HTTP, and provider limits consistent. Protect checkpoints and history that contain private file references, and avoid placing secrets in filenames or ordinary model-visible tool output.

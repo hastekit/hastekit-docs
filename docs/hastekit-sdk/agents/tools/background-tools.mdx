@@ -1,0 +1,20 @@
+---
+title: "Background tools"
+description: "Start long-running work and deliver its result to the conversation later."
+---
+
+A background tool returns an acknowledgement immediately while its work continues. Completion is delivered to the original thread, either into an active run or through a new run. This differs from [deferred tools](/hastekit-sdk/agents/tools/deferred-tools), which defer schema discovery rather than execution.
+
+## Choose a tool API
+
+`hastekit.NewBackgroundTool` accepts `func(context.Context, In, hastekit.ProgressReporter) (Out, error)` and the same naming/description options as a function tool. The runtime runs that work separately and encodes its result for the conversation.
+
+For an external job with separate start and wait operations, implement `agents.BackgroundTool`: `Execute` starts it, and `AwaitTask` waits for completion. Put the external task identity and continuation data in the serialized task payload; do not depend on a closure created during the initial call.
+
+## Lifetime and state
+
+Local agents use an in-process supervisor, so background work does not survive process loss. Temporal and Restate provide their own background runners. A custom durable runtime without a runner must not silently accept work it cannot complete.
+
+Report progress through the supplied reporter, and pass the context to blocking work. Completion and progress have their own broker stream and thread identity. Keep the original namespace and session boundaries when delivering results.
+
+Make the external job submission and completion handling idempotent if the durable execution can retry. Stopping a wait or short-circuiting it in middleware does not necessarily cancel a job already submitted to another service.

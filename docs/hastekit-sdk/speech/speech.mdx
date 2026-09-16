@@ -1,205 +1,32 @@
 ---
-title: Speech
-icon: volume-high
+title: "Speech generation"
+description: "Generate audio and consume provider-supported audio streams."
 ---
 
-HasteKit SDK supports text-to-speech generation with various LLM providers like OpenAI.
+`NewSpeech` converts text into audio with a speech-capable model. Import `pkg/gateway/llm/speech` and configure an appropriate provider and voice.
 
-## Generate speech
-
-Generate audio from text input. The response contains raw binary audio data and content type information.
+Given `client` and `ctx`:
 
 ```go
-import (
-    "context"
-    "fmt"
-    "log"
-    "os"
-    "github.com/hastekit/agent-sdk-go/pkg/gateway/llm/speech"
-)
-
-resp, err := model.NewSpeech(context.Background(), &speech.Request{
-    Input: "Hello, this is a test of the text-to-speech system.",
+model := client.Model("OpenAI/tts-1")
+response, err := model.NewSpeech(ctx, &speech.Request{
+    Input: "Welcome to the application.",
     Voice: "alloy",
 })
-if err != nil {
-    log.Fatal(err)
-}
-
-// Save audio to file
-err = os.WriteFile("output.mp3", resp.Audio, 0644)
-if err != nil {
-    log.Fatal(err)
-}
-
-// Access content type
-fmt.Println("Content-Type:", resp.ContentType)
+if err != nil { return err }
+if err := os.WriteFile("speech.mp3", response.Audio, 0600); err != nil { return err }
 ```
 
-## Response
+This example uses an MP3-producing configuration. In an application, check `response.ContentType` and use the matching extension or HTTP content type. `Audio` contains bytes, not a base64 string.
 
-The response contains the audio data as a byte array and the content type (e.g., `audio/mpeg`, `audio/opus`).
+## Configure the request
 
-```go
-// Access raw audio bytes
-audioData := resp.Audio
-fmt.Printf("Audio size: %d bytes\n", len(audioData))
+The shared request contains `Input`, `Voice`, optional `Language`, `Instruction`, `ResponseFormat`, `Speed`, and `StreamFormat`. Provider/model support differs. The Go type of `Speed` is currently `*int`; do not copy a fractional speed value from a provider's native API into this struct.
 
-// Access content type
-fmt.Println("Content-Type:", resp.ContentType)
+Choose a supported voice and output format for the provider. The SDK does not convert arbitrary provider audio formats into a common codec.
 
-// The audio data may be gzip-compressed, which is automatically handled by the SDK
-```
+## Stream audio
 
----
+Use `NewStreamingSpeech` for an adapter that supports streaming. The channel yields `OfAudioDelta` with base64-encoded audio chunks and `OfAudioDone` with terminal usage. Decode chunks with error checking and write them in order using the selected codec's framing requirements.
 
-## Streaming Speech
-
-For real-time applications, the SDK supports streaming speech generation. This returns a channel that yields audio chunks as they are generated.
-
-```go
-import (
-    "context"
-    "fmt"
-    "github.com/hastekit/agent-sdk-go/pkg/utils"
-    "github.com/hastekit/agent-sdk-go/pkg/gateway/llm/speech"
-)
-
-stream, err := model.NewStreamingSpeech(context.Background(), &speech.Request{
-    Input: "This is a streaming text-to-speech example.",
-    Voice: "alloy",
-    Speed: utils.Ptr(1), // Speed parameter enables streaming
-})
-if err != nil {
-    panic(err)
-}
-
-var audioChunks []string
-for chunk := range stream {
-    // Handle audio delta chunks
-    if chunk.OfAudioDelta != nil {
-        audioChunks = append(audioChunks, chunk.OfAudioDelta.Audio)
-    }
-    
-    // Handle completion chunk with usage statistics
-    if chunk.OfAudioDone != nil {
-        fmt.Printf("\nCompleted! Tokens used: %d\n", chunk.OfAudioDone.Usage.TotalTokens)
-    }
-}
-```
-
-## Request Configuration
-
-| Parameter | Type | Description |
-| :--- | :--- | :--- |
-| **Input** | `string` | The text input to convert to speech. |
-| **Model** | `string` | The speech model to use (e.g., `"tts-1"`, `"tts-1-hd"`). |
-| **Voice** | `string` | The voice to use (e.g., `"alloy"`, `"echo"`, `"fable"`, `"onyx"`, `"nova"`, `"shimmer"`). |
-| **Language** | `*string` | Optional. Language of the speech output. |
-| **Instruction** | `*string` | Optional. Instructions for the voice style or pronunciation. |
-| **ResponseFormat** | `*string` | Optional. Audio format: `"mp3"`, `"opus"`, `"aac"`, `"flac"`, or `"pcm"`. Default is `"mp3"`. |
-| **Speed** | `*int` | Optional. Integer speed multiplier for the generated audio (must be a whole number). When set, enables streaming mode (`IsStreamingRequest` returns true iff `Speed != nil`). |
-| **StreamFormat** | `*string` | Optional. Format for streaming responses (e.g., `"pcm"`). |
-
-## Response Structure
-
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| **Audio** | `[]byte` | Raw binary audio data. Automatically decompressed if gzip-compressed. |
-| **ContentType** | `string` | MIME type of the audio (e.g., `"audio/mpeg"`, `"audio/opus"`). |
-| **Usage** | `Usage` | Token usage statistics. |
-| **RawFields** | `map[string]any` | Raw provider response fields. |
-
-## Streaming Response Chunks
-
-When using streaming, the response channel yields `ResponseChunk` objects:
-
-### ChunkAudioDelta
-
-Contains incremental audio data during streaming.
-
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| **Type** | `ChunkTypeAudioDelta` | Chunk type identifier: `"speech.audio.delta"`. |
-| **Audio** | `string` | Base64-encoded audio chunk data. |
-
-### ChunkAudioDone
-
-Sent when streaming is complete, includes usage statistics.
-
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| **Type** | `ChunkTypeAudioDone` | Chunk type identifier: `"speech.audio.done"`. |
-| **Usage** | `Usage` | Token usage statistics. |
-
-### Usage
-
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| **InputTokens** | `int` | Number of input tokens processed. |
-| **InputTokensDetails.CachedTokens** | `int` | Number of cached input tokens. |
-| **OutputTokens** | `int` | Number of output tokens generated. |
-| **OutputTokensDetails.ReasoningTokens** | `int` | Number of reasoning tokens. |
-| **TotalTokens** | `int` | Total tokens used. |
-
-## Example: Complete Speech Generation
-
-```go
-package main
-
-import (
-    "context"
-    "log"
-    "os"
-    
-    "github.com/hastekit/agent-sdk-go/pkg/utils"
-    "github.com/hastekit/agent-sdk-go/pkg/gateway/llm/speech"
-    hastekit "github.com/hastekit/agent-sdk-go"
-)
-
-func main() {
-    // Initialize the LLM client and bind a model
-    client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
-        {
-            ProviderName:  hastekit.ProviderOpenAI,
-            BaseURL:       "",
-            CustomHeaders: nil,
-            ApiKeys: []*hastekit.APIKeyConfig{
-                {
-                    Name:   "Key 1",
-                    APIKey: os.Getenv("OPENAI_API_KEY"),
-                },
-            },
-        },
-    })
-
-    model := client.Model("OpenAI/tts-1")
-
-    // Generate speech
-    resp, err := model.NewSpeech(context.Background(), &speech.Request{
-        Input:          "Hello! This is a text-to-speech example using HasteKit SDK.",
-        Voice:          "alloy",
-        ResponseFormat: utils.Ptr("mp3"),
-    })
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    // Save audio file
-    err = os.WriteFile("output.mp3", resp.Audio, 0644)
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    log.Printf("Audio generated successfully! Size: %d bytes, Type: %s\n", 
-        len(resp.Audio), resp.ContentType)
-}
-```
-
-## Supported Providers
-
-| Provider | Speech |
-| :--- | :---: |
-| **OpenAI** | ✅ |
-| **Gemini** | ✅ |
-| **Anthropic** | ❌ |
+Pass a cancellable context and cancel it when playback or consumption stops. Not every speech adapter supports the streaming method; handle unsupported-operation and initial request errors. Do not assume the Responses text-stream error protocol also exists on the speech chunk type.

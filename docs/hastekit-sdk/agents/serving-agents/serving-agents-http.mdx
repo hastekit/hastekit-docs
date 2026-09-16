@@ -1,163 +1,36 @@
 ---
-title: Serving Agents through HTTP
-icon: server
+title: "SDK event-stream HTTP handler"
+description: "Serve SDK-native response events through a small HTTP adapter."
 ---
 
-Agents can be served as HTTP endpoints, allowing them to be invoked through standard HTTP requests. `hastekit.NewHTTPHandler()` returns an `http.Handler` that dispatches to any registered agent, making it compatible with Go's standard `net/http` package.
+`hastekit.NewHTTPHandler` accepts SDK `AgentInput` JSON and emits SDK response chunks as server-sent events. Use [AG-UI](/hastekit-sdk/agents/serving-agents/serving-agents-agui) for the embedded UI, thread APIs, namespace resolution, and reconnect support.
 
-## Creating an HTTP Server
+## Register and mount
 
-Register your agents with `hastekit.NewAgent`, then serve `hastekit.NewHTTPHandler()`:
-
-```go
-client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
-    {
-        ProviderName: hastekit.ProviderOpenAI,
-        ApiKeys: []*hastekit.APIKeyConfig{
-            {
-                Name:   "Key 1",
-                APIKey: os.Getenv("OPENAI_API_KEY"),
-            },
-        },
-    },
-})
-
-// Create agents — they register into a package-global registry
-hastekit.NewAgent(&hastekit.AgentConfig{
-    Name:        "SampleAgent",
-    Instruction: hastekit.NewPrompt("You are helpful assistant."),
-    LLM:         client.Model("OpenAI/gpt-4o-mini"),
-})
-
-// Start HTTP server
-http.ListenAndServe(":8070", hastekit.NewHTTPHandler())
-```
-
-## Invoking an Agent
-
-Send a POST request to `http://localhost:8070/?agent=<agent-name>` with the request body as `agents.AgentInput`:
-
-```bash
-curl -X POST "http://localhost:8070/?agent=SampleAgent" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "messages": {
-      "sender_id": "user",
-      "messages": [
-        {
-          "role": "user",
-          "content": "Hello!"
-        }
-      ]
-    }
-  }'
-```
-
-The `messages` key maps to `AgentInput.Message`, which is a single message **object** (not an array). It holds a `sender_id` and the actual `messages` array of input messages.
-
-### Response: Server-Sent Events
-
-The handler streams the run back as an event stream, not a single JSON body. It sets `Content-Type: text/event-stream` and emits one frame per chunk:
-
-```
-event: <ChunkType>
-data: <json chunk>
-
-```
-
-The server requires the response writer to support flushing (an `http.Flusher`); if it doesn't, it responds with `500 streaming unsupported`. Clients should read the response as an SSE stream and process each `data:` payload as it arrives.
-
-### Request Structure
-
-The request body follows the `agents.AgentInput` structure:
+Given an initialized `agent` and `mux`:
 
 ```go
-type AgentInput struct {
-    Namespace         string          `json:"namespace"`
-    ThreadID          string          `json:"thread_id"`
-    PreviousMessageID string          `json:"previous_message_id"`
-    Message           history.Message `json:"messages"`
-    RunContext        map[string]any  `json:"run_context"`
-    StreamID          string          `json:"stream_id,omitempty"`
-    SessionID         string          `json:"shared_session_id"`
-}
+registry := hastekit.NewRegistry()
+if err := registry.Register(agent); err != nil { return err }
+mux.Handle("POST /agent", hastekit.NewHTTPHandler(registry))
 ```
 
-Where `history.Message` (an alias of `messages.Message`) carries a sender-attributed bundle of provider messages:
+The method restriction is on your mux. The handler selects the agent from the `agent` query parameter:
 
-```go
-type Message struct {
-    ID       string                        `json:"id"`
-    SenderID string                        `json:"sender_id"`
-    Messages []responses.InputMessageUnion `json:"messages"`
-}
+```sh
+curl -N http://localhost:8080/agent?agent=assistant   -H 'Content-Type: application/json'   -d '{"namespace":"default","thread_id":"thread-1","messages":{"messages":[{"role":"user","content":"Hello"}]}}'
 ```
 
-- `namespace` - Optional. Namespace for conversation isolation
-- `thread_id` - Optional. Thread to continue (or empty to start a new one)
-- `previous_message_id` - Optional. Previous message ID for conversation history
-- `messages` - Required. A single message bundle (`history.Message`) with a `sender_id` and the `messages` array of input messages
-- `run_context` - Optional. Additional context for the execution
-- `stream_id` - Optional. Broker channel id; the server generates one if empty. The HTTP handler streams chunks back as Server-Sent Events as the run progresses.
-- `shared_session_id` - Optional. Conversation ID shared by a parent agent and its sub-agent
+`messages` is a message bundle containing an inner message list. This body is not the AG-UI `RunAgentInput` shape.
 
-## Complete Example
+## Stream handling
 
-```go
-package main
+Each event has an `event` name from the SDK chunk type and a JSON `data` payload. Handle error events even after HTTP 200. A closed stream alone does not prove the model completed successfully.
 
-import (
-	"net/http"
-	"os"
+The adapter uses detached `agent.Execute` execution. Losing the HTTP connection disconnects the subscriber; it does not automatically stop the run. Use an application stop endpoint or the AG-UI handler when clients need run controls.
 
-	hastekit "github.com/hastekit/agent-sdk-go"
-)
+## Application boundary
 
-func main() {
-	client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
-		{
-			ProviderName: hastekit.ProviderOpenAI,
-			ApiKeys: []*hastekit.APIKeyConfig{
-				{
-					Name:   "Key 1",
-					APIKey: os.Getenv("OPENAI_API_KEY"),
-				},
-			},
-		},
-	})
+Wrap this handler with authentication, authorization, request-body limits, and appropriate server timeouts. In particular, the SDK-native input accepts namespace and run-context fields: a public caller must not be allowed to choose privileged values unchecked. This minimal handler does not implement the AG-UI namespace resolver.
 
-	model := client.Model("OpenAI/gpt-4.1-mini")
-
-	history := hastekit.NewFileHistory("./conversations")
-	agentName := "SampleAgent"
-	_ = hastekit.NewAgent(&hastekit.AgentConfig{
-		Name:        agentName,
-		Instruction: hastekit.NewPrompt("You are helpful assistant."),
-		LLM:         model,
-		History:     history,
-	})
-
-	http.ListenAndServe(":8070", hastekit.NewHTTPHandler())
-
-	// You can then invoke by hitting POST http://localhost:8070/?agent=SampleAgent with `agents.AgentInput` as your payload
-	/*
-		  curl -X POST "http://localhost:8070/?agent=SampleAgent" \
-		  -H "Content-Type: application/json" \
-		  -d '{
-			"messages": {
-			  "sender_id": "user",
-			  "messages": [
-				{
-				  "role": "user",
-				  "content": "Hello!"
-				}
-			  ]
-			}
-		  }'
-	*/
-}
-```
-
-## Serving over AG-UI
-
-The raw `http.Handler` above is the simplest way to expose an agent, but it speaks the SDK's own `AgentInput` shape. For a standards-based option that works with CopilotKit and other off-the-shelf clients — and a ready-made browser chat UI — serve your agents over the AG-UI protocol instead. See [Serving Agents over AG-UI](/hastekit-sdk/agents/serving-agents/serving-agents-agui).
+Registry names are unique within one registry. Registration does not start an HTTP server or durable worker, and does not make the agent discoverable in other processes.

@@ -1,310 +1,64 @@
 ---
-title: History
-icon: clock-rotate-left
+title: "Conversation history"
+description: "Persist runs, continue threads, and read complete conversation transcripts."
 ---
 
-Conversation history enables agents to maintain context across multiple interactions. By preserving previous messages, agents can reference earlier exchanges and build upon prior context, facilitating natural, context-aware conversations.
+Agents use in-memory conversation history unless you provide a manager. A **thread** groups related runs; a **run** contains the user turn, model/tool messages, and execution state produced while answering it.
 
-## Overview
+## Configure file-backed history
 
-When a conversation history manager is provided to an agent, it performs the following operations:
-- **Loads Previous Messages**: Automatically retrieves conversation history based on the thread ID
-- **Saves Automatically**: Persists new messages after each execution
-
-## Enabling Conversation History
-
-To enable conversation history, create a history manager with `hastekit.NewFileHistory` and pass the created instance to the agent's `History` field. While invoking the agent, optionally set `Namespace` to bucket the conversations by namespaces.
+With `model` configured:
 
 ```go
-cm := hastekit.NewFileHistory("./conversations")
-agent := hastekit.NewAgent(&hastekit.AgentConfig{
-    Name:        "Hello world agent",
-    LLM:         model,
-    History:     cm,
+conversationHistory, err := hastekit.OpenFileHistory("./data/conversations")
+if err != nil { return err }
+defer conversationHistory.Close()
+agent, err := hastekit.NewAgent(&hastekit.AgentConfig{
+    Name: "assistant", LLM: model,
+    Instruction: hastekit.NewPrompt("Help the user."),
+    History: conversationHistory,
 })
-
-handle, err := agent.Execute(context.Background(), &agents.AgentInput{
-    Namespace: "default",
-    Message: history.Message{
-        Messages: []responses.InputMessageUnion{
-            responses.UserMessage("Hello! My name is Alice"),
-        },
-    },
-})
-out, err := handle.Result()
+if err != nil { return err }
+_ = agent
 ```
 
-## Continuing the conversation
+Close the history after all agents and requests using it finish. Agents do not close caller-owned resources. File persistence is for a process that owns its storage directory; it is not a substitute for a shared database across independent workers.
 
-To continue the conversation, pass same thread ID while invoking the agent again.
+## Continue a thread
+
+Send each new turn with the same namespace and `ThreadID`. You do not need to resend previous messages: the history manager loads them. Omitting `PreviousRunID` follows the thread's current history; setting it chooses the earlier run from which to continue. Use a paused result's run ID when explicitly resuming that branch.
+
+Choose thread IDs in your application before invoking the agent. A new ID starts another thread. Reusing a run ID is not a general HTTP idempotency mechanism: the persistence layer can reject a duplicate, and side effects need their own idempotency design.
+
+## Read a transcript
+
+Model context can be summarized or filtered. For a user-visible transcript, use `history.LoadTranscript`, or the paginated API, rather than treating the model's current message list as the full conversation.
+
+With `manager` as your `*history.CommonConversationManager`:
 
 ```go
-// First invocation
-threadID := uuid.NewString()
-handle, err := agent.Execute(context.Background(), &agents.AgentInput{
-    Namespace: "default",
-    ThreadID:  threadID,
-    Message: history.Message{
-        Messages: []responses.InputMessageUnion{
-            responses.UserMessage("Hello! My name is Alice"),
-        },
-    },
-})
-out, err := handle.Result()
-
-// Second invocation
-handle, err = agent.Execute(context.Background(), &agents.AgentInput{
-    Namespace: "default",
-    ThreadID:  threadID, // Pass the same thread ID to continue the conversation
-    Message: history.Message{
-        Messages: []responses.InputMessageUnion{
-            responses.UserMessage("What's my name?"),
-        },
-    },
-})
-out, err = handle.Result()
+page, err := history.LoadTranscriptPage(ctx, manager.ConversationPersistenceAdapter,
+    "tenant-123", "thread-42", history.TranscriptPageOptions{Limit: 50})
+if err != nil { return err }
+for _, row := range page.Rows { fmt.Println(row.RunID) }
+next := page.NextBeforeRunID
+_ = next
 ```
 
-Passing `ThreadID` alone continues from the thread's tip.
+Pages contain complete stored turns in chronological order. Set `BeforeRunID` to `NextBeforeRunID` to fetch the next older page. An empty next value means the start of history. `Latest` carries the current thread state even when reading an older page.
 
-## Branching from an earlier turn
+## Supply database persistence
 
-To continue from a specific earlier run instead of the thread's tip — a retry, or an edit of an earlier message — set `PreviousRunID` to the `RunID` of the run you want to continue from:
+Implement `history.ConversationPersistenceAdapter`, then construct `history.NewConversationManager(adapter)`. It owns ID/time generation, message loading/saving, and summary persistence.
 
-```go
-out, _ := handle.Result()
+| Optional interface | Enables |
+|---|---|
+| `history.ThreadLister` | Thread enumeration for conversation pickers |
+| `history.TranscriptReader` | Full transcript reads independent of model context |
+| `history.TranscriptPageReader` | Bounded backend pagination |
 
-handle, err = agent.Execute(ctx, &agents.AgentInput{
-    Namespace:     "user-123",
-    ThreadID:      threadID,
-    PreviousRunID: out.RunID, // continue from this run, not the thread tip
-    Message: history.Message{
-        Messages: []responses.InputMessageUnion{
-            responses.UserMessage("Actually, make it shorter."),
-        },
-    },
-})
-```
+Without native pagination, the helper loads a transcript and slices it in memory. Database implementations should use a bounded query ordered by insertion, not lexical run ID. Enforce namespace boundaries and run-ID uniqueness atomically in storage. Persist metadata and tool state as well as message text; approval and continuation depend on them.
 
-## Reading a thread back
+## Message attribution
 
-To render a thread — a chat window, an audit view — use `LoadTranscript`:
-
-```go
-transcript, err := cm.LoadTranscript(ctx, "user-123", threadID)
-```
-
-It returns the thread as written: every turn, in order, with no summary standing in for any of them.
-
-<Warning>
-That is deliberately not what the agent reads for itself. The agent's own history load is summary-aware — once a thread has been summarized it returns the summary in place of the turns the summary covers, which is what keeps a long conversation inside the context window. Right for the model, wrong for a UI: a chat window hydrating from that view shows the user their own conversation with the early part replaced by a machine-written paragraph, and the turns are still on disk, so nothing signals that anything is missing.
-</Warning>
-
-Adapters opt in by implementing `history.TranscriptReader`; the built-in in-memory and file adapters both do. An adapter that doesn't falls back to the summary-aware load.
-
-```go
-type TranscriptReader interface {
-	LoadTranscript(ctx context.Context, namespace, threadID string) ([]ConversationMessage, error)
-}
-```
-
----
-
-## Persistence
-
-The conversation manager supports three persistence configurations for storing conversation history:
-
-### 1. File Persistence
-
-When the SDK client is initialized without an `endpoint`, messages are persisted as JSON files written to the disk (under `./conversations`).
-
-### 2. HasteKit Gateway Persistence
-
-When the SDK client is initialized with an `endpoint`, the conversation manager automatically persists messages to the HasteKit's Gateway server.
-
-### 3. Custom Persistence
-
-To implement custom persistence, implement the `ConversationPersistenceAdapter` interface:
-
-```go
-type ConversationPersistenceAdapter interface {
-	NewConversationID(ctx context.Context) string
-	NewRunID(ctx context.Context) string
-	LoadMessages(ctx context.Context, namespace string, threadID string, previousRunID string) ([]history.ConversationMessage, error)
-	SaveMessages(ctx context.Context, namespace, runId, previousRunId, threadID string, conversationId string, messages []history.Message, meta map[string]any) error
-	SaveSummary(ctx context.Context, namespace string, summary history.Summary) error
-}
-```
-
-Then pass your implementation to the conversation manager constructor:
-
-```go
-cm := history.NewConversationManager(yourAdapter)
-```
-
-When you use `hastekit.NewFileHistory("./conversations")`, the SDK wires a file-backed adapter that persists messages as JSON on disk.
-
-Optionally implement [`history.TranscriptReader`](#reading-a-thread-back) so a UI can read the thread as written, and `history.ThreadLister` so threads can be [enumerated](#listing-threads).
-
-## Options
-
-Both `history.NewConversationManager` and `hastekit.NewFileHistory` take `history.ConversationManagerOptions`:
-
-```go
-cm := hastekit.NewFileHistory("./conversations",
-	history.WithSummarizer(summarizer),
-	history.WithMessageAttribution(),
-)
-```
-
-| Option | Description |
-| :--- | :--- |
-| `WithSummarizer(s)` | Condense long threads — see [Summarization](/hastekit-sdk/agents/conversations/summarization) |
-| `WithMessageFilter(f)` | Transform message bundles before they are attributed and sent |
-| `WithMessageAttribution()` | Prefix other senders' turns with `(Agent)`/`(Human) <sender> said:`. Off by default |
-| `WithoutSteeringNotices()` | Suppress the note that follows a message which arrived mid-run. On by default |
-
-### Message Filtering
-
-Each stored message bundle (`messages.Message`) carries a `SenderID`, which lets the conversation manager attribute turns to a specific participant in multi-participant conversations.
-
-You can transform a run's message bundles before they are attributed and sent to the provider by supplying a `MessageFilter`. A common use is rewriting each bundle's `SenderID` from an opaque id into a human-friendly name.
-
-```go
-type MessageFilter interface {
-	Filter(ctx context.Context, msgs []messages.Message, agentID string) []messages.Message
-}
-
-cm := history.NewConversationManager(
-	yourAdapter,
-	history.WithMessageFilter(yourFilter),
-)
-```
-
-### Attribution
-
-`WithMessageAttribution()` rewrites messages from senders other than the running agent with `(Agent) <sender> said:` / `(Human) <sender> said:` prefixes before they go to the provider. It is off by default, in which case bundles are flattened as-is.
-
-### Steering notices
-
-A message that reaches a run *after* it has started working — delivered with [`handle.EnqueueMessage`](/hastekit-sdk/agents/simple-agent#agenthandle), or POSTed to a thread already running over [AG-UI](/hastekit-sdk/agents/serving-agents/serving-agents-agui) — is followed by a short note saying so:
-
-> *[The message above arrived from the user while this run was already in progress... Treat it as their most recent instruction.]*
-
-Without it the two are the same message in the same position, and the model has no way to tell a correction shouted mid-task from the instruction it is already carrying out — so it tends to finish the original plan and address the interruption afterwards, if at all.
-
-The note is added to the outgoing message list only. It is never stored, so history keeps exactly the turn the user sent. Turn it off with `history.WithoutSteeringNotices()` only when something upstream already conveys the distinction, or when an agent's prompt depends on the exact message sequence.
-
-## Listing Threads
-
-`agent.History()` returns the agent's `*history.CommonConversationManager`. When its persistence adapter implements `history.ThreadLister`, you can enumerate stored threads. Pass an empty namespace (`""`) to list across all namespaces.
-
-```go
-type ThreadLister interface {
-	ListThreads(ctx context.Context, namespace string) ([]ThreadInfo, error)
-}
-
-if lister, ok := agent.History().ConversationPersistenceAdapter.(history.ThreadLister); ok {
-	threads, err := lister.ListThreads(context.Background(), "")
-	// ...
-}
-```
-
-## Complete Example
-
-The following example demonstrates an agent with conversation history:
-
-```go
-package main
-
-import (
-	"context"
-	"fmt"
-	"log"
-	"os"
-
-	"github.com/bytedance/sonic"
-	"github.com/google/uuid"
-	"github.com/hastekit/agent-sdk-go/pkg/agents"
-	"github.com/hastekit/agent-sdk-go/pkg/agents/history"
-	"github.com/hastekit/agent-sdk-go/pkg/gateway/llm/responses"
-	hastekit "github.com/hastekit/agent-sdk-go"
-)
-
-func main() {
-    client := hastekit.NewLLMClient([]hastekit.ProviderConfig{
-        {
-            ProviderName:  hastekit.ProviderOpenAI,
-            BaseURL:       "",
-            CustomHeaders: nil,
-            ApiKeys: []*hastekit.APIKeyConfig{
-                {
-                    Name:   "Key 1",
-                    APIKey: os.Getenv("OPENAI_API_KEY"),
-                },
-            },
-        },
-    })
-
-	model := client.Model("OpenAI/gpt-4.1-mini")
-
-	cm := hastekit.NewFileHistory("./conversations")
-	agent := hastekit.NewAgent(&hastekit.AgentConfig{
-		Name:        "Hello world agent",
-		Instruction: hastekit.NewPrompt("You are helpful assistant."),
-		LLM:         model,
-		History:     cm,
-	})
-
-    threadID := uuid.NewString()
-
-	handle, err := agent.Execute(context.Background(), &agents.AgentInput{
-		Namespace: "default",
-		ThreadID:  threadID,
-		Message: history.Message{
-            Messages: []responses.InputMessageUnion{
-			    responses.UserMessage("Hello! My name is Alice"),
-			},
-		},
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-	out, err := handle.Result()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	b, _ := sonic.Marshal(out)
-	fmt.Println(string(b))
-
-	// Agent itself is stateless - you can either re-create another agent or reuse the same agent instance, but ensure to pass the correct `ThreadID`
-	agent2 := hastekit.NewAgent(&hastekit.AgentConfig{
-		Name:        "Hello world agent",
-		Instruction: hastekit.NewPrompt("You are helpful assistant."),
-		LLM:         model,
-		History:     cm,
-	})
-
-	handle, err = agent2.Execute(context.Background(), &agents.AgentInput{
-		Namespace: "default",
-		ThreadID:  threadID,
-		Message: history.Message{
-            Messages: []responses.InputMessageUnion{
-			    responses.UserMessage("What's my name?"),
-			},
-		},
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-	out, err = handle.Result()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	b, _ = sonic.Marshal(out)
-	fmt.Println(string(b))
-}
-
-```
+The incoming `history.Message` bundle can carry sender information. `history.WithMessageAttribution()` enables attribution prefixes when producing model context. Steering notices are enabled by default for messages delivered while a run is active; `WithoutSteeringNotices()` disables that annotation. Neither option replaces application authentication.

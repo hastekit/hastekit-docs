@@ -1,0 +1,53 @@
+---
+title: "Workflow HTTP API"
+description: "Start, inspect, and resume named workflows independently of an agent."
+---
+
+Register a graph, then mount a workflow handler. No model or agent is required to invoke it.
+
+Given `compiled` and `mux`:
+
+```go
+registry := hastekit.NewRegistry()
+if err := registry.RegisterWorkflow("review", compiled); err != nil { return err }
+handler := hastekit.NewWorkflowHTTPHandler(registry, workflow.HTTPConfig{})
+mux.Handle("/workflows", handler)
+mux.Handle("/workflows/", handler)
+```
+
+Reuse the handler for the server lifetime: it owns the HTTP run checkpoints.
+
+| Method | Route | Result |
+|---|---|---|
+| GET | `/workflows` | Registered workflow names |
+| POST | `/workflows/{name}/runs` | Start with `{"input": {...}}` |
+| GET | `/workflows/{name}/runs/{run_id}` | Status, output, or interruptions |
+| POST | `/workflows/{name}/runs/{run_id}/resume` | Submit interruption resolutions |
+
+## Start and resume
+
+```sh
+curl -X POST http://localhost:8080/workflows/review/runs   -H 'Content-Type: application/json'   -d '{"input":{"amount":150}}'
+```
+
+Start and resume are synchronous until completion, pause, or failure. Start returns HTTP 201, resume returns 200, and both expose `X-Workflow-Run-ID`. Responses contain `run_id`, `workflow`, `status`, and output or interruptions. Status is `running`, `paused`, `completed`, or `failed`.
+
+Copy the returned run ID and interruption call ID into the resume request:
+
+```json
+{"resolutions":[{"call_id":"RETURNED_CALL_ID","action":"approve","content":{"note":"Reviewed"}}]}
+```
+
+The handler validates decisions before mutating paused state. Concurrent or completed resumes return 409. Unknown or foreign-namespace runs return 404. Runtime failures return 500. Disconnecting a start/resume request cancels that execution; this differs from the detached AG-UI agent stream.
+
+## Namespace and application context
+
+`HTTPConfig.NamespaceResolver` selects the authorized namespace; nil or empty selects `default`, and a resolver error returns 403. `RunContextResolver` supplies trusted context for MCP credentials and nested agents. Authenticate before these resolvers run.
+
+Clients provide business input and decisions, not checkpoint statuses, continuation state, or namespace metadata.
+
+## Storage and limits
+
+Checkpoints are **in memory per handler**. A process restart loses them, and another replica cannot resume them. The defaults are a 1 MiB request body, 1000 runs, and expiry one hour after the latest execution finishes. Adjust `MaxBodyBytes`, `MaxRuns`, and `RunTTL` to fit the service. Running executions are not evicted; a full handler returns 503 for new starts.
+
+For persisted, distributed runs, use the Go registry API with application-owned checkpoint storage and an API implementing the required concurrency controls. This handler does not become persistent by sharing a registry or using Temporal elsewhere. The embedded chat UI does not list these independent workflows.
