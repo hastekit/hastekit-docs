@@ -82,3 +82,20 @@ Thread listing requires `history.ThreadLister`; unsupported adapters return HTTP
 Disable proxy buffering for event streams and configure idle timeouts to allow keepalives. `agui.WithKeepalive` defaults to 15 seconds. Do not apply a short blanket HTTP write timeout that cuts off valid long runs.
 
 Use the same persistence and broker infrastructure on replicas serving the same conversations. Add [attachment storage](/hastekit-sdk/agents/attachments) to enable uploads and previews. Traces are exported through [OpenTelemetry](/hastekit-sdk/tracing); an embedded trace browser is not currently provided.
+
+
+## Catalogs and management
+
+`GET /agents/{agent}/skills` returns the agent's current catalog. `agui.WithSkillStore` enables the user library at `/skills`; `agui.WithMCPStore` enables configuration and OAuth routes at `/mcp`. User skills and MCP servers are enabled unless listed in `forwardedProps.skills.disable` or `forwardedProps.mcp.disable`; developer-owned globals stay enabled.
+
+The handler also accepts frontend tool definitions in the run's `tools` array. Matching tool messages continue a waiting run or resume a timed-out client tool. See [frontend tools](/hastekit-sdk/agents/tools/client-tools) and [React integration](/hastekit-sdk/agents/serving-agents/react).
+
+## Internal threads and background work
+
+Filter thread lists with `group_id`; the default group is `default`. Hidden threads are omitted unless `include_hidden=true`. Sub-agent threads normally belong to the parent's thread-ID group, so include that group when enumerating children. You can still address a known child thread directly under its registered agent.
+
+History responses include `context` when context usage is available. `run.backgroundTasks` identifies pending jobs and, for async child agents, `agentName`, `agentThreadId`, and their outstanding `interrupts`. Resume entries for those interruptions must target the child agent and child thread. The background runner keeps the parent task pending until the child completes.
+
+For persisted messages, `metadata.createdAt` supplies the bundle's timestamp (or null for old history), and `metadata.senderId` supplies its sender when known. Preserve this metadata in custom clients.
+
+Enable scheduled work with `agui.WithRoutines(service, scheduler)`; see [Routines](/hastekit-sdk/routines) for lifecycle and management.

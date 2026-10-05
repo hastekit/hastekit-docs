@@ -1,36 +1,69 @@
 ---
 title: "Migration notes"
-description: "Replace older setup, hooks, execution, and namespace APIs."
+description: "Update older examples for skill clients, store-based MCP, sub-agents, sandbox providers, and thread metadata."
 ---
 
-These notes describe differences visible in older SDK examples. Check the module version in your application before applying them; the current documentation targets the current SDK source.
+These notes describe the APIs in the current SDK checkout. Pin the Go module and frontend package versions used by your application. Persisted history and durable execution histories may need separate compatibility handling.
+
+## Public API changes
 
 | Older pattern | Current API |
 |---|---|
-| Assuming `NewAgent` cannot fail | Handle `(*Agent, error)`, or use `MustNewAgent` for static configuration |
-| `Model` / `Instructions` on `AgentConfig` | `LLM` and `Instruction: hastekit.NewPrompt(...)` |
-| Separate `Start` / `Stream` calls | `Run` for a result; `Execute` for a streaming handle |
-| Cancelling an `Execute` context to stop the run | Use `handle.Stop`; context cancellation disconnects its subscription |
-| Before/after model and tool hooks | `agents.NoopMiddleware` plus `Wrap*` methods |
-| Reading tool annotations through a separate helper | `tool.GetToolDescriptor().Annotations` |
-| Opening file history without checking an error | `OpenFileHistory` / `NewFileHistory` return a manager and error |
-| Implicit durable worker startup | Construct the runtime, create agents with `WithRuntime`, then call `Serve` |
-| Passing runtime and broker to `WithRuntime` | Pass the runtime only; it exposes its configured broker |
-| Relying on a durable runtime's default memory broker | Supply an explicit shared broker |
-| `agui.WithNamespace` | `agui.WithNamespaceResolver`; omitted/blank resolves to `default` |
-| Assuming all history arrives in one messages response | Follow `nextCursor` / `hasMore` through complete-turn pages |
-| Rejoining SSE without an event cursor | Send the last processed `Last-Event-ID` for incremental replay |
+| `Skills`, `SkillProvider`, `SkillSet`, or `NewFilesystemSkillSet` | `AgentConfig.SkillClient`; `skills.NewClient(store).WithGlobalSkills(source)` |
+| `pkg/skills` | `pkg/agents/skills` |
+| `pkg/attachments` | `pkg/agents/attachments` |
+| Endpoint/options-based `NewMCPClient` and connector slices | `mcpclient.NewClient(stores...)`; set `AgentConfig.MCPClient` |
+| `agents.MCPToolset` in workflow dependencies | `agents.MCPClient` |
+| `sandbox.Manager` and an image argument to tools | `sandbox.Provider` and a configured profile name |
+| `Model` / `Instructions` on `AgentConfig` | `LLM` / `Instruction: hastekit.NewPrompt(...)` |
+| Assuming `NewAgent` cannot fail | Handle `(*Agent, error)` or use `MustNewAgent` for static configuration |
+| Separate start/stream methods | `Run` for a result; `Execute` for a handle |
+| Before/after hooks | `AgentConfig.Middlewares` with `agents.NoopMiddleware` and `Wrap...` methods |
 
-## Keep identifiers distinct
+## Skill clients and selection
 
-`RunID` identifies an execution, `ThreadID` identifies a conversation, and `StreamID` identifies a broker stream. AG-UI can accept an omitted run ID and report the resolved one in its response headers. Do not use a stream cursor as a history-pagination cursor.
+Import `pkg/agents/skills`. Folder and embedded sources are now `NewDirSource` and `NewFSSource`; inline bundles use `NewBundleSource`, and an application-managed store namespace uses `NewStoreSource`.
 
-The history branch field is `PreviousRunID`, not `PreviousMessageID`. Preserve namespace and thread identity when resuming an interruption.
+Globals are always enabled and cannot be overridden by user content. Duplicate global names fail catalog construction. User skills are enabled by default; `agents.SkillSelection` has only `Disable`. Remove old `Enable` lists and per-entry required/blocked/optional policies. HTTP clients send `forwardedProps.skills: {"disable":[...]}`.
 
-## Persisted attachments
+The client methods take namespace explicitly: `ListSkills(ctx, namespace, runContext)` and `ReadSkill(ctx, namespace, runContext, name, file)`. The agent picker API adds a selection argument. A run-context key named `Namespace` is not a storage scope.
 
-The current message shape uses `file_id: "attachment://..."` for SDK-owned references. Older data using a `file_ref` object needs a deliberate conversion preserving the attachment ID and version. Do not rewrite ordinary provider file IDs into attachment references.
+Existing bundle stores still provide complete-bundle persistence, management APIs, and listing caches. See [Skills](/hastekit-sdk/agents/skills) and [Skill storage](/hastekit-sdk/agents/skill-library).
 
-## Public scope
+## MCP stores and credentials
 
-Skills, connectors, and compiled workflows are configured by the application. A persistent dynamic registry, runtime enable/disable controls, and agent-authored workflow registration tools are not yet part of the SDK. Treat them as future application architecture rather than APIs available in these examples.
+Define servers with `mcpclient.ServerConfig` in a memory, file, or custom store. Use `WithMCPServerConfig` for developer-owned inline definitions. Client configuration uses `WithCredentials` and `WithSchemaCache`; transport, filters, approval rules, metadata, and OAuth application settings belong in each server definition.
+
+Global records have an empty namespace and stay enabled. User records are namespace-scoped and enabled unless disabled by `Input.MCP`. Per-run tool filters narrow the configured filters. Dynamic configuration and browser OAuth management are supported; old documentation describing them as future features no longer applies.
+
+Custom MCP clients implement `ListTools(ctx, namespace, runContext, ...selection)` and `CallTool(ctx, descriptor, call)`. Update workflow `Dependencies.MCPServers` to `map[string]agents.MCPClient`.
+
+## Cache contracts
+
+MCP `SchemaCache` and skills `KeyValueStore` independently define `Get(ctx, key) ([]byte, bool, error)`, `Set(ctx, key, value, ttl) error`, and `Delete(ctx, key) error`. Concrete memory and Redis implementations live in `pkg/cache`. There is no cache-wide `Clear` contract. Configure MCP cache TTL/scope on server definitions and skill cache TTL on the store.
+
+## Delegation and paused background tasks
+
+`AgentConfig.Description` describes a delegation target. `SubAgents` supplies a catalog through `subagents.NewClient`, and the model calls `call_sub_agent` in sync or async mode. Existing fixed-target integrations can use `tools.NewAgentTool` or `tools.NewAsyncAgentTool`.
+
+Async children that need approval stay pending. Clients read the child's `agentName`, `agentThreadId`, and interrupts from the parent's `run.backgroundTasks` and resume the child thread. `BackgroundResult.Waiting` keeps the task open rather than delivering a final result. A sync `call_sub_agent` does not relay approval through its parent; synchronous `NewAgentTool` does.
+
+## Persistence and identifiers
+
+Custom `ConversationPersistenceAdapter.SaveMessages` now accepts `parentThreadID string` and `hidden bool` after `groupID`. Preserve group, parent, and hidden attributes through continuations, forks, and incremental saves. Same-run saves append message increments and update non-nil metadata, including metadata-only writes.
+
+`history.Message.CreatedAt` stores bundle time. Older rows can omit it. AG-UI includes `metadata.createdAt` and sender attribution when hydrating history. Thread listings hide internal threads by default; use `include_hidden=true` and the appropriate group when listing children.
+
+Keep namespace, thread, session, run, and stream identities distinct. Session sharing permits attachment access without sharing a child's transcript. A stream is an observation channel and may be reused across turns; it is not a workflow execution identity.
+
+## Sandbox state and attachments
+
+Sandbox acquisition uses the provider reference persisted in run state. Pass a profile name to the tools, preserve their state updates, and supply `workdir` explicitly; shell `cd` affects one invocation. Concurrent runs sharing a sandbox session are unsupported.
+
+Owned attachments use `file_id: "attachment://..."`. With attachment middleware, images inline by default, while files are references unless `InlineAttachments` is true. Use `ToolResponseMiddleware` before attachment middleware to bound and optionally store large tool output.
+
+## Durable deployments
+
+Skill, MCP, history, and background-task payloads have changed. Deploy compatible workers for existing Temporal/Restate histories, or drain/version old executions before changing activity signatures and workflow behavior. Conversation data migrations and runtime replay compatibility are separate concerns.
+
+Construct agents with `WithRuntime(runtime)` before calling `Serve`; constructors do not launch workers. The runtime exposes its broker, while stores and other caller-owned resources remain yours to close after execution stops.

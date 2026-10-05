@@ -1,0 +1,69 @@
+---
+title: "MCP configuration and OAuth"
+description: "Let users manage remote MCP servers and connect accounts without rebuilding agents."
+---
+
+MCP configuration and credentials have separate stores. Definitions describe the endpoint and OAuth application; credentials hold each namespace's account grant. Share the stores and credential provider between agent execution and HTTP management.
+
+## Persist definitions
+
+```go
+store, err := mcpclient.NewFileStore("./data/mcp-config.json")
+if err != nil { return err }
+client := mcpclient.NewClient(store)
+```
+
+The file is a JSON array of `ServerConfig` values. An empty namespace means global; a user record belongs to one namespace. File stores reload on listing and atomically replace their file on writes. Use a transactional custom store for concurrent writes across processes. `NewStore(customStore)` adds inline configuration views to a custom store.
+
+Pass `client` to `AgentConfig.MCPClient`. For the embedded UI, pass `agui.WithMCPStore(store)` to `web.Handler` and configure its namespace resolver. Management routes use the authenticated namespace; clients cannot choose another one in a request body.
+
+## Connect OAuth accounts
+
+Import `pkg/agents/mcpclient`. This example assumes the remote server supports authorization discovery and dynamic client registration:
+
+```go
+store = store.WithMCPServerConfig([]mcpclient.ServerConfig{{
+    Name: "notes",
+    Endpoint: "https://notes.example.com/mcp",
+    Transport: mcpclient.TransportStreamableHTTP,
+    ToolPrefix: "notes__",
+    Authorization: &mcpclient.OAuthConfig{
+        RedirectURL: "http://localhost:8080/api/agui/mcp/notes/callback",
+    },
+}})
+tokens, err := mcpclient.NewFileCredentialStore("./data/mcp-credentials")
+if err != nil { return err }
+defer tokens.Close()
+provider, err := mcpclient.NewOAuthCredentialProvider(mcpclient.OAuthCredentialProviderConfig{
+    Store: tokens,
+})
+if err != nil { return err }
+client := mcpclient.NewClient(store).WithCredentials(provider)
+_ = client // Use in AgentConfig.MCPClient.
+```
+
+Replace the endpoint and callback with your server and deployment. Supply `ClientID` and `ClientSecret` when using a registered application. For servers without discovery, also provide `AuthURL` and `TokenURL`; explicitly configured endpoints require a client ID.
+
+Mount the same provider using `agui.WithMCPStore(store, mcpclient.WithOAuth(provider))`. Visiting `/api/agui/mcp/notes/connect` starts authorization. The callback checks browser-bound state and PKCE, then stores refreshable credentials. Missing credentials are reported as authentication status during discovery.
+
+## Management routes
+
+The following paths are relative to the embedded UI's `/api/agui` prefix:
+
+| Method | Path | Behavior |
+|---|---|---|
+| GET | `/mcp/` | Visible definitions without secrets, including connection/error status |
+| PUT | `/mcp/{server}` | Create or replace the user's definition |
+| DELETE | `/mcp/{server}` | Remove the user's definition and associated grant |
+| GET | `/mcp/{server}/connect` | Begin OAuth |
+| GET | `/mcp/{server}/callback` | Finish OAuth |
+
+Global and inline definitions are read-only. A user definition can contain literal headers or its own OAuth settings, but cannot contain templates, stdio commands, environment variables, or `UseCredentials`. Public-address checks apply when connecting, including DNS results and redirects. Trusted global definitions may use internal services.
+
+A standalone handler is `mcpclient.NewHandler(store, mcpclient.WithNamespaceResolver(resolve), mcpclient.WithOAuth(provider))`; mount it with `http.StripPrefix`. Without a trusted namespace resolver it denies requests.
+
+## Deployment
+
+The file credential store contains plaintext tokens in private files. Protect its directory. Share one provider in a process to coordinate refreshes. Multi-process deployments need persistence and refresh coordination suitable for concurrent token rotation.
+
+OAuth state is process-local and expires after ten minutes, so connect and callback must reach the same handler instance. Register the complete callback URL and keep credentials available until all requests and workers finish. Changing the definition's OAuth client or token endpoint can require reconnection.

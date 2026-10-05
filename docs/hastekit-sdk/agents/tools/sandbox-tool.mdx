@@ -1,40 +1,56 @@
 ---
 title: "Sandbox tools"
-description: "Run shell and file operations through a host-provided sandbox manager."
+description: "Run shell and file operations through Docker, Kubernetes, E2B, Daytona, or a gateway-backed provider."
 ---
 
-Sandbox tools delegate shell and file operations to an `agents/sandbox.Manager`. The SDK defines the tool integration; the configured sandbox service is responsible for provisioning and isolating the execution environment.
+Sandbox tools use a `sandbox.Provider` from `pkg/agents/sandbox`. The provider creates and reconnects execution environments; tools run commands and access files. Docker and Kubernetes use the HasteKit sandbox daemon, while E2B and Daytona use their service protocols.
 
-## Register tools
+## Configure a provider
 
-Given a configured `manager` implementing `sandbox.Manager`, import `pkg/agents/tools` and add:
+Import `pkg/agents/sandbox/providers/docker`, `pkg/agents/tools`, and `github.com/moby/moby/api/types/container`:
 
 ```go
+provider, err := docker.New(docker.Config{
+    Profiles: map[string]docker.Profile{
+        "analysis": {
+            Config: container.Config{Image: "your-registry/sandbox-daemon:tag"},
+        },
+    },
+})
+if err != nil { return err }
+defer provider.Close()
+
 sandboxTools := []hastekit.Tool{
-    tools.NewBashTool(manager, "your-sandbox-image", nil),
-    tools.NewReadFileTool(manager, "your-sandbox-image", nil),
-    tools.NewWriteFileTool(manager, "your-sandbox-image", nil),
-    tools.NewDeleteFileTool(manager, "your-sandbox-image", nil),
+    tools.NewBashTool(provider, "analysis", nil),
+    tools.NewReadFileTool(provider, "analysis", nil),
+    tools.NewWriteFileTool(provider, "analysis", nil),
+    tools.NewDeleteFileTool(provider, "analysis", nil),
 }
 ```
 
-Pass this slice as `AgentConfig.Tools`. The image is application configuration and must exist in your sandbox service. An optional environment map can supply run-context-templated values.
+Add `sandboxTools` to `AgentConfig.Tools`. The second argument is a configured **profile name**. Supply an image with the sandbox daemon and Bash; the provider does not build it. Keep the provider open until all runs finish.
 
-The SDK's `pkg/hastekitgateway.Config.NewSandboxClient` is an HTTP adapter for the HasteKit sandbox service. You can supply another implementation of the manager interface. The SDK does not start a local container simply because a sandbox tool is configured.
+## Choose a backend
 
-## Tool behavior
-
-| Tool | Operation |
+| Package under `pkg/agents/sandbox/providers` | Environment |
 |---|---|
-| `execute_bash_commands` | Run the `code` argument as shell commands |
-| `read_file` | Read a file in the sandbox |
-| `write_file` | Write file content |
-| `delete_file` | Remove a file |
+| `docker` | Docker Engine containers and daemon routing |
+| `k8s` | Kubernetes pods, pod templates, and application-managed storage |
+| `e2b` | E2B templates |
+| `daytona` | Daytona snapshots |
 
-The bash tool starts from `/workspace` and records the working directory in tool state so later commands can continue there. Session identity selects the sandbox; preserve it when related calls should use the same environment.
+`hastekitgateway.Config.NewSandboxClient()` is a gateway-specific HTTP client implementing the same provider contract. Applications can also implement `sandbox.Provider` directly.
 
-## Deployment responsibilities
+## State and commands
 
-Configure filesystem boundaries, process limits, command timeouts, network access, credentials, and cleanup in the sandbox service. A model-visible tool description is not an isolation policy. Avoid injecting application-wide secrets when a scoped credential is sufficient.
+`sandbox.Acquire` reconnects using the reference saved under `sandbox.StateKey` in run state, or creates a resource when no reference exists. Tools return state updates that later calls and persisted turns reuse. Approval and middleware run before provisioning.
 
-Inspect command exit status and stderr in tool results. Do not assume a transport-successful tool response means the shell command succeeded. Use [approval](/hastekit-sdk/agents/tools/human-in-the-loop) or [middleware](/hastekit-sdk/agents/hooks) for sensitive operations.
+The bash tool executes `bash -c` with the supplied `code`. Use its `workdir` argument for a working directory; `cd` affects only that invocation. Nonzero exit codes are command results, not transport errors.
+
+Separate threads do not automatically share compute, even when they share a session. Concurrent runs of the same session are unsupported. A corrupt reference, scope mismatch, or missing saved resource fails rather than silently provisioning a replacement. Changing creation settings does not reconfigure an existing environment.
+
+## Lifecycle
+
+Configure mounts, resource limits, networking, credentials, and cleanup in the provider. A crash before the resource reference is persisted can orphan compute. Command cancellation stops waiting; remote process termination depends on the provider. Do not retry external commands blindly.
+
+The SDK repository contains daemon image instructions in `deployments/sandbox` and backend configuration guides beside each provider. Use [approval](/hastekit-sdk/agents/tools/human-in-the-loop) or [middleware](/hastekit-sdk/agents/hooks) for sensitive operations.

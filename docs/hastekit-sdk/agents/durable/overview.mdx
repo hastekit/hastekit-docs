@@ -1,0 +1,32 @@
+---
+title: "Durable execution"
+description: "Move agent orchestration to Temporal or Restate while keeping the agent-facing API."
+---
+
+Durable execution records orchestration and completed step results so work can continue after a worker restart. Conversation history records messages and state; it does not itself recover an interrupted process.
+
+| Runtime | Execution | Infrastructure |
+|---|---|---|
+| Local | Agent loop and background supervisor in the application process | No workflow service |
+| [Temporal](/hastekit-sdk/agents/durable/temporal) | Workflow orchestration with model/tool activities | Temporal workers, shared broker and persistence |
+| [Restate](/hastekit-sdk/agents/durable/restate) | Workflow orchestration with journaled run steps | Restate ingress/service, shared broker and persistence |
+
+Construct the runtime, supply it with `hastekit.WithRuntime(runtime)`, register every participating agent, then start `runtime.Serve`. Continue calling `agent.Run` or `agent.Execute` from your application.
+
+## What crosses the boundary
+
+Prompt retrieval, history operations, model calls, tool execution, and skill/sub-agent listing execute through the runtime adapters. Agent middleware runs inside the activity or step performing the operation. MCP calls resolve configuration and credentials on the worker.
+
+Background tasks have a separate wait lifecycle that can outlive the parent run. A paused async sub-agent remains pending while someone answers on its own thread. Model and tool completion timestamps are captured inside execution boundaries and retained with the result.
+
+## Shared resources
+
+Use the same broker for callers and workers so chunks, queued input, progress, and stop signals reach the right process. Use shared conversation and attachment storage wherever workers can handle the same thread. Process-local memory does not become distributed merely because execution uses a workflow service.
+
+A `StreamID` names an observation channel; it is distinct from a workflow execution ID and a persisted `RunID`. Thread channels may be reused for later turns while executions remain separate.
+
+## Retry boundaries
+
+An activity or step can repeat if it failed or its completion was not recorded. Use stable external job IDs and idempotent writes for side effects. A provider retry policy does not cover arbitrary tool operations. See [retries and timeouts](/hastekit-sdk/agents/retries).
+
+Version incompatible workflow/activity changes and keep old implementations available for in-flight work. Changes to persisted message formats and activity arguments require a migration strategy; see [migration notes](/hastekit-sdk/migration).

@@ -1,0 +1,54 @@
+---
+title: "Routines"
+description: "Schedule one-time or recurring agent instructions and track each occurrence as a conversation."
+---
+
+`pkg/routines` separates schedule definitions from execution state. A `Service` manages definitions, a `Scheduler` owns timing and retries, and an `AgentExecutor` calls registered agents. A routine becomes useful only while its scheduler is running.
+
+## Create a local scheduler
+
+Import `pkg/routines`. With `registry` containing your configured agents:
+
+```go
+definitions, err := routines.OpenJSONLStore("./data/routines.jsonl")
+if err != nil { return err }
+defer definitions.Close()
+state, err := routines.OpenJSONLStateStore("./data/routine-state.jsonl")
+if err != nil { return err }
+defer state.Close()
+service := routines.NewService(definitions, &routines.AgentExecutor{Registry: registry})
+scheduler := routines.NewLocalScheduler(service, state, routines.SchedulerConfig{})
+
+_, err = service.Create(ctx, "tenant-123", routines.Definition{
+    Name: "Morning summary",
+    Agent: "assistant",
+    Instruction: "Summarize today's priorities.",
+    Schedule: routines.Schedule{Cron: "0 9 * * 1-5", Timezone: "Asia/Kolkata"},
+})
+if err != nil { return err }
+return scheduler.Run(ctx)
+```
+
+Use different files for definitions and execution state. `Run` blocks until shutdown or an error. In an HTTP service, supervise it alongside the server and wait for it to stop before closing stores. Create definitions through a one-time setup path or management API; repeating `Create` on every restart creates new routines.
+
+## Schedule and execution
+
+A schedule has exactly one of `At` (a future timestamp) or `Cron` (five fields). `Timezone` applies only to cron and defaults to UTC. Creating a routine enables it. Use `Service.SetEnabled` to pause or resume future scheduling.
+
+Each occurrence gets a thread and session of its own, grouped under the routine ID. The executor preserves namespace and records routine/agent attribution in run context. Use `AgentExecutor.ContextResolver` to rebuild trusted application context at execution time. An agent pause is reported as a paused occurrence requiring attention.
+
+Default scheduler settings are a one-second poll interval, concurrency of four, a ten-minute run timeout, a one-minute retry delay, and three attempts. External actions must tolerate retries; persisted scheduler state does not make arbitrary tool side effects exactly once.
+
+## Redis scheduling
+
+`routines.NewRedisScheduler(service, redisClient, routines.RedisSchedulerConfig{})` stores execution state and due times in Redis. Definitions still live in the service's store. A renewable lease permits one active owner per prefix; use a distinct prefix per definition store and persistent, non-evicting Redis for recovery.
+
+Run only one scheduler per definition store, including when changing backends. The application owns and closes the Redis client.
+
+## Management UI and tools
+
+Pass `agui.WithRoutines(service, scheduler)` to `web.Handler` to enable routine management and the embedded UI. The scheduler must be running for manual runs. `RunNow` queues an enabled routine without changing its next scheduled occurrence; acceptance does not mean completion.
+
+The management API lives under `/api/agui/routines` in the embedded UI. It supports create/list/get/update/delete, enable/disable, manual runs, status, and occurrence threads. Use `@hastekit/react`'s `useRoutines` for management and `useRoutineThreads` to follow occurrence conversations.
+
+To let an agent manage schedules, construct `routines.Tools(service, scheduler)` and add selected methods such as `CreateRoutineTool`, `ListRoutinesTool`, `PauseRoutineTool`, and `GetRoutineStatusTool` to its tools. Make the selected management capabilities part of your application's permission policy.

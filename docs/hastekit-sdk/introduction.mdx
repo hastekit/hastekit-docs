@@ -1,35 +1,66 @@
 ---
 title: "Go SDK overview"
-description: "Build Go agents, call models, and execute explicit workflows."
+description: "Build agents in Go, connect tools and models, and ship conversational applications."
 ---
 
-The HasteKit Go SDK provides three layers you can use independently:
+HasteKit is a Go SDK for agents that use tools, keep conversation history, delegate work, and pause for human input. Run an agent in your application, expose it through a chat interface, or move its execution to Temporal or Restate.
 
-| Layer | Use it when you need | Main API |
+The Go module is `github.com/hastekit/agent-sdk-go`. These guides import the root package as `hastekit`. You can call providers directly; a separately deployed HasteKit Gateway is optional.
+
+## Build your first agent
+
+After [installing the SDK and configuring a provider](/hastekit-sdk/setting-up), create an agent and send a turn. Here `model` is the provider returned by `client.Model(...)`, and `ctx` is your request context:
+
+```go
+agent, err := hastekit.NewAgent(&hastekit.AgentConfig{
+    Name: "assistant",
+    LLM: model,
+    Instruction: hastekit.NewPrompt("Give clear, concise answers."),
+})
+if err != nil { return err }
+result, err := agent.Run(ctx, &hastekit.Input{
+    ThreadID: "first-conversation",
+    Message: hastekit.UserTurn("What can you help me with?"),
+})
+if err != nil { return err }
+fmt.Println(result.Text())
+```
+
+Add function tools when the agent needs to act, and reuse a thread ID when it needs earlier turns. [Agents and execution](/hastekit-sdk/agents/simple-agent) explains streaming, cancellation, and paused results.
+
+## What are you building?
+
+<CardGroup cols={2}>
+  <Card title="An assistant with tools" icon="wrench" href="/hastekit-sdk/agents/tools/function-tools">
+    Turn Go functions into model-callable tools, then connect MCP servers and skills.
+  </Card>
+  <Card title="A chat application" icon="comments" href="/hastekit-sdk/agents/serving-agents/serving-agents-agui">
+    Serve the embedded chat UI or build your own with React and CopilotKit.
+  </Card>
+  <Card title="A team of agents" icon="users" href="/hastekit-sdk/agents/multi-agents/overview">
+    Delegate independent work to sub-agents or hand the conversation to a specialist.
+  </Card>
+  <Card title="Work that runs later" icon="clock" href="/hastekit-sdk/routines">
+    Schedule one-time or recurring agent tasks and inspect their conversations.
+  </Card>
+  <Card title="A durable service" icon="server" href="/hastekit-sdk/agents/durable/overview">
+    Keep orchestration in Temporal or Restate and share history, events, and files across workers.
+  </Card>
+  <Card title="An explicit workflow" icon="diagram-project" href="/hastekit-sdk/workflows/introduction">
+    Define a graph in Go or YAML when your application should choose the steps and branches.
+  </Card>
+</CardGroup>
+
+## Find the right layer
+
+| Layer | Use it for | Start here |
 |---|---|---|
-| Model calls | Direct control over requests, messages, and response events | `NewLLMClient`, `client.Model` |
-| Agents | A model that selects tools and continues until it answers or pauses | `NewAgent`, `agent.Run`, `agent.Execute` |
-| Workflows | An explicit graph with application-defined routing and checkpoints | `workflow.NewGraph`, `workflow.LoadYAML` |
+| Agents | Model-directed tool use, conversation state, approvals, and delegation | [Agents](/hastekit-sdk/agents/simple-agent) |
+| Model APIs | Direct requests for text, structured data, images, embeddings, and audio | [Models and providers](/hastekit-sdk/models/overview) |
+| Workflows | Application-defined routing and checkpoints | [Workflow overview](/hastekit-sdk/workflows/introduction) |
 
-The SDK runs inside your Go application. A separately deployed HasteKit AI Gateway is optional; it is not required to call a provider directly or run an agent.
+## Learn the core concepts
 
-## Start with a working agent
+Start with [prompts and run context](/hastekit-sdk/agents/system-instruction), [structured output](/hastekit-sdk/responses/structured-output), and [conversation history](/hastekit-sdk/agents/conversations/history). Add [middleware](/hastekit-sdk/agents/hooks) to customize execution and [evaluations](/hastekit-sdk/testing) to measure changes to models, instructions, and tools.
 
-Follow the [installation and quickstart](/hastekit-sdk/setting-up), then add [function tools](/hastekit-sdk/agents/tools/function-tools) or [MCP tools](/hastekit-sdk/agents/tools/mcp-tools). Use [Run and stream](/hastekit-sdk/agents/simple-agent) to choose the execution and cancellation behavior your application needs.
-
-## Build an application
-
-- **Conversation state:** store messages and continue a thread with [history](/hastekit-sdk/agents/conversations/history).
-- **Human decisions:** require approval or collect form input with [interruptions](/hastekit-sdk/agents/tools/human-in-the-loop).
-- **HTTP and UI:** expose agents through [AG-UI](/hastekit-sdk/agents/serving-agents/serving-agents-agui), including the embedded chat UI.
-- **Files:** keep uploaded and generated media in [attachment storage](/hastekit-sdk/agents/attachments).
-- **Durable agents:** run with [Temporal](/hastekit-sdk/agents/durable/temporal) or [Restate](/hastekit-sdk/agents/durable/restate).
-- **Explicit orchestration:** build [workflows](/hastekit-sdk/workflows/introduction) in Go or YAML, then invoke them directly or expose them as tools.
-
-## Read examples correctly
-
-These guides describe the current SDK source. Pin the module version in your application and use documentation that matches that version. Examples use the root package with the alias `hastekit`; lower-level types live under `pkg/agents`, `pkg/gateway`, and `pkg/workflow`.
-
-Complete programs include `package main` and imports. Smaller snippets state the variables they assume and belong inside an application function unless they declare types or methods. Provider model IDs in examples are illustrative: configure a model available to your account that supports the requested capability.
-
-A unified request shape does not mean every provider supports every field or tool. Consult the relevant feature guide before switching providers.
+These guides follow the current SDK APIs. Pin your module version and use matching documentation when upgrading. Complete programs include imports; shorter snippets name their prerequisites. Model IDs are examples—choose a model available to your account with the capabilities your application needs.

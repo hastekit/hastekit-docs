@@ -1,13 +1,13 @@
 ---
 title: "Agents as tools"
-description: "Delegate a bounded task and return the result to the calling agent."
+description: "Expose one child agent as a named synchronous or background tool."
 ---
 
-An agent tool runs a child agent and returns its answer to the parent as a tool result. The parent keeps control of the conversation and decides what to do next. Use a [handoff](/hastekit-sdk/agents/multi-agents/handoff) when the specialist should take over the run instead.
+An agent tool fixes the delegation target in application code. The parent keeps its conversation and receives the child's answer. Use a [sub-agent client](/hastekit-sdk/agents/multi-agents/sub-agents) when the model should choose from a catalog, or a [handoff](/hastekit-sdk/agents/multi-agents/handoff) when a specialist should take over the current run.
 
-## Wrap a child agent
+## Wait for a child
 
-Given an already-created `researcher`, import `pkg/agents/tools`:
+Given a constructed `researcher`, import `pkg/agents/tools`:
 
 ```go
 researchTool := tools.NewAgentTool(
@@ -18,17 +18,30 @@ researchTool := tools.NewAgentTool(
 )
 ```
 
-Add `researchTool` to the parent's `AgentConfig.Tools`. Construct the child with its own model, instructions, tool permissions, and history configuration.
+Add the tool to the parent's `AgentConfig.Tools`. A synchronous child pause is forwarded through the parent, with continuation identifiers saved in tool state. Resume the parent through the normal approval flow.
 
-| Context mode | Thread behavior |
+## Run a child in the background
+
+```go
+researchTool := tools.NewAsyncAgentTool(
+    "research",
+    "Start research and deliver the answer when it finishes.",
+    researcher,
+    tools.SubAgentContextModeNone,
+)
+```
+
+The constructor chooses whether to wait; there is no model-supplied async flag. The async wrapper returns a task ID and acknowledgement, then delivers the result through the background runner. It implements `agents.BackgroundTool`.
+
+An async child can wait for human input on its own thread. Its task stays pending while the user answers there; the completed answer subsequently reaches the parent. See [sub-agent approvals](/hastekit-sdk/agents/multi-agents/sub-agents#human-input-from-an-async-child).
+
+## Choose thread behavior
+
+| Context mode | Behavior |
 |---|---|
-| `SubAgentContextModeIsolated` | The integration manages a separate child conversation for the call |
-| `SubAgentContextModeNone` | The tool schema exposes an optional `thread_id` for selecting a child conversation |
+| `SubAgentContextModeIsolated` | Parent tool state remembers one child thread for this agent and reuses it |
+| `SubAgentContextModeNone` | Schema exposes optional `thread_id`; results include the child thread ID |
 
-An isolated thread is a conversation boundary, not a security sandbox. The child still executes with its configured tools and forwarded application context.
+Children run in hidden threads, grouped under and parented to the calling thread. They share its namespace and session for attachments, but do not receive the parent's transcript. A follow-up to a child working on an async task is steered into that task.
 
-## Pauses and durable execution
-
-If the child pauses, the wrapper returns the interruption through the parent and saves the continuation identifiers in tool state. Resume the parent using the standard interruption resolution flow. Keep the same child configuration available after the pause.
-
-Register all participating agent configurations with a durable runtime before starting its workers. When returning a result to the parent, account for the additional model calls, tool calls, and token usage caused by delegation.
+A separate thread is a history boundary; the child still has its configured tools and credentials. Register participating agents before starting durable workers, and budget for their additional model/tool calls.

@@ -20,7 +20,7 @@ JSON configuration is copied at construction. Injected clients, agents, and conn
 
 ## MCP call
 
-Given a configured `connector`:
+Given a configured `connector` implementing `agents.MCPClient`:
 
 ```go
 record, err := workflow.NewMCPNode("record", workflow.MCPNodeConfig{
@@ -32,7 +32,7 @@ if err != nil { return err }
 _ = record
 ```
 
-Go passes the connector directly; YAML uses `server`, `tool`, and optional `arguments`. Arguments must resolve to an object. Approval and supported MCP interruption state are preserved for resume. Background MCP tasks are not supported by this workflow node.
+Go passes the client directly; the tool name must match the exposed descriptor, including any configured prefix. YAML uses `server`, `tool`, and optional `arguments`. Arguments must resolve to an object. Approval and supported MCP interruption state are preserved for resume. Background MCP tasks are not supported by this workflow node.
 
 ## HTTP API call
 

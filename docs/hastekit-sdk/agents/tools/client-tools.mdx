@@ -1,0 +1,61 @@
+---
+title: "Frontend tools"
+description: "Let the model call browser actions and resume with their results."
+---
+
+Frontend tools execute in the client, for example to read a selection or update a view. The client sends tool definitions with each run. The agent sees them alongside server tools, and the client returns ordinary AG-UI tool messages.
+
+## Register with React
+
+With a stable `transport` from `createAGUITransport`, import `useChat` from `@hastekit/react`:
+
+```tsx
+const chat = useChat({
+  agent: "assistant",
+  transport,
+  clientTools: [{
+    name: "get_selection",
+    description: "Read the text selected in the browser.",
+    parameters: { type: "object", properties: {} },
+    handler: () => window.getSelection()?.toString() ?? "",
+  }],
+});
+```
+
+Strings become text results; other values are JSON-encoded. Thrown errors become tool errors. Use the [React integration](/hastekit-sdk/agents/serving-agents/react) for the surrounding UI.
+
+## Register with CopilotKit
+
+Use CopilotKit's `useFrontendTool` and `useHastekitClientTools` from `@hastekit/copilotkit/react` inside the provider:
+
+```tsx
+function BrowserTools({ agent }: { agent: HastekitAgent }) {
+  useHastekitClientTools(agent);
+  useFrontendTool({
+    name: "get_selection",
+    description: "Read selected text.",
+    handler: async () => window.getSelection()?.toString() ?? "",
+  });
+  return null;
+}
+```
+
+`HastekitAgent` is imported from `@hastekit/copilotkit`. When opening an existing thread, pass `page.run?.pendingToolCallIds` as the hook's `pendingToolCallIds` option so unanswered calls can be recovered.
+
+## Configure server waiting
+
+The server waits up to 30 seconds by default. Set the agent configuration to change it:
+
+```go
+config.ClientTools = agents.ClientToolOptions{Timeout: 10 * time.Second}
+```
+
+Zero selects the default; a negative timeout pauses immediately. While the run is waiting, a matching tool message lets it continue. After timeout, the run pauses and the AG-UI handler converts a later matching tool result into a resume resolution. Send the tool definitions again on new runs and resumes.
+
+Server tools win name collisions. Definitions accept names of 1–64 ASCII letters, digits, underscores, or hyphens, with at most 128 tools per run. The server receives definitions and results, never the browser handler code.
+
+## Reconnect and authorize
+
+The bundled clients execute tools promptly in runs they started. Rejoined streams can replay already answered calls; clients instead recover outstanding calls after the run ends or from persisted pending IDs. Unmounting the browser does not cancel server execution; an unanswered client tool may leave it paused.
+
+Treat browser results as untrusted input when they lead to server actions. Keep server authorization in server tools or middleware. Client tool registration is a capability declaration, not proof of permission.

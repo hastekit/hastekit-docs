@@ -1,0 +1,95 @@
+---
+title: "React and CopilotKit"
+description: "Build a custom chat frontend against the SDK's AG-UI endpoints."
+---
+
+The SDK repository includes two frontend integrations. `@hastekit/react` supplies headless hooks; `@hastekit/copilotkit` adapts the server to CopilotKit components. The embedded `pkg/agui/web` UI uses CopilotKit and is already bundled into the Go binary.
+
+Mount [AG-UI](/hastekit-sdk/agents/serving-agents/serving-agents-agui) before connecting either client. These examples use `/api/agui` as the base URL.
+
+## Headless React
+
+Build the package from `packages/react` in the SDK checkout with `npm ci` and `npm pack`, then install the resulting tarball in your application. The package supports React 18.3 and 19, emits ESM and TypeScript declarations, and supplies no markup or CSS.
+
+```tsx
+import { useState } from "react";
+import { createAGUITransport, useChat } from "@hastekit/react";
+
+const transport = createAGUITransport({ baseUrl: "/api/agui" });
+
+export function Chat() {
+  const chat = useChat({ agent: "assistant", transport });
+  const [draft, setDraft] = useState("");
+  return (
+    <main>
+      {chat.error && <p role="alert">{chat.error.message}</p>}
+      {chat.messages.map((message) => (
+        <p key={message.id}>
+          <strong>{message.role}: </strong>
+          {typeof message.content === "string" ? message.content : "[Attachment]"}
+        </p>
+      ))}
+      <form onSubmit={async (event) => {
+        event.preventDefault();
+        const text = draft.trim();
+        if (!text) return;
+        setDraft("");
+        await chat.sendMessage(text).catch(() => {});
+      }}>
+        <input value={draft} onChange={(event) => setDraft(event.target.value)} />
+        <button disabled={chat.connection !== "idle" || chat.loadingMessages}>Send</button>
+      </form>
+      {chat.isRunning && (
+        <button onClick={() => void chat.stop().catch(() => {})}>Stop</button>
+      )}
+    </main>
+  );
+}
+```
+
+This renders text only. Add rendering for tool calls, tool results, reasoning, and multipart content as needed. Keep the transport stable—create it outside the component or memoize it. In Next.js, put hooks in a client component.
+
+| API | Purpose |
+|---|---|
+| `threads`, `selectThread`, `newThread` | Conversation navigation |
+| `loadOlderMessages`, `hasOlderMessages` | History pagination |
+| `stop`, `isStopping` | Server stop requests |
+| `isCompacting` | Context summarization indicator |
+| `clientTools` | Browser-executed tools |
+| `mcpServers`, `setMCPServerEnabled` | MCP server selection |
+
+Use one `ChatProvider` with `useChatContext` to share state across a sidebar, transcript, and composer. Separate `useChat` calls create separate controllers. Unmounting or changing threads disconnects observation without stopping server work.
+
+## CopilotKit
+
+Install `@hastekit/copilotkit` with `@copilotkit/react-core`, `@ag-ui/client`, `@ag-ui/core`, and `rxjs`, using compatible versions from the SDK package manifests. No separate CopilotKit runtime server is required.
+
+```tsx
+import { useMemo } from "react";
+import { CopilotChat, CopilotKitProvider } from "@copilotkit/react-core/v2";
+import "@copilotkit/react-core/v2/styles.css";
+import { HastekitAgent } from "@hastekit/copilotkit";
+
+export function Chat({ threadId }: { threadId: string }) {
+  const agent = useMemo(() => new HastekitAgent({
+    agentName: "assistant", threadId, baseUrl: "/api/agui",
+  }), [threadId]);
+  return (
+    <CopilotKitProvider selfManagedAgents={{ assistant: agent }}>
+      <CopilotChat agentId="assistant" threadId={threadId} />
+    </CopilotKitProvider>
+  );
+}
+```
+
+Use `fetchThreadMessages(connection, threadId)` and `initialMessages` when opening existing history. Prepend older pages with `agent.prependMessages`. The returned `page.run` contains pending interrupts, client tool call IDs, and background tasks; `page.context` reports saved context usage.
+
+`useHastekitInterrupt` provides the approval/form/URL interaction adapter. `useHastekitClientTools` connects CopilotKit frontend tools to live and paused runs. See [frontend tools](/hastekit-sdk/agents/tools/client-tools).
+
+## Background activity
+
+`HastekitAgent.steer(content)` sends a message to an active run. `watchRuns` observes thread lifecycle events, and `joinIfIdle()` lets the client join a newly started run. Skill and MCP selections use `{ disable: string[] }`.
+
+Async child tasks can expose their own pending interrupts through `page.run.backgroundTasks`. Resume using that task's `agentName` and `agentThreadId`; the decision belongs to the child conversation.
+
+For schedules, the headless package provides `useRoutines` and `useRoutineThreads`. Enable `agui.WithRoutines` on the server; see [Routines](/hastekit-sdk/routines).

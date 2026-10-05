@@ -18,3 +18,11 @@ Local agents use an in-process supervisor, so background work does not survive p
 Report progress through the supplied reporter, and pass the context to blocking work. Completion and progress have their own broker stream and thread identity. Keep the original namespace and session boundaries when delivering results.
 
 Make the external job submission and completion handling idempotent if the durable execution can retry. Stopping a wait or short-circuiting it in middleware does not necessarily cancel a job already submitted to another service.
+
+## Tasks waiting for human input
+
+`BackgroundResult.Waiting` means the task is still pending. Nothing is delivered to the model, and the runner calls `AwaitTask` again with a delay starting at one second and capped at thirty seconds. Local, Temporal, and Restate runners support this state.
+
+Async agent tools set `ToolCallResponse.TaskAgent` to identify the child agent and thread. When that child pauses, AG-UI exposes its interrupts in the parent's background task entry. Answer on the child's thread; the task completes after that conversation finishes. See [sub-agents](/hastekit-sdk/agents/multi-agents/sub-agents).
+
+`BackgroundTaskRef` preserves the originating namespace, session, run context, skills, MCP selection, and client tool definitions for a continuation. Progress uses the task's own stream; completion is delivered to the parent thread as new input rather than a second result for the already-answered tool call.

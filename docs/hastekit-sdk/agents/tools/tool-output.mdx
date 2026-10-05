@@ -1,0 +1,29 @@
+---
+title: "Tool output limits"
+description: "Keep large tool results out of model context while retaining full output in attachment storage."
+---
+
+`middleware.ToolResponseMiddleware` limits successful tool results before they enter history or a durable journal. It measures text bytes or the JSON encoding of multipart output. Control fields such as IDs, state updates, interruptions, and background task metadata are preserved.
+
+Import `pkg/agents/middleware` and `pkg/agents`. With `store` implementing `attachments.UploadStore`:
+
+```go
+config.Middlewares = []agents.Middleware{
+    middleware.NewToolResponseMiddleware(middleware.ToolResponseMiddlewareConfig{
+        Store: store,
+        MaxResponseBytes: 32 << 10,
+        MaxSummaryBytes: 2 << 10,
+    }),
+    middleware.NewAttachmentMiddleware(middleware.AttachmentMiddlewareConfig{
+        Store: store,
+    }),
+}
+```
+
+The limiter belongs before attachment middleware. Results return through the middleware chain in reverse order, so inline media is externalized before its size is measured.
+
+The defaults are 32 KiB for the result and 2 KiB for the excerpt. The excerpt is shortened further if needed to fit metadata; no summarizing model call is made. With a store, the full result is saved and the model receives a bounded preview and retrieval guidance. The call needs a namespace and session for storage.
+
+Without a store, oversized content is discarded after extracting a preview. The replacement explains that it was not saved and suggests pagination or filtering. Upload or metadata failures abort the call instead of persisting an oversized payload. Tool failures pass through unchanged.
+
+Provide an appropriate file-reading tool if the agent needs to inspect saved output. See [attachments](/hastekit-sdk/agents/attachments) for storage and [summarization](/hastekit-sdk/agents/conversations/summarization) for managing accumulated context.

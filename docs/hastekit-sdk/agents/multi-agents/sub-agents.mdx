@@ -1,0 +1,75 @@
+---
+title: "Sub-agents"
+description: "Let an agent delegate to a named catalog, wait for an answer, or continue while a child works."
+---
+
+Set `AgentConfig.SubAgents` to give an agent the `call_sub_agent` tool. A `SubAgentClient` controls which agents are available and how messages reach them. The built-in registry client lives in `pkg/agents/subagents`.
+
+## Create a catalog
+
+With `model` configured, import `pkg/agents/subagents` and `pkg/agents/prompts`:
+
+```go
+registry := hastekit.NewRegistry()
+researcher, err := hastekit.NewAgent(&hastekit.AgentConfig{
+    Name: "researcher",
+    Description: "Investigates a question and returns a concise report.",
+    LLM: model,
+    Instruction: hastekit.NewPrompt("Investigate the assigned question and state your evidence."),
+})
+if err != nil { return err }
+if err := registry.Register(researcher); err != nil { return err }
+
+lead, err := hastekit.NewAgent(&hastekit.AgentConfig{
+    Name: "lead",
+    LLM: model,
+    SubAgents: subagents.NewClient(registry, subagents.WithAgents("researcher")),
+    Instruction: hastekit.NewPrompt("Delegate research when useful, then answer the user.",
+        prompts.WithResolver(prompts.DefaultResolvers()...)),
+})
+if err != nil { return err }
+if err := registry.Register(lead); err != nil { return err }
+```
+
+Add appropriate research tools to the child for your application. The registry is read when the catalog is listed, so later registrations are visible. With an empty catalog, the run is not offered `call_sub_agent`.
+
+## Choose availability
+
+| Option | Behavior |
+|---|---|
+| `WithAgents(names...)` | Restrict registry agents to the named entries |
+| `WithoutAgents(names...)` | Exclude named registry entries |
+| `WithSelf()` | Add the caller itself as a delegation target |
+| `WithFilter(filter)` | Apply a policy using caller, namespace, run context, and agent metadata |
+
+The caller is excluded from ordinary registry entries; `WithSelf` adds it separately. Name include/exclude options filter registry entries. Use `WithFilter` when policy should also restrict the self entry. All filters must accept an entry for it to be available.
+
+A self call runs the calling agent's configuration in a separate thread. It does not receive the parent's conversation. The default prompt resolvers include `ResolveSubAgents`, which lists names and descriptions.
+
+## Call and follow up
+
+The model sends arguments such as:
+
+```json
+{"agent":"researcher","mode":"async","message":"Summarize the tradeoffs described in the attached report."}
+```
+
+- `sync` waits and returns the child's answer as the tool result.
+- `async` returns an acknowledgement immediately; the task later delivers its answer to the parent's thread.
+- `thread_id` continues a previously returned child thread; omit it for a new thread.
+
+A follow-up to a busy child is queued for that run. Tool responses include the thread ID. Application code can observe the thread through AG-UI using the child's registered agent name.
+
+Child threads inherit the caller's namespace and session, carry `ParentThreadID`, and are `Hidden`. Their default group is the calling thread ID. Ordinary thread listings omit them; `include_hidden=true` includes them within the requested group. History stays separate while attachments can share session scope.
+
+## Human input from an async child
+
+An async child that pauses for approval or input keeps its task pending. The parent thread's history response exposes `run.backgroundTasks` with `agentName`, `agentThreadId`, and pending `interrupts`. Answer those interrupts by posting resume entries to the **child agent and child thread**. After the child finishes, its answer is delivered to the parent.
+
+A `call_sub_agent` call in sync mode reports a child pause as unfinished work; it does not forward that interruption through the parent. Use the synchronous [agent tool](/hastekit-sdk/agents/tools/agent-as-a-tool) if the parent must pause and relay the child's decision.
+
+## Runtime behavior
+
+Local background tasks live in the process. Temporal and Restate run their waits separately from the parent run. A task's fixed message ID lets a retried wait recognize a persisted child turn. External tool effects still need idempotency, and all workers need access to the same history and broker.
+
+Custom `agents.SubAgentClient` implementations provide `ListSubAgents`, `RunSubAgent`, and `SteerSubAgent`. Both execution methods must enforce the same allowed catalog as listing and support concurrent use.

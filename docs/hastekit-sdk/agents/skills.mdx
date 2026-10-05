@@ -1,58 +1,95 @@
 ---
 title: "Skills"
-description: "Advertise reusable instructions and read them through one skill tool."
+description: "Give agents reusable instructions from developer-owned sources and a user's stored library."
 ---
 
-A skill is a folder containing `SKILL.md` and optional supporting resources. Its name and description help the model decide when to read it; the full instructions enter the conversation only when the model requests them.
+A skill is a `SKILL.md` instruction file with optional supporting resources. The prompt lists enabled skill descriptions; the model calls `read_skill` when it needs the full instructions. Reading a script returns its text—it does not execute it.
+
+Configure `AgentConfig.SkillClient` with `pkg/agents/skills`. Each agent can have its own global sources while sharing a namespace-scoped user library.
 
 ## Write a skill
 
-Create `skills/release-notes/SKILL.md`:
+Create `skills/release-review/SKILL.md`:
 
 ```markdown
 ---
-name: release-notes
-description: Write release notes from a set of reviewed changes.
+name: release-review
+description: Review a release for missing tests and compatibility changes.
 ---
 
-Group changes into features, fixes, and compatibility notes.
-Describe user-visible behavior and include migration steps when needed.
+Check the changed public APIs, read the relevant tests, and report actionable issues.
+Use refs/checklist.md for the release checklist.
 ```
 
-Keep credentials and private configuration out of skill resources. Skill text guides the model but does not enforce tool permissions.
+Put supporting files beneath the skill folder. Names and descriptions come from frontmatter; uploaded content cannot set its own availability policy.
 
-## Configure the provider
+## Attach developer-owned skills
 
-With `model` already configured, import `pkg/agents/prompts`:
+With `model` configured, import `pkg/agents/skills` and `pkg/agents/prompts`:
 
 ```go
-skills, err := hastekit.NewSkillRegistryFromDir("./skills")
+source, err := skills.NewDirSource("./skills")
 if err != nil { return err }
 agent, err := hastekit.NewAgent(&hastekit.AgentConfig{
-    Name: "release-assistant",
+    Name: "reviewer",
     LLM: model,
-    Skills: skills,
-    Instruction: hastekit.NewPrompt("Help prepare release notes.",
+    SkillClient: skills.NewClient(nil).WithGlobalSkills(source),
+    Instruction: hastekit.NewPrompt("Review releases using the relevant skills.",
         prompts.WithResolver(prompts.DefaultResolvers()...)),
 })
 if err != nil { return err }
 _ = agent
 ```
 
-Setting `Skills` adds the provider's reader tool. Enabling `ResolveSkills` advertises the catalog in the prompt. Both are needed for the usual discovery-and-read experience; do not separately add a second `read_skill` tool.
+| Source | Content |
+|---|---|
+| `NewDirSource(directory)` | Ordinary skill folders, discovered on each listing |
+| `NewFSSource(fsys)` | An `embed.FS` or another `fs.FS` |
+| `NewBundleSource(bundles...)` | Inline bundles validated and copied at construction |
+| `NewStoreSource(store, namespace)` | An application-managed namespace in a skill store |
 
-## Read instructions and resources
+`WithGlobalSkills` returns a copy of the client sharing its user store. Globals are always enabled, cannot be disabled by the user, and take precedence over a user skill with the same name. Duplicate names across global sources are a configuration error.
 
-The built-in reader accepts `{"name":"release-notes"}` for instructions and `{"name":"release-notes","file":"references/style.md"}` for a bundled resource. Resource paths must be in the registry's resource list. Reading a script returns its contents; the skill reader does not execute it.
+## Add a user library
 
-Names must be unique across all configured sources. `NewSkillRegistryFromDir` accepts multiple directories. `NewSkillRegistry` accepts `fs.FS` sources, including an `embed.FS`, so instructions can ship with a binary.
+```go
+store, err := skills.NewFileStore("./data/skills")
+if err != nil { return err }
+client := skills.NewClient(store).WithGlobalSkills(source)
+```
 
-The catalog is built at construction and is read-only afterwards. Rebuild the provider to pick up catalog changes; this is not a live registry with runtime enable/disable controls.
+Set `SkillClient: client` on the agent. Its globals are combined with the skills stored under `Input.Namespace`. The store is shared across agents; the agent name does not create a separate library. An empty namespace passed directly to the client lists globals only.
 
-## Custom sources
+User skills are enabled by default. Disable selected names for one execution with `agents.SkillSelection`:
 
-Implement `agents.SkillProvider` with `Skills() []Skill`, `SkillTool() Tool`, and `SkillHint() string`. The provider owns the explanation of how its instructions are read. Return a nil tool only when another configured tool already provides that access.
+```go
+result, err := agent.Run(ctx, &hastekit.Input{
+    Namespace: "tenant-123",
+    ThreadID: "release-42",
+    Skills: agents.SkillSelection{Disable: []string{"writing-style"}},
+    Message: hastekit.UserTurn("Review this release."),
+})
+if err != nil { return err }
+_ = result
+```
 
-`SkillList` advertises a list without adding a reader; `SkillsWithHint` adds host-defined guidance, for example when instructions are already mounted in a sandbox. Do not advertise a reader the agent has not been given.
+There is no `Enable` list. Unknown disabled names are ignored, and global skills remain enabled. Send the selection on each new turn and approval resume; handoffs and background continuations inherit the originating run's selection. Disabling a skill does not remove instructions already read into history.
 
-A persistent dynamic skill registry and per-run skill selection are not currently built-in features.
+## Read and extend the catalog
+
+Use `agent.ListSkills(ctx, namespace, runContext, selection)` for a picker with `Global` and `Enabled` flags. The agent refreshes its catalog when entering a run, fixes the enabled names and resource allowlist for that execution, and resolves content when it is read. A listing error fails the run. Use versioned custom storage if reads must remain pinned to one content version.
+
+The `read_skill` tool accepts the exact skill `name` and an optional `file`. An omitted file returns instructions without frontmatter; `file: "SKILL.md"` returns the original file. Other reads are limited to the listed resources.
+
+Implement `skills.Source` for a custom global source (`List`, `Read`), or implement the consumer-owned `agents.SkillClient`:
+
+```go
+type SkillClient interface {
+    ListSkills(context.Context, string, map[string]any) ([]agents.Skill, error)
+    ReadSkill(context.Context, string, map[string]any, string, string) (string, error)
+}
+```
+
+Arguments after context are namespace, run context, then skill name and file for reads. Namespace is authoritative; `RunContext["Namespace"]` has no special meaning. Clients must support concurrent calls. Temporal and Restate perform listing and reading inside activities or durable steps.
+
+See [Skill storage and management](/hastekit-sdk/agents/skill-library) for uploads, S3, management routes, and caching.

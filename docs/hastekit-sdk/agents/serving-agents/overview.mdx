@@ -1,0 +1,29 @@
+---
+title: "Interfaces"
+description: "Choose an embedded chat, a custom frontend, or a programmatic agent interface."
+---
+
+The same agent can run in Go or serve a browser. Register agents once, then choose the interface your application needs.
+
+| Interface | Use it when | Integration |
+|---|---|---|
+| Go execution | Your application needs results or SDK chunks | `agent.Run`, `agent.Execute` |
+| Embedded chat | You want a ready-made browser UI | `web.Handler`, `web.Serve` |
+| Headless React | You own markup and interaction design | `@hastekit/react` |
+| CopilotKit | You use CopilotKit chat components | `@hastekit/copilotkit` |
+| AG-UI HTTP | You are building another protocol client | `agui.NewHandler` |
+| SDK event stream | You consume native SDK response chunks | `hastekit.NewHTTPHandler` |
+
+Start with [AG-UI and embedded chat](/hastekit-sdk/agents/serving-agents/serving-agents-agui), then choose [React or CopilotKit](/hastekit-sdk/agents/serving-agents/react) for a custom UI. Both integrations support persisted history, reconnects, stop requests, and frontend tools.
+
+## Protocol responsibilities
+
+The server owns conversation history and execution. Send only the new turn when using that history. A dropped browser connection ends observation; use the stop endpoint to request cancellation. Reconnect using the last SSE event ID while replay is retained, and use persisted history for older turns.
+
+Resolve namespaces from trusted identity at the HTTP boundary. Client-selected thread IDs identify conversations within that namespace; they do not establish authorization. See [production deployment](/hastekit-sdk/production) for shared storage and lifecycle management.
+
+## Agent-to-agent HTTP
+
+The AG-UI handler also mounts an A2A directory at `/a2a/`, discovery cards at `/a2a/{agent}/.well-known/agent-card.json`, and A2A JSON-RPC/SSE at `/a2a/{agent}`. With the embedded UI, prepend `/api/agui`. Configure `agui.WithA2ABaseURL` when a reverse proxy changes the public base URL.
+
+For agents within one application, use [sub-agents or handoffs](/hastekit-sdk/agents/multi-agents/overview) instead of adding an HTTP boundary.

@@ -61,3 +61,10 @@ Under Temporal and Restate, middleware runs **inside** the activity or durable s
 ## Agent middleware versus provider middleware
 
 `AgentConfig.Middlewares` accepts `agents.Middleware` (also `hastekit.AgentMiddleware`). `hastekit.WithMiddleware` configures the separate model-provider chain for retries, fallback, and provider operations. The two APIs run at different boundaries; see [provider configuration](/hastekit-sdk/multiple-keys).
+
+
+## Built-in middleware
+
+`pkg/agents/middleware` includes retry/fallback policies, attachment handling, and tool response limits. See [retries and timeouts](/hastekit-sdk/agents/retries), [attachments](/hastekit-sdk/agents/attachments), and [tool output limits](/hastekit-sdk/agents/tools/tool-output).
+
+Stop and timestamp middleware are installed at built-in execution boundaries. Completion timestamps are saved on response metadata and become stored message timestamps. Custom durable adapters must arrange for side effects and time reads to happen inside their recorded steps.

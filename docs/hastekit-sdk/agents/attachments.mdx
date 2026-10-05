@@ -11,7 +11,7 @@ A reference is opaque SDK data, not a provider file ID or downloadable URL. Ordi
 
 The SDK includes a filesystem `FileStore` and an `S3Store`. Both implement the upload/read interfaces used by the resolver, middleware, and HTTP attachment handler.
 
-For local storage, import `pkg/attachments`:
+For local storage, import `pkg/agents/attachments`:
 
 ```go
 store, err := attachments.NewFileStore("./data/attachments", attachments.FileStoreConfig{
@@ -52,11 +52,14 @@ With `store` and `resolver` configured, import `pkg/agents/middleware`:
 attachmentMiddleware := middleware.NewAttachmentMiddleware(middleware.AttachmentMiddlewareConfig{
     Store: store,
     Resolver: resolver,
+    InlineAttachments: true,
     MaxInlineBytes: 32 << 20,
 })
 ```
 
-Set `AgentConfig.Middlewares` to include this value. The middleware resolves attachment inputs inside model calls and externalizes supported inline tool/model media before it is persisted. Installing a store alone does not enable model resolution.
+Set `AgentConfig.Middlewares` to include this value. Images resolve to bytes by default (`InlineImages` defaults to true). Files default to plain-text references with metadata; the example explicitly enables `InlineAttachments` so file bytes reach the model. Set `InlineImages` to a pointer to false to send image references as text too.
+
+The middleware externalizes supported inline tool/model media before persistence. Installing a store alone does not enable model resolution. Register it outside middleware that adds media to results; if using [tool output limits](/hastekit-sdk/agents/tools/tool-output), put the limiter first so it measures externalized results.
 
 Use `attachments.FileID(ref)` in an image/file input's `FileID`, and `attachments.RefFromFileID` to decode a reference. Generated images use the existing `image_generation_call.result` field. A direct LLM call without this middleware does not resolve SDK-owned references.
 

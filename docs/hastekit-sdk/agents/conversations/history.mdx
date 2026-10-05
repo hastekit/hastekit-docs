@@ -28,7 +28,7 @@ Close the history after all agents and requests using it finish. Agents do not c
 
 Send each new turn with the same namespace and `ThreadID`. You do not need to resend previous messages: the history manager loads them. Omitting `PreviousRunID` follows the thread's current history; setting it chooses the earlier run from which to continue. Use a paused result's run ID when explicitly resuming that branch.
 
-Choose thread IDs in your application before invoking the agent. A new ID starts another thread. Reusing a run ID is not a general HTTP idempotency mechanism: the persistence layer can reject a duplicate, and side effects need their own idempotency design.
+Choose thread IDs in your application before invoking the agent. A new ID starts another thread. Reusing a run ID is not a general HTTP idempotency mechanism: saves append increments to a run, and side effects need their own idempotency design.
 
 ## Read a transcript
 
@@ -62,3 +62,25 @@ Without native pagination, the helper loads a transcript and slices it in memory
 ## Message attribution
 
 The incoming `history.Message` bundle can carry sender information. `history.WithMessageAttribution()` enables attribution prefixes when producing model context. Steering notices are enabled by default for messages delivered while a run is active; `WithoutSteeringNotices()` disables that annotation. Neither option replaces application authentication.
+
+## Groups, parents, and visibility
+
+`Input.GroupID` assigns a new conversation to a group; empty means `default`. `ParentThreadID` identifies the thread that spawned it, and `Hidden` marks an internal thread. Continuations and forks preserve stored attributes. Sub-agent threads are hidden, parented to the caller, and normally grouped under its thread ID. Routine occurrences use the routine ID as their group.
+
+`ThreadLister.ListThreads(ctx, namespace, groupID)` returns thread metadata, including these attributes. AG-UI omits hidden threads unless `include_hidden=true`; this visibility flag is a presentation filter, not an authorization boundary.
+
+Custom persistence implements the current save signature:
+
+```go
+SaveMessages(ctx context.Context, namespace, groupID, parentThreadID string,
+    hidden bool, runID, previousRunID, threadID, conversationID string,
+    messages []history.Message, meta map[string]any) error
+```
+
+Assign attributes on creation and preserve them on incremental saves, continuations, and forks. Append supplied messages to an existing run; replace non-nil metadata even when there are no new messages. Preserve its thread, conversation, and creation time. This incremental contract supports opening-turn persistence and later state transitions.
+
+## Message timestamps
+
+Each `history.Message` bundle carries `CreatedAt`. Built-in timestamp middleware records model and tool completion time inside their execution boundary. Other bundles receive the run clock's time when accepted. Old stored bundles can have a zero timestamp.
+
+Hydrated AG-UI user, assistant, and tool messages expose `metadata.createdAt` as RFC 3339 or null for older untimed messages. `metadata.senderId` carries the bundle sender when known. The embedded chat displays message and tool-result times; these are distinct from the run's timestamps.

@@ -1,78 +1,89 @@
 ---
-title: "MCP connectors"
-description: "Connect remote tools with explicit transport, identity, discovery, and caching."
+title: "MCP tools"
+description: "Discover and execute MCP tools from developer configuration and user-owned server definitions."
 ---
 
-An MCP connector implements `agents.MCPToolset`. Configure it during application setup and pass it in `AgentConfig.McpServers`. During a run, the agent discovers its tools and executes selected calls through the connector.
+`AgentConfig.MCPClient` accepts a client that discovers tools, reports connector status, and executes calls. Use `pkg/agents/mcpclient.NewClient` with one or more configuration stores. The root `hastekit.NewMCPClient` is an alias for this store-based constructor.
 
-## Connect over HTTP
+## Configure a server
 
-With `ctx` and `model` already defined, import `pkg/agents`, `pkg/agents/mcpclient`, and `pkg/agents/prompts`:
+Import `pkg/agents/mcpclient` and `pkg/agents/prompts`. With `model` configured:
 
 ```go
-connector, err := hastekit.NewMCPClient(ctx, "issues", "https://mcp.example.com/mcp",
-    mcpclient.WithTransport(mcpclient.TransportStreamableHTTP),
-    mcpclient.WithToolPrefix("issues__"),
-    mcpclient.WithToolFilter("search_issues", "create_issue"),
-    mcpclient.WithApprovalRequiredTools("create_issue"),
-)
-if err != nil { return err }
+store := mcpclient.NewMemoryStore().WithMCPServerConfig([]mcpclient.ServerConfig{{
+    Name: "docs",
+    Endpoint: "https://example.com/mcp",
+    Transport: mcpclient.TransportStreamableHTTP,
+    ToolPrefix: "docs__",
+}})
+client := mcpclient.NewClient(store)
 agent, err := hastekit.NewAgent(&hastekit.AgentConfig{
-    Name: "issue-assistant",
-    LLM: model,
-    Instruction: hastekit.NewPrompt("Help users investigate issues.",
+    Name: "assistant", LLM: model,
+    MCPClient: client,
+    Instruction: hastekit.NewPrompt("Use the connected tools when needed.",
         prompts.WithResolver(prompts.DefaultResolvers()...)),
-    McpServers: []agents.MCPToolset{connector},
 })
 if err != nil { return err }
 _ = agent
 ```
 
-The URL is a placeholder; use your server's endpoint. Select the transport explicitly. Supported constants are `TransportStreamableHTTP`, `TransportSSE`, and `TransportStdio`; the default is SSE.
+Replace the endpoint with your MCP server. Definitions with an empty `Namespace` are global, developer-owned, and always enabled. Namespace-owned definitions are enabled unless the run disables them. A global definition wins over a user definition with the same name.
 
-`WithToolPrefix("issues__")` exposes `search_issues` as `issues__search_issues` to the model. Include the separator in the prefix. Filters, approval lists, and deferred-tool lists always use the **server's original tool names**.
+Use `mcpclient.NewFileStore(path)` for persisted definitions or implement `MCPServerConfigStore.ListServerConfigs(ctx, namespace, runContext)`. `NewClient(storeA, storeB)` combines sources. `WithMCPServerConfig` returns a new view, copies inline configuration, and shares backing persistence.
 
-## Credentials and run context
+## Transports and tool filters
 
-`WithHeaders(map[string]string{"Authorization": "Bearer {{token}}"})` resolves values against `Input.RunContext`. Supply credentials from authenticated application state. They are not model arguments.
+| Configuration | Purpose |
+|---|---|
+| `TransportStreamableHTTP` | Remote Streamable HTTP MCP server |
+| `TransportSSE` | Remote SSE transport |
+| `TransportStdio`, `Command`, `Env` | Developer-configured local process |
+| `ToolPrefix` | Prefix exposed tool names to avoid collisions |
+| `ToolFilter` | Include/exclude original server tool names |
+| `DeferredTools` | Select schemas exposed through deferred discovery |
+| `ApprovalRequiredTools` | Require approval for selected original tool names |
+| `Headers`, `Meta` | Connection headers and tool-call metadata |
+| `DisableStandaloneSSE` | Compatibility option for servers without a standalone GET stream |
 
-For stdio, use `WithCommand(command, args...)` and an empty endpoint. The command is fixed application configuration; `WithEnv` can template values from run context. The child process inherits the application environment plus those values. Deploy the executable and its dependencies on every worker that can execute the tool.
+Filters use `mcpclient.ToolFilter{Include: ..., Exclude: ...}`. Empty `Include` selects all; `Exclude` wins. Configure a prefix when different servers expose the same tool name.
 
-## Refreshing OAuth credentials
+## Select tools for one run
 
-Use `mcpclient.WithCredentialProvider` when credentials must be fetched or refreshed rather than supplied as a fixed templated header. Implement `CredentialProvider.Resolve(ctx, connector, runContext)` or use `CredentialProviderFn`.
+Set `Input.MCP` using `agents.MCPSelection`:
 
-Return a `Credential` containing an `oauth2.TokenSource` and a stable `Principal`, such as a tenant/user identity. The token source is consulted for HTTP requests so expired tokens can refresh. The principal partitions pooled sessions; it must not change merely because a token rotated. Leaving it empty disables session pooling for token-source credentials. Never reuse one principal for unrelated users with different permissions.
+```go
+selection := agents.MCPSelection{
+    Disable: []string{"archive"},
+    Tools: map[string]agents.MCPToolSelection{
+        "docs": {Include: []string{"search"}, Exclude: []string{"delete"}},
+    },
+}
+```
 
-This resolves credentials for an already-configured connector. It is not dynamic connector registration.
+Selections use original, unprefixed tool names and only narrow the configured filter. Global servers cannot be disabled. Unknown names are ignored across handoffs. AG-UI accepts the same object at `forwardedProps.mcp`; send it again on new turns and approval resumes.
 
-## Discovery failures
+## Discovery and execution
 
-An unavailable MCP server is omitted from the run's available tools rather than necessarily failing the entire agent. `prompts.ResolveConnectors`, included in `DefaultResolvers`, tells the model which connectors are unavailable. Monitor discovery errors if a connector is essential to your application; an agent continuing is not evidence that every configured server was reachable.
+A run lists the current catalog. Individual connection and authentication failures become connector statuses, allowing other servers to work. Disabled servers contribute no tools or statuses. Store errors, invalid global definitions, and collisions between global tool names fail discovery; invalid user definitions fail their own connector. `ResolveConnectors`, included in the default prompt resolvers, tells the model about availability.
 
-## Schema caching
+Calls resolve the current configuration and credentials again. Editing a definition can therefore affect a tool listed earlier. Temporal and Restate carry descriptors and statuses through their histories; workers resolve connection secrets inside the activity or step.
 
-Caching requires an injected `SchemaCache` through `WithSchemaCache`. `WithCacheTTL` controls lifetime; it does not install a cache by itself. The cached data is the tool listing, not tool execution results.
+Global definitions may template headers and metadata from run context. User-owned definitions must be literal, use public HTTP endpoints, and cannot launch processes or request the shared credential provider. Application authentication determines which namespace may manage them.
 
-| Server TTL | Local TTL | Effective lifetime |
-|---|---|---|
-| Positive | Positive | The smaller value |
-| Positive | Zero/unset | Server TTL |
-| Zero/unset | Positive | Local TTL |
-| Zero/unset | Zero/unset | Bypass caching |
+## Credentials and schema caching
 
-A listing explicitly marked public is shared under the connector name. Private listings, and listings with no cache-scope declaration, use a requester-specific key. Connector names must be unique across servers sharing a cache. Filters and prefixes are applied after lookup, so a cached listing still uses the current connector's tool selection.
+Add a shared credential provider and cache to the client:
 
-Use `InvalidateToolCache(ctx, runContext)` for the connector's public and current requester keys. `InvalidateAllToolCache(ctx)` clears the injected cache, which can affect other connectors sharing it.
+```go
+client := mcpclient.NewClient(store).
+    WithCredentials(credentialProvider).
+    WithSchemaCache(cache.NewMemoryCache())
+```
 
-## Approval, forms, and progress
+`cache` is `pkg/cache`. For custom credentials on global definitions, set `UseCredentials: true`; public servers do not use the provider. OAuth application settings belong in `ServerConfig.Authorization`. See [MCP configuration and OAuth](/hastekit-sdk/agents/tools/mcp-management) for persisted credentials and browser connection flows.
 
-Use `WithApprovalRequiredTools` for actions requiring a human decision. `WithDeferredTools` delays full schema disclosure for selected tools. These controls are independent.
+Set `CacheTTLSeconds` and `DefaultCacheScope` per server. Explicit server cache scope wins; unspecified scope defaults to private. Use public scope only when every user sees the same schemas. Filters apply after cache lookup. Cache `Get`, `Set`, and `Delete` use the same byte-oriented signatures as the skill cache; the interfaces remain separate.
 
-MCP elicitation can surface as an agent interruption. Send the returned call ID, action, and requested content through the normal [resolution flow](/hastekit-sdk/agents/tools/human-in-the-loop). Keep the saved continuation state; sending an unrelated user message is not the same as resolving the pending call.
+## Approvals and progress
 
-The connector forwards server progress notifications to agent progress events and maps MCP annotations onto `agents.ToolAnnotations` for middleware inspection.
-
-`WithDisableStandaloneSSE(true)` is available for Streamable HTTP servers that cannot provide the standalone server-to-client GET stream. Use it for that compatibility requirement rather than changing the transport globally.
-
-The built-in connector list is configured in code. A persistent registry with per-user enable/disable controls and runtime connector resolution is not part of this API yet.
+MCP annotations flow into tool descriptors. Approval requirements, form elicitations, and URL elicitations use the normal [human-input flow](/hastekit-sdk/agents/tools/human-in-the-loop). Progress notifications become agent progress events. For a large catalog, combine filters with [deferred discovery](/hastekit-sdk/agents/tools/deferred-tools).

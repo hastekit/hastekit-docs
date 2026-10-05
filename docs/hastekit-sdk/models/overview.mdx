@@ -1,0 +1,37 @@
+---
+title: "Models and providers"
+description: "Configure a provider once and reuse its model for agents or direct model requests."
+---
+
+`hastekit.NewLLMClient` holds provider configuration. `client.Model("Provider/model")` selects a provider/model pair implementing the model API. Reuse that value in `AgentConfig.LLM` or call it directly.
+
+With credentials in your environment:
+
+```go
+client := hastekit.NewLLMClient([]hastekit.ProviderConfig{{
+    ProviderName: hastekit.ProviderOpenAI,
+    ApiKeys: []*hastekit.APIKeyConfig{{
+        Name: "primary", APIKey: os.Getenv("OPENAI_API_KEY"),
+    }},
+}})
+model := client.Model("OpenAI/gpt-4.1-mini")
+```
+
+See [providers and keys](/hastekit-sdk/multiple-keys) for multiple credentials, custom base URLs, and provider middleware. Supported operations differ by adapter and model; a shared request field does not imply universal support.
+
+## Choose an API
+
+| Need | Guide |
+|---|---|
+| Agent tool loop | [Agents and execution](/hastekit-sdk/agents/simple-agent) |
+| Text and streaming | [Text generation](/hastekit-sdk/responses/text-generation) |
+| JSON constrained by a schema | [Structured output](/hastekit-sdk/responses/structured-output) |
+| Application-controlled tool loop | [Direct function calling](/hastekit-sdk/responses/tool-calling) |
+| Reasoning configuration | [Reasoning controls](/hastekit-sdk/responses/reasoning) |
+| Images and vision | [Images](/hastekit-sdk/responses/image-generation) |
+| Vector representations | [Embeddings](/hastekit-sdk/embeddings/embeddings) |
+| Audio output and input | [Speech](/hastekit-sdk/speech/speech), [transcription](/hastekit-sdk/speech/transcription) |
+
+Provider-hosted [web search](/hastekit-sdk/responses/web-search-tool) and [code execution](/hastekit-sdk/responses/code-execution-tool) are separate from Go function tools and SDK sandbox tools. Their availability and billing belong to the selected provider.
+
+For agent-specific retry budgets and fallback targets, use [agent resilience middleware](/hastekit-sdk/agents/retries). For exact request shapes, see the [model API reference](/hastekit-sdk/responses/responses-api).

@@ -1,0 +1,19 @@
+---
+title: "Multi-agent patterns"
+description: "Choose delegation, background work, or a handoff based on who owns the conversation."
+---
+
+Compose agents when a task benefits from different instructions, models, or tool access. Choose the pattern based on where the answer belongs and whether the caller should wait.
+
+| Pattern | Execution | Conversation ownership |
+|---|---|---|
+| [Sub-agent client](/hastekit-sdk/agents/multi-agents/sub-agents) | Model chooses a named agent and sync/async mode | Parent keeps its thread; child has a separate thread |
+| [Agent as a tool](/hastekit-sdk/agents/tools/agent-as-a-tool) | Application fixes the child and whether to wait | Child answer becomes a parent tool result or background delivery |
+| [Handoff](/hastekit-sdk/agents/multi-agents/handoff) | Specialist takes over the current run | Same conversation and run state |
+| [Workflow](/hastekit-sdk/workflows/introduction) | Application defines the graph | Graph determines order, branches, and pauses |
+
+Use a sub-agent for a self-contained research or analysis request. Send all necessary context in its message: sharing a session for attachments does not share the parent's transcript. Use a handoff when a specialist should continue speaking directly to the user with the conversation's existing state.
+
+An agent's `Description` tells a delegating agent what it does. Its `Instruction` controls how it behaves. Give each child the tools and credentials appropriate to its job. Delegation adds model calls and can recurse when agents can call themselves or each other; bound that work through application policy, deadlines, and the allowed catalog.
+
+For local execution, register agents in `hastekit.NewRegistry()`. For durable execution, construct every participating agent with its runtime before starting workers. A registry supplies lookup; runtime registration supplies the worker implementation.

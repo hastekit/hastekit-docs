@@ -1,0 +1,45 @@
+---
+title: "Retries and timeouts"
+description: "Set model retry budgets, fallback targets, and execution deadlines explicitly."
+---
+
+Agent model resilience belongs in `AgentConfig.Middlewares`. Import `pkg/agents/middleware` for retries and fallback around a complete model call, including stream consumption.
+
+## Retry before trying another model
+
+With a model client configured for every target provider:
+
+```go
+config.Middlewares = []agents.Middleware{
+    middleware.NewFallbackModels("Anthropic/your-fallback-model"),
+    middleware.NewRetry(middleware.RetryConfig{MaxAttempts: 3}),
+}
+```
+
+The first middleware is outermost. This ordering gives each target its retry budget before moving to the next model. `MaxAttempts` includes the initial call. Configure `Backoff`, `Retryable`, or `RetryableStreamError` to customize classification and delay.
+
+Retries and fallback stop once a chunk has been published, so two attempts cannot be mixed into one visible answer. Cancellation, deadlines, stream-transform failures, and stop requests also prevent repetition. The durable adapters recognize terminal model-call failures so activity retries do not restart an exhausted policy.
+
+## Agent and provider middleware
+
+`pkg/gateway/middleware` wraps direct provider operations and is configured through `hastekit.WithMiddleware`. `pkg/agents/middleware` wraps the agent's model operation and is configured through `AgentConfig.Middlewares`. Avoid stacking retry policies at both layers unintentionally; their attempt budgets can multiply.
+
+See [provider configuration](/hastekit-sdk/multiple-keys) for direct model requests and provider keys.
+
+## Bound execution time
+
+For a caller-bound run:
+
+```go
+runCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+defer cancel()
+result, err := agent.Run(runCtx, &hastekit.Input{
+    Message: hastekit.UserTurn("Summarize the report."),
+})
+if err != nil { return err }
+_ = result
+```
+
+`Run` cancellation cancels local work and signals remote execution through the broker. `Execute` starts detached execution: cancelling its context disconnects observation, and cancelling `handle.Wait` stops only that wait. Use `handle.Stop` to request execution cancellation.
+
+`MaxLoops` bounds the model loop, not elapsed time or spending. Frontend tools have a separate wait timeout, and external APIs should have their own deadlines. Tools must honor context cancellation; a timeout cannot roll back a completed external action.

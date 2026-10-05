@@ -1,0 +1,83 @@
+---
+title: "Testing and evaluation"
+description: "Test deterministic behavior offline and score agent answers and tool trajectories."
+---
+
+Use ordinary Go tests for tool behavior and application policy. Use `pkg/agents/eval` to measure the agent's answers and tool choices across a fixed set of scenarios.
+
+## Test an agent without a provider
+
+The lower-level `agents.LLM` interface can supply deterministic responses. `WithLLM` returns a copy of the agent using that implementation:
+
+```go
+package agent_test
+
+import (
+    "context"
+    "testing"
+
+    "github.com/hastekit/agent-sdk-go/pkg/agents"
+    "github.com/hastekit/agent-sdk-go/pkg/gateway/llm/constants"
+    "github.com/hastekit/agent-sdk-go/pkg/gateway/llm/responses"
+)
+
+type fixedLLM struct{}
+
+func (fixedLLM) NewStreamingResponses(context.Context, *agents.ModelCall,
+    *responses.Request, func(*responses.ResponseChunk)) (*responses.Response, error) {
+    return &responses.Response{Output: []responses.OutputMessageUnion{{
+        OfOutputMessage: &responses.OutputMessage{
+            ID: "answer", Role: constants.RoleAssistant,
+            Content: &responses.OutputContent{{
+                OfOutputText: &responses.OutputTextContent{Text: "Hello"},
+            }},
+        },
+    }}}, nil
+}
+
+func TestAnswer(t *testing.T) {
+    agent := agents.NewAgent(&agents.AgentOptions{Name: "test"}).WithLLM(fixedLLM{})
+    result, err := agent.Run(t.Context(), &agents.AgentInput{})
+    if err != nil { t.Fatal(err) }
+    if result.Text() != "Hello" { t.Fatalf("unexpected answer: %q", result.Text()) }
+}
+```
+
+For a single model decision without executing its tools, use lower-level `AgentOptions.SingleTurn`. A scripted model can return tool-call messages to test approval, state updates, and follow-up requests. These tests do not establish the quality of a real model's decisions.
+
+## Evaluate representative cases
+
+With `agent` configured and `ctx` supplied, import `pkg/agents/eval`:
+
+```go
+runner := eval.Runner{
+    Agent: eval.Fixed(agent),
+    Scorers: []eval.Scorer{eval.Contains{}, eval.ToolTrajectory{Ordered: true}},
+    Threshold: 1,
+}
+report, err := runner.Run(ctx, []eval.Case{{
+    Name: "order-status",
+    Turns: []string{"What is the status of order 42?"},
+    Expect: eval.Expect{Text: "shipped", Tools: []string{"lookup_order"}},
+}})
+if err != nil { return err }
+fmt.Println(report)
+if report.Failed() > 0 { return fmt.Errorf("agent evaluation failed") }
+```
+
+Configure a `lookup_order` tool and known test data for this case. Each case gets a fresh thread in the `eval` namespace by default. Its turns share that thread. Text scoring uses the final turn's answer; tool trajectories cover every turn.
+
+| Scorer | Measures |
+|---|---|
+| `Contains` | Expected substring, case-insensitive by default |
+| `ExactMatch` | Expected text after trimming whitespace; case-insensitive by default |
+| `ToolTrajectory` | Ordered position matches or unordered Jaccard overlap |
+| `LLMJudge` | A model's score against a reference and optional rubric |
+
+`LLMJudge{Provider: judgeModel}` makes extra model calls. Pin the judge and rubric when comparing runs. Implement `Scorer.Name` and `Scorer.Score` for application-specific criteria.
+
+## Use results in CI
+
+A runner error means the suite could not run. A case error is stored in `Result.Err`; inspect `Report.Failed()` or `Failures()` even when `Run` returns no error. Cases pass on their mean score against `Runner.Threshold`, optionally overridden by `Case.Threshold`. The zero threshold is suitable only for collecting a baseline.
+
+`Concurrency` defaults to sequential execution. When increasing it, supply an `Agent` factory returning a distinct agent per case and use tools safe for concurrent execution. `eval.Fixed` is convenient for sequential suites. Keep fixture services and credentials separate from production side effects.

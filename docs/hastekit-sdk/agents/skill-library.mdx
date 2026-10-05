@@ -1,0 +1,86 @@
+---
+title: "Skill storage and management"
+description: "Store complete skill bundles and expose a namespace-scoped library in the chat UI."
+---
+
+`pkg/agents/skills.Store` supports complete-bundle `Put`, `Get`, paginated `List`, and idempotent `Delete`. Built-in stores use files or S3; implement the interface for a database or service. See [Skills](/hastekit-sdk/agents/skills) to attach the library to an agent.
+
+## Connect storage and the UI
+
+Import `pkg/agents/skills`, `pkg/agents/prompts`, `pkg/agui`, and `pkg/agui/web`. With `model` configured:
+
+```go
+store, err := skills.NewFileStore("./data/skills")
+if err != nil { return err }
+agent, err := hastekit.NewAgent(&hastekit.AgentConfig{
+    Name: "assistant", LLM: model,
+    SkillClient: skills.NewClient(store),
+    Instruction: hastekit.NewPrompt("Use relevant skills.",
+        prompts.WithResolver(prompts.DefaultResolvers()...)),
+})
+if err != nil { return err }
+registry := hastekit.NewRegistry()
+if err := registry.Register(agent); err != nil { return err }
+return web.Serve(":8080", registry, agui.WithSkillStore(store))
+```
+
+The embedded UI offers a skill library and a composer picker. Users upload a folder or selected files, preview instructions, download resources, and delete bundles. A replacement removes files omitted from the new upload. New user skills are on by default; globals are marked built-in and cannot be toggled or deleted. Uploads matching a registered agent's global skill name are rejected.
+
+For authenticated applications, wrap `web.Handler` in your authentication middleware and set `agui.WithNamespaceResolver`. Share the same store with the agent client and HTTP handler.
+
+## Bundle format and limits
+
+A bundle contains one root `SKILL.md` with a name and description, plus relative resource paths. Limits are 100 files and 10 MiB of decoded content. HTTP requests are limited to 20 MiB including encoding overhead. Parent-folder uploads containing several skills and ZIP extraction are unsupported.
+
+File storage uses one JSON file per bundle and atomic replacement. Its format is separate from the ordinary skill directories read by `NewDirSource`. S3 uses one JSON object per bundle. Concurrent replacements use last-writer-wins semantics.
+
+## Use S3
+
+Supply an application-owned AWS SDK v2 S3 client:
+
+```go
+store, err := skills.NewS3Store(s3Client, skills.S3Config{
+    Bucket: "private-agent-assets",
+    Prefix: "skills",
+})
+if err != nil { return err }
+client := skills.NewClient(store)
+_ = client
+```
+
+Configure credentials, region, endpoint, bucket, encryption, and lifecycle in your application. The client needs object put/get/list/delete permissions. Use shared storage for HTTP replicas and durable workers that must see the same library.
+
+## Management routes
+
+With `web.Handler`, these routes live under `/api/agui`:
+
+| Method | Path | Behavior |
+|---|---|---|
+| GET | `/skills?limit=50&cursor=...` | User skill metadata and an optional `nextCursor` |
+| POST | `/skills` | Upload or replace a bundle |
+| PUT | `/skills/{name}` | Replace using JSON; name must match frontmatter |
+| GET | `/skills/{name}` | Bundle with base64-encoded file contents |
+| GET | `/skills/{name}?file=refs/checklist.md` | Download one resource |
+| DELETE | `/skills/{name}` | Remove a bundle idempotently |
+| GET | `/agents/{agent}/skills` | Agent catalog including globals |
+
+POST accepts multipart files with relative filenames or JSON such as `{"files":{"SKILL.md":"<base64>"}}`. PUT accepts JSON. Page sizes are 1–200. Invalid content returns 400, namespace denial 403, missing content 404, reserved global names 409, oversized uploads 413, and storage failures 500.
+
+For a standalone API, use `skills.NewHandler(store, skills.WithNamespaceResolver(resolve))`. Without a resolver, the standalone handler denies requests. `skills.WithReservedNames` can supply protected global names. Management namespaces come from authenticated requests, not payload fields.
+
+## Cache listings
+
+Both built-in stores cache listing pages with a private memory cache and a one-minute TTL by default. Content reads still use storage. Import `pkg/cache` for the shared byte-oriented cache implementations:
+
+```go
+store, err := skills.NewFileStore("./data/skills",
+    skills.WithCache(cache.NewMemoryCache()),
+    skills.WithCacheTTL(5*time.Minute),
+)
+if err != nil { return err }
+_ = store
+```
+
+`cache.NewRedisCache(redisClient, prefix)` returns a cache and error. Share the same cache and backing storage across replicas for shared invalidation. Uploads and deletes invalidate the namespace's listing pages. Direct filesystem or S3 writes become visible after TTL expiry. Use `WithCache(nil)` or `WithCacheTTL(0)` to bypass caching.
+
+The custom `skills.KeyValueStore` contract is `Get(ctx, key) ([]byte, bool, error)`, `Set(ctx, key, value, ttl) error`, and `Delete(ctx, key) error`. Cache failures are returned; a failed invalidation can be reported after the underlying write succeeded.

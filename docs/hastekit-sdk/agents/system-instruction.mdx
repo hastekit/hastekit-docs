@@ -5,7 +5,7 @@ description: "Build static or resolved prompts and keep application data explici
 
 `AgentConfig.Instruction` accepts an `agents.SystemPromptProvider`. For a static instruction, use `hastekit.NewPrompt("...")`.
 
-A prompt created without resolvers is used exactly as written. Templates, skill descriptions, handoff guidance, and connector status are not appended automatically.
+A prompt created without resolvers is used exactly as written. Templates, skill descriptions, handoff guidance, sub-agent descriptions, and connector status are not appended automatically.
 
 ## Enable the standard resolvers
 
@@ -26,7 +26,8 @@ The standard chain runs in this order:
 2. `ResolveHandoffs`: describe available handoffs.
 3. `ResolveDeferredTools`: explain tools available through discovery.
 4. `ResolveConnectors`: report MCP connector availability.
-5. `ResolveTemplate`: substitute run-context values in the assembled prompt.
+5. `ResolveSubAgents`: describe the available delegation targets.
+6. `ResolveTemplate`: substitute run-context values in the assembled prompt.
 
 `prompts.WithResolver` appends to the chain. You can select individual resolvers or add one after the defaults. Omitting a resolver is appropriate only when your prompt already supplies the corresponding guidance.
 

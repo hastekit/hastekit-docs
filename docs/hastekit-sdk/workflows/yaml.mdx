@@ -37,11 +37,11 @@ edges:
 
 ## Supply named dependencies
 
-With `descriptor` as bytes, `connector` as an `agents.MCPToolset`, and `httpClient` configured:
+With `descriptor` as bytes, `connector` as an `agents.MCPClient`, and `httpClient` configured:
 
 ```go
 compiled, err := workflow.LoadYAML(descriptor, workflow.Dependencies{
-    MCPServers: map[string]agents.MCPToolset{"payments": connector},
+    MCPServers: map[string]agents.MCPClient{"payments": connector},
     HTTPClient: httpClient,
 })
 if err != nil { return err }
